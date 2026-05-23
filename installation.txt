@@ -1,0 +1,25 @@
+for queue worker
+
+cd /d "C:\path\to\your\irms-project"
+php artisan queue:work database --queue=default,notifications,emails,reports --timeout=60 --tries=3 --sleep=3
+
+
+@echo off
+REM queue-worker.bat
+REM Run this in a separate terminal to process queue jobs
+
+echo ============================================
+echo IRMS Queue Worker - Database Driver
+echo ============================================
+echo.
+echo Processing queues: default, notifications, emails, reports
+echo.
+
+cd /d "C:\path\to\your\irms-project"
+
+:loop
+echo [%date% %time%] Processing queue jobs...
+php artisan queue:work database --queue=default,notifications,emails,reports --timeout=60 --tries=3 --sleep=3 --stop-when-empty
+echo [%date% %time%] Batch complete. Waiting 5 seconds...
+timeout /t 5 /nobreak > nul
+goto loop

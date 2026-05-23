@@ -5,6 +5,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EscalationMatrixController;
+use App\Http\Controllers\FeedController;
+use App\Http\Controllers\HelpController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
@@ -32,6 +34,19 @@ Route::get('/home', function () {
 Route::get('/', function () {
     return redirect()->route('login');
 })->name('welcome');
+
+//public feed route:-
+
+Route::get('/feed', [FeedController::class, 'index'])->name('guest.home');
+Route::get('/search', [FeedController::class, 'search'])->name('search');
+Route::get('/incident/{incident}', [FeedController::class, 'showIncident'])->name('incident.public');
+Route::middleware('auth')->group(function () {
+    Route::post('/incidents/{incident}/like', [FeedController::class, 'toggleLike'])->name('incidents.like');
+});
+
+
+Route::get('/help', [HelpController::class, 'index'])->name('guest.help');
+Route::get('/features', [HelpController::class, 'features'])->name('guest.features');
 
 // Authentication Routes
 Auth::routes(['verify' => true]);

@@ -1,8 +1,9 @@
+{{-- Update in: resources/views/layouts/partials/mobile/bottom-nav-guest.blade.php --}}
 <nav class="mobile-bottom-nav" id="mobileBottomNav">
     <div class="nav-grid">
         {{-- Home --}}
         <div class="nav-item">
-            <a href="{{ url('/') }}" class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}">
+            <a href="{{ route('guest.home') }}" class="nav-link {{ request()->routeIs('guest.home') ? 'active' : '' }}">
                 <i class="fas fa-house"></i>
                 <span>Home</span>
             </a>
@@ -10,8 +11,8 @@
 
         {{-- Features --}}
         <div class="nav-item">
-            <a href="#" class="nav-link" onclick="openDrawer(); return false;">
-                <i class="fas fa-shield-halved"></i>
+            <a href="{{ route('guest.features') }}" class="nav-link {{ request()->routeIs('guest.features') ? 'active' : '' }}">
+                <i class="fas fa-star"></i>
                 <span>Features</span>
             </a>
         </div>
@@ -36,7 +37,7 @@
 
         {{-- Help --}}
         <div class="nav-item">
-            <a href="#" class="nav-link" onclick="openDrawer(); return false;">
+            <a href="{{ route('guest.help') }}" class="nav-link {{ request()->routeIs('guest.help') ? 'active' : '' }}">
                 <i class="fas fa-circle-question"></i>
                 <span>Help</span>
             </a>

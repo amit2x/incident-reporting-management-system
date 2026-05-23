@@ -548,4 +548,23 @@ class Incident extends Model
     {
         return in_array($this->status, ['resolved', 'closed']);
     }
+
+
+    /**
+     * Users who liked this incident
+     */
+    public function likes(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'incident_likes')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if incident is liked by a specific user
+     */
+    public function isLikedBy(?User $user): bool
+    {
+        if (!$user) return false;
+        return $this->likes()->where('user_id', $user->id)->exists();
+    }
 }

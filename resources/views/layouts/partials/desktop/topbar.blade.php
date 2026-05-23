@@ -2,7 +2,7 @@
     <div class="container-fluid">
         <div class="d-flex align-items-center justify-content-between w-100">
 
-            {{-- Left: Mobile Menu Toggle + Search --}}
+            {{-- Left: Mobile Menu Toggle + Brand --}}
             <div class="d-flex align-items-center gap-3 flex-grow-1">
                 {{-- Hamburger for tablet/desktop --}}
                 <button class="btn btn-light d-none d-md-flex d-lg-none align-items-center justify-content-center"
@@ -18,20 +18,13 @@
                     <i class="fas fa-bars"></i>
                 </button>
 
-                {{-- Search --}}
-                <div class="search-box d-none d-sm-block">
-                    <form action="{{ route('incidents.index') }}" method="GET">
-                        <div class="position-relative">
-                            <i class="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" style="font-size: 0.875rem;"></i>
-                            <input type="text"
-                                   name="search"
-                                   class="form-control ps-5"
-                                   placeholder="Search incidents..."
-                                   value="{{ request('search') }}"
-                                   style="border-radius: var(--radius-full); border: 1px solid var(--gray-200); background: var(--gray-50); font-size: 0.8125rem; padding: 8px 16px 8px 40px; width: 280px;">
-                        </div>
-                    </form>
-                </div>
+                {{-- App Brand Name --}}
+                <a href="{{ route('home') }}" class="text-decoration-none d-flex align-items-center gap-2">
+                    <i class="fas fa-shield-halved" style="font-size: 1.5rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+                    <span class="fw-bold d-none d-sm-inline" style="font-size: 1.125rem; font-family: var(--font-heading); color: #1f2937; letter-spacing: -0.5px;">
+                        IRMSystem
+                    </span>
+                </a>
             </div>
 
             {{-- Right: Actions --}}
@@ -112,6 +105,9 @@
                         @else
                             <a href="{{ route('login') }}" class="dropdown-item py-2">
                                 <i class="fas fa-right-to-bracket me-2"></i>Sign In
+                            </a>
+                            <a href="{{ route('register') }}" class="dropdown-item py-2">
+                                <i class="fas fa-user-plus me-2"></i>Register
                             </a>
                         @endauth
                     </div>

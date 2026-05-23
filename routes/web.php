@@ -167,6 +167,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Escalation Matrix
         Route::prefix('escalation-matrix')->name('escalation-matrix.')->group(function () {
+            Route::get('users-by-department', [EscalationMatrixController::class, 'getUsersByDepartment'])->name('users-by-department');
+
             Route::get('/', [EscalationMatrixController::class, 'index'])->name('index');
             Route::get('/create', [EscalationMatrixController::class, 'create'])->name('create');
             Route::post('/', [EscalationMatrixController::class, 'store'])->name('store');
@@ -174,7 +176,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/{escalationMatrix}/edit', [EscalationMatrixController::class, 'edit'])->name('edit');
             Route::put('/{escalationMatrix}', [EscalationMatrixController::class, 'update'])->name('update');
             Route::delete('/{escalationMatrix}', [EscalationMatrixController::class, 'destroy'])->name('destroy');
+            // AJAX route for getting users by department
         });
+
+
+
 
         // Audit Logs
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');

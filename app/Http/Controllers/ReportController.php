@@ -5,23 +5,24 @@ namespace App\Http\Controllers;
 use App\Models\Incident;
 use App\Models\Department;
 use App\Models\IncidentCategory;
-use App\Repositories\IncidentRepository;
+use App\Models\KpiReport;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\IncidentReportExport;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
 
 class ReportController extends Controller
 {
-    protected $incidentRepository;
-
-    public function __construct(IncidentRepository $incidentRepository)
+    public function __construct()
     {
-        $this->incidentRepository = $incidentRepository;
         $this->middleware('auth');
     }
 
+    /**
+     * Reports index page
+     */
     public function index()
     {
         $this->authorize('view-reports');
@@ -32,36 +33,39 @@ class ReportController extends Controller
         return view('reports.index', compact('departments', 'categories'));
     }
 
+    /**
+     * KPI Report
+     */
     public function kpiReport(Request $request)
     {
         $this->authorize('view-reports');
         
         $filters = $this->getDateRangeFilter($request);
         
-        $kpiData = $this->incidentRepository->getStats($filters);
-        $trendData = $this->getTrendData($filters);
-        $severityData = $this->getSeverityDistribution($filters);
-        $statusData = $this->getStatusDistribution($filters);
+        $kpiData = $this->getKpiData($filters, $request->get('department_id'));
+        $trendData = $this->getTrendData($filters, $request->get('department_id'));
+        $severityData = $this->getSeverityDistribution($filters, $request->get('department_id'));
+        $statusData = $this->getStatusDistribution($filters, $request->get('department_id'));
         $departmentData = $this->getDepartmentPerformance($filters);
-        $categoryData = $this->getCategoryDistribution($filters);
+        $categoryData = $this->getCategoryDistribution($filters, $request->get('department_id'));
         $slaData = $this->getSlaCompliance($filters);
-        $hourlyDistribution = $this->getHourlyDistribution($filters);
+        $hourlyDistribution = $this->getHourlyDistribution($filters, $request->get('department_id'));
         
         $departments = Department::active()->ordered()->get();
-        $categoryStats = $this->getCategoryStats($filters);
+        $categoryStats = $this->getCategoryStats($filters, $request->get('department_id'));
         $departmentStats = $this->getDepartmentStats($filters);
 
-        if ($request->ajax()) {
+        if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'total_incidents' => $kpiData['total'],
-                'open_incidents' => $kpiData['open'],
-                'resolved_incidents' => $kpiData['resolved'],
-                'escalated_incidents' => $kpiData['escalated'],
-                'avg_response_time' => $kpiData['avg_response_time'],
-                'avg_resolution_time' => $kpiData['avg_resolution_time'],
-                'sla_compliance' => $this->calculateSlaCompliance($filters),
-                'labels' => array_keys($trendData),
+                'total_incidents' => $kpiData['total_incidents'] ?? 0,
+                'open_incidents' => $kpiData['open_incidents'] ?? 0,
+                'resolved_incidents' => $kpiData['resolved_incidents'] ?? 0,
+                'escalated_incidents' => $kpiData['escalated_incidents'] ?? 0,
+                'avg_response_time' => $kpiData['avg_response_time'] ?? 0,
+                'avg_resolution_time' => $kpiData['avg_resolution_time'] ?? 0,
+                'sla_compliance' => $kpiData['sla_compliance'] ?? 0,
+                'labels' => array_keys($trendData['total'] ?? []),
                 'total' => array_values($trendData['total'] ?? []),
                 'resolved' => array_values($trendData['resolved'] ?? []),
             ]);
@@ -74,19 +78,17 @@ class ReportController extends Controller
         ));
     }
 
+    /**
+     * Department Report
+     */
     public function departmentReport(Request $request)
     {
         $this->authorize('view-reports');
         
         $filters = $this->getDateRangeFilter($request);
-        
-        if ($request->department_id) {
-            $filters['department_id'] = $request->department_id;
-        }
-        
         $departmentStats = $this->getDepartmentStats($filters);
         
-        if ($request->ajax()) {
+        if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'data' => $departmentStats,
@@ -98,6 +100,9 @@ class ReportController extends Controller
         return view('reports.department', compact('departmentStats', 'departments'));
     }
 
+    /**
+     * SLA Report
+     */
     public function slaReport(Request $request)
     {
         $this->authorize('view-reports');
@@ -105,9 +110,9 @@ class ReportController extends Controller
         $filters = $this->getDateRangeFilter($request);
         
         $slaData = $this->getSlaCompliance($filters);
-        $slaBreaches = $this->getSlaBreaches($filters);
+        $slaBreaches = $this->getSlaBreaches($filters, $request->get('department_id'));
         
-        if ($request->ajax()) {
+        if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'sla_compliance' => $slaData,
@@ -115,9 +120,14 @@ class ReportController extends Controller
             ]);
         }
         
-        return view('reports.sla', compact('slaData', 'slaBreaches'));
+        $departments = Department::active()->ordered()->get();
+        
+        return view('reports.sla', compact('slaData', 'slaBreaches', 'departments'));
     }
 
+    /**
+     * Export report
+     */
     public function export(Request $request, string $format)
     {
         $this->authorize('export-reports');
@@ -125,7 +135,7 @@ class ReportController extends Controller
         $filters = $this->getDateRangeFilter($request);
         $reportType = $request->get('type', 'general');
         
-        $data = $this->getReportData($reportType, $filters);
+        $data = $this->getReportData($reportType, $filters, $request->get('department_id'));
         
         return match($format) {
             'excel' => Excel::download(
@@ -133,84 +143,99 @@ class ReportController extends Controller
                 "incident_report_{$reportType}_" . now()->format('Y-m-d_His') . '.xlsx'
             ),
             'pdf' => $this->exportPdf($data, $reportType),
-            'csv' => response()->streamDownload(
-                fn() => $this->generateCsv($data),
-                "incident_report_{$reportType}_" . now()->format('Y-m-d_His') . '.csv'
-            ),
+            'csv' => $this->exportCsv($data),
             default => abort(400, 'Unsupported export format'),
         };
     }
 
-    protected function getDateRangeFilter(Request $request): array
+    // ==========================================
+    // PRIVATE HELPER METHODS
+    // ==========================================
+
+    /**
+     * Get date range filter from request
+     */
+    private function getDateRangeFilter(Request $request): array
     {
-        $filters = [];
-        $period = $request->get('period', 'last7days');
-        
-        switch ($period) {
-            case 'today':
-                $filters['date_from'] = Carbon::today();
-                $filters['date_to'] = Carbon::today()->endOfDay();
-                break;
-            case 'yesterday':
-                $filters['date_from'] = Carbon::yesterday();
-                $filters['date_to'] = Carbon::yesterday()->endOfDay();
-                break;
-            case 'last7days':
-                $filters['date_from'] = Carbon::now()->subDays(7);
-                $filters['date_to'] = Carbon::now();
-                break;
-            case 'last30days':
-                $filters['date_from'] = Carbon::now()->subDays(30);
-                $filters['date_to'] = Carbon::now();
-                break;
-            case 'thisMonth':
-                $filters['date_from'] = Carbon::now()->startOfMonth();
-                $filters['date_to'] = Carbon::now()->endOfMonth();
-                break;
-            case 'lastMonth':
-                $filters['date_from'] = Carbon::now()->subMonth()->startOfMonth();
-                $filters['date_to'] = Carbon::now()->subMonth()->endOfMonth();
-                break;
-            case 'custom':
-                $filters['date_from'] = $request->get('date_from') ? Carbon::parse($request->date_from) : Carbon::now()->subDays(7);
-                $filters['date_to'] = $request->get('date_to') ? Carbon::parse($request->date_to)->endOfDay() : Carbon::now();
-                break;
-        }
+        $period = $request->get('period', 'last30days');
 
-        if ($request->department_id) {
-            $filters['department_id'] = $request->department_id;
-        }
-
-        return $filters;
+        return match ($period) {
+            'today' => ['date_from' => Carbon::today(), 'date_to' => Carbon::today()->endOfDay()],
+            'yesterday' => ['date_from' => Carbon::yesterday(), 'date_to' => Carbon::yesterday()->endOfDay()],
+            'last7days' => ['date_from' => Carbon::now()->subDays(7), 'date_to' => Carbon::now()],
+            'last30days' => ['date_from' => Carbon::now()->subDays(30), 'date_to' => Carbon::now()],
+            'thisMonth' => ['date_from' => Carbon::now()->startOfMonth(), 'date_to' => Carbon::now()->endOfMonth()],
+            'lastMonth' => ['date_from' => Carbon::now()->subMonth()->startOfMonth(), 'date_to' => Carbon::now()->subMonth()->endOfMonth()],
+            'custom' => [
+                'date_from' => $request->get('date_from') ? Carbon::parse($request->date_from) : Carbon::now()->subDays(30),
+                'date_to' => $request->get('date_to') ? Carbon::parse($request->date_to)->endOfDay() : Carbon::now(),
+            ],
+            default => ['date_from' => Carbon::now()->subDays(30), 'date_to' => Carbon::now()],
+        };
     }
 
-    protected function getTrendData(array $filters): array
+    /**
+     * Apply filters to query
+     */
+    private function applyFilters($query, array $filters, ?int $departmentId = null): void
     {
-        $query = Incident::query();
-        
-        if (!empty($filters['department_id'])) {
-            $query->where('department_id', $filters['department_id']);
+        if ($departmentId) {
+            $query->where('department_id', $departmentId);
         }
-        
         if (!empty($filters['date_from'])) {
             $query->whereDate('created_at', '>=', $filters['date_from']);
         }
-        
         if (!empty($filters['date_to'])) {
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
+    }
 
-        $total = $query->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+    /**
+     * Get KPI data
+     */
+    private function getKpiData(array $filters, ?int $departmentId = null): array
+    {
+        $query = Incident::query();
+        $this->applyFilters($query, $filters, $departmentId);
+
+        $total = (clone $query)->count();
+        $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
+
+        return [
+            'total_incidents' => $total,
+            'open_incidents' => (clone $query)->whereIn('status', ['open', 'acknowledged', 'in_progress'])->count(),
+            'resolved_incidents' => (clone $query)->whereIn('status', ['resolved', 'closed'])->count(),
+            'escalated_incidents' => (clone $query)->where('status', 'escalated')->count(),
+            'sla_breaches' => $breached,
+            'avg_response_time' => round((clone $query)->whereNotNull('acknowledged_at')
+                ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, acknowledged_at)) as avg_time')
+                ->value('avg_time') ?? 0, 1),
+            'avg_resolution_time' => round((clone $query)->whereNotNull('resolved_at')
+                ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) as avg_time')
+                ->value('avg_time') ?? 0, 1),
+            'sla_compliance' => $total > 0 ? round((($total - $breached) / $total) * 100, 2) : 100,
+        ];
+    }
+
+    /**
+     * Get trend data for charts
+     */
+    private function getTrendData(array $filters, ?int $departmentId = null): array
+    {
+        $totalQuery = Incident::query();
+        $this->applyFilters($totalQuery, $filters, $departmentId);
+
+        $resolvedQuery = Incident::query();
+        $this->applyFilters($resolvedQuery, $filters, $departmentId);
+        $resolvedQuery->whereNotNull('resolved_at');
+
+        $total = $totalQuery->selectRaw('DATE(created_at) as date, COUNT(*) as count')
             ->groupBy('date')
             ->orderBy('date')
             ->pluck('count', 'date')
             ->toArray();
 
-        $resolved = Incident::whereNotNull('resolved_at')
-            ->when(!empty($filters['department_id']), fn($q) => $q->where('department_id', $filters['department_id']))
-            ->when(!empty($filters['date_from']), fn($q) => $q->whereDate('resolved_at', '>=', $filters['date_from']))
-            ->when(!empty($filters['date_to']), fn($q) => $q->whereDate('resolved_at', '<=', $filters['date_to']))
-            ->selectRaw('DATE(resolved_at) as date, COUNT(*) as count')
+        $resolved = $resolvedQuery->selectRaw('DATE(resolved_at) as date, COUNT(*) as count')
             ->groupBy('date')
             ->orderBy('date')
             ->pluck('count', 'date')
@@ -222,123 +247,42 @@ class ReportController extends Controller
         ];
     }
 
-    protected function getSeverityDistribution(array $filters): array
-    {
-        return Incident::when(!empty($filters), function ($query) use ($filters) {
-            return $this->applyFilters($query, $filters);
-        })
-        ->selectRaw('severity, COUNT(*) as count')
-        ->groupBy('severity')
-        ->pluck('count', 'severity')
-        ->toArray();
-    }
-
-    protected function getStatusDistribution(array $filters): array
-    {
-        return Incident::when(!empty($filters), function ($query) use ($filters) {
-            return $this->applyFilters($query, $filters);
-        })
-        ->selectRaw('status, COUNT(*) as count')
-        ->groupBy('status')
-        ->pluck('count', 'status')
-        ->toArray();
-    }
-
-    protected function getDepartmentPerformance(array $filters): array
-    {
-        return Department::active()
-            ->withCount(['incidents as total' => function ($query) use ($filters) {
-                $this->applyFilters($query, $filters);
-            }])
-            ->withCount(['incidents as active' => function ($query) use ($filters) {
-                $this->applyFilters($query, $filters);
-                $query->whereIn('status', ['open', 'acknowledged', 'in_progress', 'escalated']);
-            }])
-            ->withCount(['incidents as resolved' => function ($query) use ($filters) {
-                $this->applyFilters($query, $filters);
-                $query->whereIn('status', ['resolved', 'closed']);
-            }])
-            ->get()
-            ->toArray();
-    }
-
-    protected function getCategoryDistribution(array $filters): array
-    {
-        return IncidentCategory::active()
-            ->withCount(['incidents' => function ($query) use ($filters) {
-                $this->applyFilters($query, $filters);
-            }])
-            ->pluck('incidents_count', 'name')
-            ->toArray();
-    }
-
-    protected function getSlaCompliance(array $filters): array
-    {
-        $result = [];
-        $departments = Department::active()->get();
-
-        foreach ($departments as $department) {
-            $query = Incident::where('department_id', $department->id);
-            $this->applyFilters($query, $filters);
-
-            $total = (clone $query)->count();
-            $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
-
-            $result[$department->name] = $total > 0 ? round((($total - $breached) / $total) * 100, 2) : 100;
-        }
-
-        return $result;
-    }
-
-    protected function calculateSlaCompliance(array $filters): float
+    /**
+     * Get severity distribution
+     */
+    private function getSeverityDistribution(array $filters, ?int $departmentId = null): array
     {
         $query = Incident::query();
-        $this->applyFilters($query, $filters);
+        $this->applyFilters($query, $filters, $departmentId);
 
-        $total = (clone $query)->count();
-        $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
-
-        return $total > 0 ? round((($total - $breached) / $total) * 100, 2) : 100;
-    }
-
-    protected function getHourlyDistribution(array $filters): array
-    {
-        $query = Incident::query();
-        $this->applyFilters($query, $filters);
-
-        return $query->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
-            ->groupBy('hour')
-            ->orderBy('hour')
-            ->pluck('count', 'hour')
+        return $query->selectRaw('severity, COUNT(*) as count')
+            ->groupBy('severity')
+            ->pluck('count', 'severity')
             ->toArray();
     }
 
-    protected function getCategoryStats(array $filters): array
+    /**
+     * Get status distribution
+     */
+    private function getStatusDistribution(array $filters, ?int $departmentId = null): array
     {
-        return IncidentCategory::active()->get()->map(function ($category) use ($filters) {
-            $query = Incident::where('category_id', $category->id);
-            $this->applyFilters($query, $filters);
+        $query = Incident::query();
+        $this->applyFilters($query, $filters, $departmentId);
 
-            return [
-                'name' => $category->name,
-                'icon' => $category->icon,
-                'color' => $category->color,
-                'total' => (clone $query)->count(),
-                'open' => (clone $query)->whereIn('status', ['open', 'acknowledged', 'in_progress'])->count(),
-                'resolved' => (clone $query)->whereIn('status', ['resolved', 'closed'])->count(),
-                'avg_response_time' => (clone $query)->whereNotNull('acknowledged_at')
-                    ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, acknowledged_at)) as avg_time')
-                    ->value('avg_time') ?? 0,
-                'sla_compliance' => $this->calculateCategorySla($category->id, $filters),
-            ];
-        })->toArray();
+        return $query->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
     }
 
-    protected function getDepartmentStats(array $filters): array
+    /**
+     * Get department performance
+     */
+    private function getDepartmentPerformance(array $filters): array
     {
         return Department::active()->get()->map(function ($department) use ($filters) {
             $query = Incident::where('department_id', $department->id);
-            $this->applyFilters($query, $filters);
+            $this->applyFilters($query, $filters, $department->id);
 
             $total = (clone $query)->count();
             $resolved = (clone $query)->whereIn('status', ['resolved', 'closed'])->count();
@@ -349,82 +293,239 @@ class ReportController extends Controller
                 'total' => $total,
                 'active' => (clone $query)->whereIn('status', ['open', 'acknowledged', 'in_progress', 'escalated'])->count(),
                 'resolved' => $resolved,
+                'performance' => $total > 0 ? round(($resolved / $total) * 100, 2) : 0,
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Get category distribution
+     */
+    private function getCategoryDistribution(array $filters, ?int $departmentId = null): array
+    {
+        $query = Incident::query();
+        $this->applyFilters($query, $filters, $departmentId);
+
+        return $query->selectRaw('category_id, COUNT(*) as count')
+            ->groupBy('category_id')
+            ->with('category:id,name')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                return [$item->category->name ?? 'Unknown' => $item->count];
+            })
+            ->toArray();
+    }
+
+    /**
+     * Get SLA compliance by department
+     */
+    private function getSlaCompliance(array $filters): array
+    {
+        $result = [];
+        $departments = Department::active()->get();
+
+        foreach ($departments as $department) {
+            $query = Incident::where('department_id', $department->id);
+            $this->applyFilters($query, $filters, $department->id);
+
+            $total = (clone $query)->count();
+            $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
+
+            $result[$department->name] = $total > 0 ? round((($total - $breached) / $total) * 100, 2) : 100;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get hourly distribution
+     */
+    private function getHourlyDistribution(array $filters, ?int $departmentId = null): array
+    {
+        $query = Incident::query();
+        $this->applyFilters($query, $filters, $departmentId);
+
+        return $query->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->pluck('count', 'hour')
+            ->toArray();
+    }
+
+    /**
+     * Get category statistics
+     */
+    private function getCategoryStats(array $filters, ?int $departmentId = null): array
+    {
+        return IncidentCategory::active()->get()->map(function ($category) use ($filters, $departmentId) {
+            $query = Incident::where('category_id', $category->id);
+            $this->applyFilters($query, $filters, $departmentId);
+
+            $total = (clone $query)->count();
+            $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
+
+            return [
+                'name' => $category->name,
+                'icon' => $category->icon,
+                'color' => $category->color,
+                'total' => $total,
+                'open' => (clone $query)->whereIn('status', ['open', 'acknowledged', 'in_progress'])->count(),
+                'resolved' => (clone $query)->whereIn('status', ['resolved', 'closed'])->count(),
+                'avg_response_time' => round((clone $query)->whereNotNull('acknowledged_at')
+                    ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, acknowledged_at)) as avg_time')
+                    ->value('avg_time') ?? 0, 1),
+                'sla_compliance' => $total > 0 ? round((($total - $breached) / $total) * 100, 2) : 100,
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Get department statistics
+     */
+    private function getDepartmentStats(array $filters): array
+    {
+        return Department::active()->get()->map(function ($department) use ($filters) {
+            $query = Incident::where('department_id', $department->id);
+            $this->applyFilters($query, $filters, $department->id);
+
+            $total = (clone $query)->count();
+            $resolved = (clone $query)->whereIn('status', ['resolved', 'closed'])->count();
+
+            return [
+                'name' => $department->name,
+                'color' => $department->color,
+                'code' => $department->code,
+                'total' => $total,
+                'active' => (clone $query)->whereIn('status', ['open', 'acknowledged', 'in_progress', 'escalated'])->count(),
+                'resolved' => $resolved,
                 'escalated' => (clone $query)->where('status', 'escalated')->count(),
                 'performance' => $total > 0 ? round(($resolved / $total) * 100, 2) : 0,
             ];
         })->toArray();
     }
 
-    protected function getSlaBreaches(array $filters): array
+    /**
+     * Get SLA breaches
+     */
+    private function getSlaBreaches(array $filters, ?int $departmentId = null): array
     {
         return Incident::where('sla_breach_count', '>', 0)
-            ->when(!empty($filters), function ($query) use ($filters) {
-                return $this->applyFilters($query, $filters);
-            })
+            ->when($departmentId, fn($q) => $q->where('department_id', $departmentId))
+            ->when(!empty($filters['date_from']), fn($q) => $q->whereDate('created_at', '>=', $filters['date_from']))
+            ->when(!empty($filters['date_to']), fn($q) => $q->whereDate('created_at', '<=', $filters['date_to']))
             ->with(['department', 'category'])
             ->orderBy('sla_breach_count', 'desc')
             ->limit(20)
             ->get()
+            ->map(function ($incident) {
+                return [
+                    'incident_id' => $incident->incident_id,
+                    'title' => $incident->title,
+                    'department' => $incident->department?->name,
+                    'category' => $incident->category?->name,
+                    'breach_count' => $incident->sla_breach_count,
+                    'sla_due_at' => $incident->sla_due_at?->format('Y-m-d H:i'),
+                    'status' => $incident->status,
+                ];
+            })
             ->toArray();
     }
 
-    protected function applyFilters($query, array $filters): void
-    {
-        if (!empty($filters['department_id'])) {
-            $query->where('department_id', $filters['department_id']);
-        }
-        if (!empty($filters['date_from'])) {
-            $query->whereDate('created_at', '>=', $filters['date_from']);
-        }
-        if (!empty($filters['date_to'])) {
-            $query->whereDate('created_at', '<=', $filters['date_to']);
-        }
-    }
-
-    protected function getReportData(string $type, array $filters): array
+    /**
+     * Get report data for export
+     */
+    private function getReportData(string $type, array $filters, ?int $departmentId = null): array
     {
         return match($type) {
             'general' => [
-                'stats' => $this->incidentRepository->getStats($filters),
+                'stats' => $this->getKpiData($filters, $departmentId),
                 'department' => $this->getDepartmentStats($filters),
-                'category' => $this->getCategoryStats($filters),
+                'category' => $this->getCategoryStats($filters, $departmentId),
+                'generated_at' => now()->format('Y-m-d H:i:s'),
+                'generated_by' => Auth::user()->name,
             ],
             'sla' => [
                 'compliance' => $this->getSlaCompliance($filters),
-                'breaches' => $this->getSlaBreaches($filters),
+                'breaches' => $this->getSlaBreaches($filters, $departmentId),
+                'generated_at' => now()->format('Y-m-d H:i:s'),
+                'generated_by' => Auth::user()->name,
             ],
             default => [],
         };
     }
 
-    protected function exportPdf(array $data, string $type): \Illuminate\Http\Response
+    /**
+     * Export as PDF
+     */
+    private function exportPdf(array $data, string $type)
     {
-        $pdf = Pdf::loadView("reports.exports.{$type}_pdf", [
+        $viewName = "reports.exports.{$type}_pdf";
+        
+        if (!view()->exists($viewName)) {
+            $viewName = 'reports.exports.general_pdf';
+        }
+        
+        $pdf = Pdf::loadView($viewName, [
             'data' => $data,
             'reportDate' => now()->format('d M Y, H:i'),
-            'generatedBy' => auth()->user()->name,
+            'generatedBy' => Auth::user()->name,
         ]);
-        
+
         $pdf->setPaper('a4', 'landscape');
-        
+
         return $pdf->download("incident_{$type}_report_" . now()->format('Y-m-d_His') . '.pdf');
     }
 
-    protected function generateCsv(array $data): void
+    /**
+     * Export as CSV
+     */
+    private function exportCsv(array $data)
     {
-        $handle = fopen('php://output', 'w');
-        
-        // Headers
-        fputcsv($handle, [
-            'Incident ID', 'Title', 'Category', 'Department', 'Status',
-            'Severity', 'Priority', 'Reported By', 'Assigned To', 'Created At', 'Resolved At'
-        ]);
-        
-        // Data rows
-        foreach ($data as $row) {
-            fputcsv($handle, $row);
+        $filename = "incident_report_" . now()->format('Y-m-d_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($data) {
+            $file = fopen('php://output', 'w');
+            
+            // Headers
+            fputcsv($file, ['Metric', 'Value']);
+            
+            // Flatten and write data
+            $this->flattenArray($data, $file);
+            
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Flatten array for CSV
+     */
+    private function flattenArray(array $data, $file, string $prefix = ''): void
+    {
+        foreach ($data as $key => $value) {
+            $label = $prefix ? "{$prefix}.{$key}" : $key;
+            
+            if (is_array($value) && !empty($value)) {
+                if (isset($value[0]) && is_array($value[0])) {
+                    foreach ($value as $i => $item) {
+                        $this->flattenArray($item, $file, "{$label}[{$i}]");
+                    }
+                } else {
+                    foreach ($value as $k => $v) {
+                        if (!is_array($v)) {
+                            fputcsv($file, [ucwords(str_replace('_', ' ', "{$label}.{$k}")), $v]);
+                        }
+                    }
+                }
+            } elseif (!is_array($value)) {
+                fputcsv($file, [ucwords(str_replace('_', ' ', $label)), $value]);
+            }
         }
-        
-        fclose($handle);
     }
 }

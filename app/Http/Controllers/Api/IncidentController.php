@@ -1,18 +1,19 @@
 <?php
+// app/Http/Controllers/Api/IncidentController.php
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Models\Incident;
 use App\Services\IncidentService;
 use App\Repositories\IncidentRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
-class IncidentController extends Controller
+class IncidentController extends BaseApiController
 {
-    protected $incidentService;
-    protected $incidentRepository;
+    protected IncidentService $incidentService;
+    protected IncidentRepository $incidentRepository;
 
     public function __construct(
         IncidentService $incidentService,
@@ -22,26 +23,80 @@ class IncidentController extends Controller
         $this->incidentRepository = $incidentRepository;
     }
 
-    public function index(Request $request)
+    /**
+     * Display a listing of incidents
+     */
+    public function index(Request $request): JsonResponse
     {
         $filters = $request->only([
             'department_id', 'category_id', 'severity', 'priority',
-            'status', 'assigned_to', 'date_from', 'date_to', 'search'
+            'status', 'assigned_to', 'date_from', 'date_to', 'search', 'per_page'
         ]);
 
-        if (!Auth::user()->isAdmin()) {
-            $filters['department_id'] = Auth::user()->department_id;
+        // Apply role-based filters
+        $user = $this->getUser();
+        if (!$this->isAdmin()) {
+            $filters['department_id'] = $user->department_id;
         }
 
-        $incidents = $this->incidentRepository->getFeedIncidents($filters);
+        $perPage = $request->get('per_page', 15);
+        $incidents = $this->incidentRepository->getFeedIncidents($filters, $perPage);
 
         return $this->paginatedResponse($incidents);
     }
 
-    public function show(Incident $incident)
+    /**
+     * Store a newly created incident
+     */
+    public function store(Request $request): JsonResponse
     {
-        if (!Auth::user()->canAccessIncident($incident)) {
-            return $this->errorResponse('Unauthorized', 403);
+        $this->authorize('create-incident');
+
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'category_id' => 'required|exists:incident_categories,id',
+            'severity' => 'required|in:low,medium,high,critical',
+            'priority' => 'required|in:low,medium,high,critical',
+            'department_id' => 'required|exists:departments,id',
+            'location' => 'nullable|string|max:255',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'tags' => 'nullable|array',
+            'is_anonymous' => 'nullable|boolean',
+            'files.*' => 'nullable|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,mp4,avi,mov,mp3,wav,pdf,doc,docx,xls,xlsx',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
+
+        try {
+            $incident = $this->incidentService->createIncident(
+                $request->except('files'),
+                $request->file('files', [])
+            );
+
+            return $this->successResponse(
+                $incident->load(['reporter', 'department', 'category', 'media']),
+                'Incident created successfully',
+                201
+            );
+        } catch (\Exception $e) {
+            \Log::error('API Incident creation failed: ' . $e->getMessage());
+            return $this->errorResponse('Failed to create incident: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Display the specified incident
+     */
+    public function show(Incident $incident): JsonResponse
+    {
+        $user = $this->getUser();
+
+        if (!$user->canAccessIncident($incident)) {
+            return $this->errorResponse('Unauthorized access', 403);
         }
 
         $incident->increment('views_count');
@@ -50,173 +105,269 @@ class IncidentController extends Controller
         return $this->successResponse($incident);
     }
 
-    public function store(Request $request)
-    {
-        $this->authorize('create-incident');
-
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'category_id' => 'required|exists:incident_categories,id',
-            'severity' => 'required|in:low,medium,high,critical',
-            'priority' => 'required|in:low,medium,high,critical',
-            'department_id' => 'required|exists:departments,id',
-            'location' => 'nullable|string|max:255',
-            'files.*' => 'nullable|file|max:20480',
-        ]);
-
-        $incident = $this->incidentService->createIncident(
-            $request->all(),
-            $request->file('files', [])
-        );
-
-        return $this->successResponse($incident, 'Incident created successfully', 201);
-    }
-
-    public function update(Request $request, Incident $incident)
+    /**
+     * Update the specified incident
+     */
+    public function update(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('edit-incident');
 
-        $incident = $this->incidentService->updateIncident($incident, $request->all());
+        $user = $this->getUser();
+        if (!$user->canAccessIncident($incident)) {
+            return $this->errorResponse('Unauthorized access', 403);
+        }
 
-        return $this->successResponse($incident, 'Incident updated successfully');
+        $validator = Validator::make($request->all(), [
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'category_id' => 'sometimes|exists:incident_categories,id',
+            'severity' => 'sometimes|in:low,medium,high,critical',
+            'priority' => 'sometimes|in:low,medium,high,critical',
+            'location' => 'nullable|string|max:255',
+            'tags' => 'nullable|array',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
+
+        try {
+            $incident = $this->incidentService->updateIncident($incident, $request->all());
+            return $this->successResponse($incident, 'Incident updated successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to update incident: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function destroy(Incident $incident)
+    /**
+     * Remove the specified incident
+     */
+    public function destroy(Incident $incident): JsonResponse
     {
         $this->authorize('delete-incident');
 
-        $incident->delete();
-
-        return $this->successResponse(null, 'Incident deleted successfully');
+        try {
+            $incident->delete();
+            return $this->successResponse(null, 'Incident deleted successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to delete incident: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function assign(Request $request, Incident $incident)
+    /**
+     * Assign incident to user
+     */
+    public function assign(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('assign-incident');
 
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'assigned_to' => 'required|exists:users,id',
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:500',
         ]);
 
-        $this->incidentService->assignIncident(
-            $incident,
-            $request->assigned_to,
-            $request->notes
-        );
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
 
-        return $this->successResponse(null, 'Incident assigned successfully');
+        try {
+            $this->incidentService->assignIncident(
+                $incident,
+                $request->assigned_to,
+                $request->notes
+            );
+            return $this->successResponse(null, 'Incident assigned successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Assignment failed: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function escalate(Request $request, Incident $incident)
+    /**
+     * Escalate incident
+     */
+    public function escalate(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('escalate-incident');
 
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'escalated_to' => 'required|exists:users,id',
             'to_department_id' => 'required|exists:departments,id',
             'reason' => 'required|string|max:500',
         ]);
 
-        $this->incidentService->escalateIncident($incident, $request->all());
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
 
-        return $this->successResponse(null, 'Incident escalated successfully');
+        try {
+            $this->incidentService->escalateIncident($incident, $request->all());
+            return $this->successResponse(null, 'Incident escalated successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Escalation failed: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function resolve(Request $request, Incident $incident)
+    /**
+     * Resolve incident
+     */
+    public function resolve(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('resolve-incident');
 
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'resolution_notes' => 'required|string|max:1000',
         ]);
 
-        $this->incidentService->resolveIncident($incident, $request->resolution_notes);
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
 
-        return $this->successResponse(null, 'Incident resolved successfully');
+        try {
+            $this->incidentService->resolveIncident($incident, $request->resolution_notes);
+            return $this->successResponse(null, 'Incident resolved successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Resolution failed: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function close(Request $request, Incident $incident)
+    /**
+     * Close incident
+     */
+    public function close(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('close-incident');
 
-        $this->incidentService->closeIncident($incident);
-
-        return $this->successResponse(null, 'Incident closed successfully');
+        try {
+            $this->incidentService->closeIncident($incident);
+            return $this->successResponse(null, 'Incident closed successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Closure failed: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function reopen(Request $request, Incident $incident)
+    /**
+     * Reopen incident
+     */
+    public function reopen(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('reopen-incident');
 
-        $this->incidentService->reopenIncident($incident);
-
-        return $this->successResponse(null, 'Incident reopened successfully');
+        try {
+            $this->incidentService->reopenIncident($incident);
+            return $this->successResponse(null, 'Incident reopened successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Reopen failed: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function addComment(Request $request, Incident $incident)
+    /**
+     * Add comment to incident
+     */
+    public function addComment(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('add-comment');
 
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'content' => 'required|string|max:2000',
             'parent_id' => 'nullable|exists:incident_comments,id',
             'mentions' => 'nullable|array',
+            'is_internal' => 'nullable|boolean',
         ]);
 
-        $this->incidentService->addComment($incident, $request->all());
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
 
-        $incident = $this->incidentRepository->getIncidentDetails($incident->id);
+        try {
+            $this->incidentService->addComment($incident, $request->all());
+            $incident = $this->incidentRepository->getIncidentDetails($incident->id);
 
-        return $this->successResponse([
-            'comments' => $incident->comments,
-            'comments_count' => $incident->comments_count,
-        ], 'Comment added successfully');
+            return $this->successResponse([
+                'comments' => $incident->comments,
+                'comments_count' => $incident->comments_count,
+            ], 'Comment added successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to add comment: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function uploadMedia(Request $request, Incident $incident)
+    /**
+     * Upload media to incident
+     */
+    public function uploadMedia(Request $request, Incident $incident): JsonResponse
     {
         $this->authorize('upload-media');
 
-        $request->validate([
-            'files.*' => 'required|file|max:20480',
+        $validator = Validator::make($request->all(), [
+            'files.*' => 'required|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,mp4,avi,mov,mp3,wav,pdf,doc,docx,xls,xlsx',
         ]);
 
-        $media = $this->incidentService->uploadMedia($incident, $request->file('files', []));
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
 
-        return $this->successResponse($media, 'Media uploaded successfully');
+        try {
+            $media = $this->incidentService->uploadMedia($incident, $request->file('files', []));
+            return $this->successResponse($media, 'Media uploaded successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Media upload failed: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function deleteMedia(Incident $incident, $mediaId)
+    /**
+     * Delete media from incident
+     */
+    public function deleteMedia(Incident $incident, $mediaId): JsonResponse
     {
         $this->authorize('delete-media');
 
         $media = $incident->media()->findOrFail($mediaId);
-        $this->incidentService->deleteMedia($media);
 
-        return $this->successResponse(null, 'Media deleted successfully');
+        try {
+            $this->incidentService->deleteMedia($media);
+            return $this->successResponse(null, 'Media deleted successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to delete media: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function timeline(Incident $incident)
+    /**
+     * Get incident timeline
+     */
+    public function timeline(Incident $incident): JsonResponse
     {
         return $this->successResponse($incident->timeline);
     }
 
-    public function logs(Incident $incident)
+    /**
+     * Get incident logs
+     */
+    public function logs(Incident $incident): JsonResponse
     {
-        return $this->successResponse($incident->logs()->with('user')->get());
+        $logs = $incident->logs()->with('user')->latest()->paginate(30);
+        return $this->paginatedResponse($logs);
     }
 
-    public function search(Request $request)
+    /**
+     * Search incidents
+     */
+    public function search(Request $request): JsonResponse
     {
-        $request->validate([
-            'q' => 'required|string|min:2',
+        $validator = Validator::make($request->all(), [
+            'q' => 'required|string|min:2|max:255',
         ]);
 
-        $incidents = $this->incidentRepository->getFeedIncidents([
-            'search' => $request->q,
-        ]);
+        if ($validator->fails()) {
+            return $this->errorResponse('Validation failed', 422, $validator->errors());
+        }
+
+        $filters = ['search' => $request->q];
+
+        if (!$this->isAdmin()) {
+            $filters['department_id'] = $this->getUser()->department_id;
+        }
+
+        $incidents = $this->incidentRepository->getFeedIncidents($filters);
 
         return $this->paginatedResponse($incidents);
     }

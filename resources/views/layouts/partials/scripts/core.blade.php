@@ -82,36 +82,72 @@ document.addEventListener('DOMContentLoaded', function() {
     // NOTIFICATIONS LOADER
     // ==========================================
     function loadUnreadCount() {
-        fetch('/api/v1/notifications/unread-count', {
+        fetch('/notifications/unread-count', {
             headers: {
                 'Accept': 'application/json',
-                'Authorization': 'Bearer {{ session("api_token") ?? "" }}',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'X-Requested-With': 'XMLHttpRequest'
             },
             credentials: 'same-origin'
         })
         .then(response => {
-            if (response.ok) {
-                return response.json();
+            if (!response.ok) {
+                throw new Error('Failed to load notifications');
             }
-            throw new Error('Not authenticated');
+            return response.json();
         })
         .then(data => {
-            const badge = document.querySelector('.notification-badge');
-            if (badge && data.count > 0) {
-                badge.textContent = data.count;
-                badge.style.display = 'block';
-            } else if (badge) {
-                badge.style.display = 'none';
+            // Update desktop notification badge
+            const desktopBadge = document.querySelector('.notification-badge');
+            if (desktopBadge) {
+                if (data.count > 0) {
+                    desktopBadge.textContent = data.count > 99 ? '99+' : data.count;
+                    desktopBadge.style.display = 'inline-block';
+                } else {
+                    desktopBadge.style.display = 'none';
+                }
+            }
+
+            // Update mobile bottom nav badge
+            const mobileBadge = document.querySelector('.badge-count');
+            if (mobileBadge) {
+                if (data.count > 0) {
+                    mobileBadge.textContent = data.count > 99 ? '99+' : data.count;
+                    mobileBadge.style.display = 'flex';
+                } else {
+                    mobileBadge.style.display = 'none';
+                }
+            }
+
+            // Update mobile drawer badge
+            const drawerBadge = document.querySelector('.drawer-notification-badge');
+            if (drawerBadge) {
+                if (data.count > 0) {
+                    drawerBadge.textContent = data.count > 99 ? '99+' : data.count;
+                    drawerBadge.style.display = 'inline-block';
+                } else {
+                    drawerBadge.style.display = 'none';
+                }
+            }
+
+            // Update badge dot on mobile nav
+            const badgeDot = document.querySelector('.badge-dot');
+            if (badgeDot) {
+                badgeDot.style.display = data.count > 0 ? 'block' : 'none';
             }
         })
         .catch(err => {
-            console.log('Notifications not loaded:', err.message);
+            console.log('Notification count not loaded:', err.message);
         });
     }
 
-    loadUnreadCount();
-    setInterval(loadUnreadCount, 30000);
+    // Load immediately
+    document.addEventListener('DOMContentLoaded', function() {
+        loadUnreadCount();
+
+        // Refresh every 30 seconds
+        setInterval(loadUnreadCount, 30000);
+    });
 
     if (document.querySelector('.notification-badge')) {
         loadUnreadCount();

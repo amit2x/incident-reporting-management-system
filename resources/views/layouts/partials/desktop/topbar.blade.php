@@ -2,7 +2,7 @@
     <div class="container-fluid">
         <div class="d-flex align-items-center justify-content-between w-100">
 
-            {{-- Left: Mobile Menu Toggle + Brand --}}
+            {{-- Left: Mobile Menu Toggle + Brand + Nav Links --}}
             <div class="d-flex align-items-center gap-3 flex-grow-1">
                 {{-- Hamburger for tablet/desktop --}}
                 <button class="btn btn-light d-none d-md-flex d-lg-none align-items-center justify-content-center"
@@ -19,23 +19,45 @@
                 </button>
 
                 {{-- App Brand Name --}}
-                <a href="{{ route('home') }}" class="text-decoration-none d-flex align-items-center gap-2">
+                <a href="{{ route('guest.home') }}" class="text-decoration-none d-flex align-items-center gap-2 me-2">
                     <i class="fas fa-shield-halved" style="font-size: 1.5rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
                     <span class="fw-bold d-none d-sm-inline" style="font-size: 1.125rem; font-family: var(--font-heading); color: #1f2937; letter-spacing: -0.5px;">
                         IRMSystem
                     </span>
                 </a>
+
+                {{-- Desktop Nav Links (Visible on md and above) --}}
+                <div class="d-none d-md-flex align-items-center gap-1 ms-2">
+                    <a href="{{ route('guest.home') }}"
+                       class="btn btn-sm rounded-pill px-3 {{ request()->routeIs('guest.home') ? 'btn-primary' : 'btn-light' }}"
+                       style="font-size: 0.8125rem; font-weight: 500;">
+                        <i class="fas fa-house me-1"></i> Home
+                    </a>
+                    <a href="{{ route('guest.features') }}"
+                       class="btn btn-sm rounded-pill px-3 {{ request()->routeIs('guest.features') ? 'btn-primary' : 'btn-light' }}"
+                       style="font-size: 0.8125rem; font-weight: 500;">
+                        <i class="fas fa-star me-1"></i> Features
+                    </a>
+                    <a href="{{ route('guest.help') }}"
+                       class="btn btn-sm rounded-pill px-3 {{ request()->routeIs('guest.help') ? 'btn-primary' : 'btn-light' }}"
+                       style="font-size: 0.8125rem; font-weight: 500;">
+                        <i class="fas fa-circle-question me-1"></i> Help
+                    </a>
+                </div>
             </div>
 
             {{-- Right: Actions --}}
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                {{-- Quick Report Button --}}
+                {{-- Quick Report Button (only for authenticated users) --}}
+                @auth
                 <a href="{{ route('incidents.create') }}" class="btn btn-primary btn-sm d-none d-md-flex align-items-center gap-1" style="border-radius: var(--radius-full); padding: 8px 16px;">
                     <i class="fas fa-plus"></i>
                     <span>Report</span>
                 </a>
+                @endauth
 
-                {{-- Notifications --}}
+                {{-- Notifications (only for authenticated users) --}}
+                @auth
                 <div class="dropdown">
                     <button class="btn btn-light position-relative d-flex align-items-center justify-content-center"
                             data-bs-toggle="dropdown"
@@ -60,6 +82,7 @@
                         </div>
                     </div>
                 </div>
+                @endauth
 
                 {{-- Theme Toggle --}}
                 <button class="btn btn-light d-flex align-items-center justify-content-center"
@@ -89,6 +112,9 @@
                                 <small class="text-muted">{{ Auth::user()->email }}</small>
                             </div>
                             <div class="dropdown-divider"></div>
+                            <a href="{{ route('dashboard') }}" class="dropdown-item py-2">
+                                <i class="fas fa-gauge-high me-2"></i>Dashboard
+                            </a>
                             <a href="{{ route('profile.edit') }}" class="dropdown-item py-2">
                                 <i class="fas fa-user me-2"></i>Profile
                             </a>

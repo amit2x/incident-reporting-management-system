@@ -12,25 +12,34 @@ class NewIncidentNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    protected $incident;
+    protected Incident $incident;
 
+    /**
+     * Create a new notification instance.
+     */
     public function __construct(Incident $incident)
     {
         $this->incident = $incident;
         $this->afterCommit();
     }
 
-    public function via($notifiable): array
+    /**
+     * Get the notification's delivery channels.
+     */
+    public function via(object $notifiable): array
     {
         return ['mail', 'database'];
     }
 
-    public function toMail($notifiable): MailMessage
+    /**
+     * Get the mail representation of the notification.
+     */
+    public function toMail(object $notifiable): MailMessage
     {
         $url = route('incidents.show', $this->incident->id);
 
         return (new MailMessage)
-            ->subject("🚨 New Incident: {$this->incident->incident_id} - {$this->incident->title}")
+            ->subject("🚨 New Incident Reported: #{$this->incident->incident_id}")
             ->greeting("Hello {$notifiable->name},")
             ->line("A new incident has been reported that requires your attention.")
             ->line("**Incident ID:** {$this->incident->incident_id}")
@@ -41,7 +50,6 @@ class NewIncidentNotification extends Notification implements ShouldQueue
             ->line("**Category:** {$this->incident->category->name}")
             ->line("**Reported By:** " . ($this->incident->is_anonymous ? 'Anonymous' : $this->incident->reporter->name))
             ->line("**Location:** " . ($this->incident->location ?? 'Not specified'))
-            ->line("**Description:** " . \Str::limit($this->incident->description, 200))
             ->when($this->incident->sla_due_at, function ($mail) {
                 return $mail->line("**SLA Due:** {$this->incident->sla_due_at->format('d M Y, H:i')}");
             })
@@ -50,7 +58,10 @@ class NewIncidentNotification extends Notification implements ShouldQueue
             ->salutation('Regards,<br>IRMS Notification System');
     }
 
-    public function toArray($notifiable): array
+    /**
+     * Get the array representation of the notification.
+     */
+    public function toArray(object $notifiable): array
     {
         return [
             'type' => 'new_incident',

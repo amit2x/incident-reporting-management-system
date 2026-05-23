@@ -3,26 +3,23 @@
 namespace App\Notifications;
 
 use App\Models\Incident;
-use App\Models\Escalation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class IncidentEscalatedNotification extends Notification implements ShouldQueue
+class IncidentClosedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     protected Incident $incident;
-    protected Escalation $escalation;
 
     /**
      * Create a new notification instance.
      */
-    public function __construct(Incident $incident, Escalation $escalation)
+    public function __construct(Incident $incident)
     {
         $this->incident = $incident;
-        $this->escalation = $escalation;
         $this->afterCommit();
     }
 
@@ -42,18 +39,13 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
         $url = route('incidents.show', $this->incident->id);
 
         return (new MailMessage)
-            ->subject("⬆️ Incident Escalated: #{$this->incident->incident_id}")
+            ->subject("🔒 Incident Closed: #{$this->incident->incident_id}")
             ->greeting("Hello {$notifiable->name},")
-            ->line("An incident has been escalated to you for immediate attention.")
+            ->line("An incident has been closed.")
             ->line("**Incident ID:** {$this->incident->incident_id}")
             ->line("**Title:** {$this->incident->title}")
-            ->line("**Escalation Level:** {$this->escalation->level}")
-            ->line("**Escalated From:** {$this->escalation->fromDepartment->name}")
-            ->line("**Escalated By:** {$this->escalation->escalatedBy->name}")
-            ->line("**Reason:** {$this->escalation->reason}")
-            ->line("**Priority:** " . ucfirst($this->incident->priority))
             ->action('View Incident', $url)
-            ->line('This escalation requires your immediate response.')
+            ->line('This incident is now closed.')
             ->salutation('Regards,<br>IRMS Notification System');
     }
 
@@ -63,13 +55,11 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            'type' => 'incident_escalated',
+            'type' => 'incident_closed',
             'incident_id' => $this->incident->id,
             'incident_number' => $this->incident->incident_id,
             'title' => $this->incident->title,
-            'escalation_level' => $this->escalation->level,
-            'message' => "Incident #{$this->incident->incident_id} has been escalated to you",
-            'reason' => $this->escalation->reason,
+            'message' => "Incident #{$this->incident->incident_id} has been closed",
             'url' => route('incidents.show', $this->incident->id),
         ];
     }

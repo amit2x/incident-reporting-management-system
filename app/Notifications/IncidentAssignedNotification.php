@@ -3,26 +3,38 @@
 namespace App\Notifications;
 
 use App\Models\Incident;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class IncidentAssignedNotification extends Notification
+class IncidentAssignedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    protected $incident;
+    protected Incident $incident;
 
+    /**
+     * Create a new notification instance.
+     */
     public function __construct(Incident $incident)
     {
         $this->incident = $incident;
+        $this->afterCommit();
     }
 
-    public function via($notifiable): array
+    /**
+     * Get the notification's delivery channels.
+     */
+    public function via(object $notifiable): array
     {
         return ['mail', 'database'];
     }
 
-    public function toMail($notifiable): MailMessage
+    /**
+     * Get the mail representation of the notification.
+     */
+    public function toMail(object $notifiable): MailMessage
     {
         $url = route('incidents.show', $this->incident->id);
 
@@ -33,12 +45,18 @@ class IncidentAssignedNotification extends Notification
             ->line("**Incident ID:** {$this->incident->incident_id}")
             ->line("**Title:** {$this->incident->title}")
             ->line("**Priority:** " . ucfirst($this->incident->priority))
+            ->line("**Severity:** " . ucfirst($this->incident->severity))
             ->line("**Department:** {$this->incident->department->name}")
-            ->line("**Assigned By:** " . (auth()->user()->name ?? 'System'))
-            ->action('View Details', $url);
+            ->line("**Location:** " . ($this->incident->location ?? 'Not specified'))
+            ->action('View Incident Details', $url)
+            ->line('Please acknowledge and take appropriate action.')
+            ->salutation('Regards,<br>IRMS Notification System');
     }
 
-    public function toArray($notifiable): array
+    /**
+     * Get the array representation of the notification.
+     */
+    public function toArray(object $notifiable): array
     {
         return [
             'type' => 'incident_assigned',
@@ -46,7 +64,6 @@ class IncidentAssignedNotification extends Notification
             'incident_number' => $this->incident->incident_id,
             'title' => $this->incident->title,
             'message' => "Incident #{$this->incident->incident_id} has been assigned to you",
-            'assigned_by' => auth()->user()->name ?? 'System',
             'url' => route('incidents.show', $this->incident->id),
         ];
     }

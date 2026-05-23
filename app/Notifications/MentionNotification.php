@@ -3,26 +3,26 @@
 namespace App\Notifications;
 
 use App\Models\Incident;
-use App\Models\Escalation;
+use App\Models\IncidentComment;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class IncidentEscalatedNotification extends Notification implements ShouldQueue
+class MentionNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     protected Incident $incident;
-    protected Escalation $escalation;
+    protected IncidentComment $comment;
 
     /**
      * Create a new notification instance.
      */
-    public function __construct(Incident $incident, Escalation $escalation)
+    public function __construct(Incident $incident, IncidentComment $comment)
     {
         $this->incident = $incident;
-        $this->escalation = $escalation;
+        $this->comment = $comment;
         $this->afterCommit();
     }
 
@@ -42,18 +42,11 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
         $url = route('incidents.show', $this->incident->id);
 
         return (new MailMessage)
-            ->subject("⬆️ Incident Escalated: #{$this->incident->incident_id}")
+            ->subject("👋 You were mentioned in Incident #{$this->incident->incident_id}")
             ->greeting("Hello {$notifiable->name},")
-            ->line("An incident has been escalated to you for immediate attention.")
-            ->line("**Incident ID:** {$this->incident->incident_id}")
-            ->line("**Title:** {$this->incident->title}")
-            ->line("**Escalation Level:** {$this->escalation->level}")
-            ->line("**Escalated From:** {$this->escalation->fromDepartment->name}")
-            ->line("**Escalated By:** {$this->escalation->escalatedBy->name}")
-            ->line("**Reason:** {$this->escalation->reason}")
-            ->line("**Priority:** " . ucfirst($this->incident->priority))
+            ->line("**{$this->comment->user->name}** mentioned you in a comment on incident #{$this->incident->incident_id}:")
+            ->line("\"{$this->comment->content}\"")
             ->action('View Incident', $url)
-            ->line('This escalation requires your immediate response.')
             ->salutation('Regards,<br>IRMS Notification System');
     }
 
@@ -63,13 +56,12 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            'type' => 'incident_escalated',
+            'type' => 'mentioned',
             'incident_id' => $this->incident->id,
             'incident_number' => $this->incident->incident_id,
-            'title' => $this->incident->title,
-            'escalation_level' => $this->escalation->level,
-            'message' => "Incident #{$this->incident->incident_id} has been escalated to you",
-            'reason' => $this->escalation->reason,
+            'comment_id' => $this->comment->id,
+            'mentioner_name' => $this->comment->user->name,
+            'message' => "{$this->comment->user->name} mentioned you in a comment",
             'url' => route('incidents.show', $this->incident->id),
         ];
     }

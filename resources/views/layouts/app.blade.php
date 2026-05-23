@@ -26,16 +26,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon-16.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/icon-180.png') }}">
 
-    {{-- Fonts --}}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    {{-- Bootstrap Icons --}}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-    {{-- Font Awesome --}}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     {{-- Vite Assets --}}
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])

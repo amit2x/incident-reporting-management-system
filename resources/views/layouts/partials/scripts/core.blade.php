@@ -81,20 +81,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==========================================
     // NOTIFICATIONS LOADER
     // ==========================================
-    async function loadUnreadCount() {
-        try {
-            const response = await fetch('/api/v1/notifications/unread-count', {
-                headers: { 'Accept': 'application/json' }
-            });
-            const data = await response.json();
-            const badges = document.querySelectorAll('.notification-badge, .badge-count');
-            if (data.count > 0) {
-                badges.forEach(b => { b.textContent = data.count; b.style.display = 'flex'; });
+    function loadUnreadCount() {
+        fetch('/api/v1/notifications/unread-count', {
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': 'Bearer {{ session("api_token") ?? "" }}',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json();
             }
-        } catch (e) {
-            // Silently fail
-        }
+            throw new Error('Not authenticated');
+        })
+        .then(data => {
+            const badge = document.querySelector('.notification-badge');
+            if (badge && data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = 'block';
+            } else if (badge) {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(err => {
+            console.log('Notifications not loaded:', err.message);
+        });
     }
+
+    loadUnreadCount();
+    setInterval(loadUnreadCount, 30000);
 
     if (document.querySelector('.notification-badge')) {
         loadUnreadCount();

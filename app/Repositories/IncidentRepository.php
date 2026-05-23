@@ -72,29 +72,72 @@ class IncidentRepository extends BaseRepository
         return $query->paginate($perPage);
     }
 
-    public function getIncidentDetails(int $id): Incident
-    {
-        return $this->model->with([
-            'reporter',
-            'assignedTo',
-            'department',
-            'category',
-            'escalatedTo',
-            'media',
-            'comments' => function ($query) {
-                $query->with(['user', 'replies.user'])->latest();
-            },
-            'logs' => function ($query) {
-                $query->with('user')->latest()->limit(50);
-            },
-            'escalations' => function ($query) {
-                $query->with(['escalatedBy', 'escalatedTo'])->latest();
-            },
-            'assignments' => function ($query) {
-                $query->with(['assignedBy', 'assignedTo'])->latest();
-            },
-        ])->findOrFail($id);
-    }
+    // public function getIncidentDetails(int $id): Incident
+    // {
+    //     return $this->model->with([
+    //         'reporter',
+    //         'assignedTo',
+    //         'department',
+    //         'category',
+    //         'escalatedTo',
+    //         'media',
+    //         'comments' => function ($query) {
+    //             $query->with(['user', 'replies.user'])->latest();
+    //         },
+    //         'logs' => function ($query) {
+    //             $query->with('user')->latest()->limit(50);
+    //         },
+    //         'escalations' => function ($query) {
+    //             $query->with(['escalatedBy', 'escalatedTo'])->latest();
+    //         },
+    //         'assignments' => function ($query) {
+    //             $query->with(['assignedBy', 'assignedTo'])->latest();
+    //         },
+    //     ])->findOrFail($id);
+    // }
+
+
+public function getIncidentDetails(int $id): Incident
+{
+    return $this->model->with([
+        'reporter' => function ($query) {
+            $query->with('roles'); // Eager load roles
+        },
+        'assignedTo' => function ($query) {
+            $query->with('roles'); // Eager load roles
+        },
+        'department',
+        'category',
+        'escalatedTo' => function ($query) {
+            $query->with('roles'); // Eager load roles
+        },
+        'media',
+        'comments' => function ($query) {
+            $query->with(['user' => function ($q) {
+                $q->with('roles'); // Eager load roles for comment users
+            }, 'replies.user' => function ($q) {
+                $q->with('roles'); // Eager load roles for reply users
+            }])->latest();
+        },
+        'logs' => function ($query) {
+            $query->with('user')->latest()->limit(50);
+        },
+        'escalations' => function ($query) {
+            $query->with(['escalatedBy' => function ($q) {
+                $q->with('roles');
+            }, 'escalatedTo' => function ($q) {
+                $q->with('roles');
+            }])->latest();
+        },
+        'assignments' => function ($query) {
+            $query->with(['assignedBy' => function ($q) {
+                $q->with('roles');
+            }, 'assignedTo' => function ($q) {
+                $q->with('roles');
+            }])->latest();
+        },
+    ])->findOrFail($id);
+}
 
     public function getDepartmentIncidents(int $departmentId, array $filters = []): LengthAwarePaginator
     {

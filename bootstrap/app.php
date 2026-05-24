@@ -41,8 +41,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         ]);
 
-        // 5. rate limiting for login
-        $middleware->throttleWithRedis();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

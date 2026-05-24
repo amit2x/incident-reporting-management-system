@@ -81,22 +81,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==========================================
     // NOTIFICATIONS LOADER
     // ==========================================
+
     function loadUnreadCount() {
         fetch('/notifications/unread-count', {
+            method: 'GET',
             headers: {
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 'X-Requested-With': 'XMLHttpRequest'
             },
             credentials: 'same-origin'
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Failed to load notifications');
+                throw new Error('HTTP ' + response.status);
             }
             return response.json();
         })
         .then(data => {
+            console.log('Unread notifications:', data.count);
+
             // Update desktop notification badge
             const desktopBadge = document.querySelector('.notification-badge');
             if (desktopBadge) {
@@ -119,17 +123,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Update mobile drawer badge
-            const drawerBadge = document.querySelector('.drawer-notification-badge');
-            if (drawerBadge) {
-                if (data.count > 0) {
-                    drawerBadge.textContent = data.count > 99 ? '99+' : data.count;
-                    drawerBadge.style.display = 'inline-block';
-                } else {
-                    drawerBadge.style.display = 'none';
-                }
-            }
-
             // Update badge dot on mobile nav
             const badgeDot = document.querySelector('.badge-dot');
             if (badgeDot) {
@@ -137,17 +130,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(err => {
-            console.log('Notification count not loaded:', err.message);
+            console.log('Notification count error:', err.message);
         });
     }
 
-    // Load immediately
+    // Run on page load
     document.addEventListener('DOMContentLoaded', function() {
         loadUnreadCount();
-
         // Refresh every 30 seconds
         setInterval(loadUnreadCount, 30000);
     });
+
 
     if (document.querySelector('.notification-badge')) {
         loadUnreadCount();

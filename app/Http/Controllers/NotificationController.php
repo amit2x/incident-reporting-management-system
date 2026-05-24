@@ -103,6 +103,10 @@ class NotificationController extends Controller
      */
     public function unreadCount()
     {
+        if (!Auth::check()) {
+            return response()->json(['count' => 0]);
+        }
+
         $count = Auth::user()->unreadNotifications()->count();
 
         return response()->json(['count' => $count]);
@@ -136,6 +140,8 @@ class NotificationController extends Controller
 
         return response()->json($notifications);
     }
+
+
 
     /**
      * Handle notification click - mark as read and redirect.

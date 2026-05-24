@@ -19,6 +19,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="IRMS">
+    <meta name="user-authenticated" content="{{ auth()->check() ? 'true' : 'false' }}">
+
     <link rel="manifest" href="{{ asset('menifest.json') }}">
 
     {{-- Icons --}}
@@ -120,7 +122,27 @@
 
     {{-- Core Scripts --}}
     @include('layouts.partials.scripts.core')
+    @auth
+    <script>
+    // Register Firebase Service Worker
+    if ('serviceWorker' in navigator && 'Notification' in window) {
+        // Only register if not already registered
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            const hasFirebaseSW = registrations.some(reg => reg.scope.includes('firebase'));
 
+            if (!hasFirebaseSW) {
+                navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                    .then(function(registration) {
+                        console.log('Firebase Service Worker registered:', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            }
+        });
+    }
+    </script>
+    @endauth
     @stack('scripts')
 </body>
 </html>

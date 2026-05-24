@@ -11,7 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class SendPushNotificationJob implements ShouldQueue
+class SendFCMNotification implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -22,7 +22,6 @@ class SendPushNotificationJob implements ShouldQueue
 
     public $tries = 3;
     public $timeout = 60;
-    public $backoff = [10, 30, 60];
 
     /**
      * Create a new job instance.
@@ -42,23 +41,17 @@ class SendPushNotificationJob implements ShouldQueue
     public function handle(FCMService $fcmService): void
     {
         // Skip if user has no FCM token
-        if (empty($this->user->fcm_token)) {
-            Log::info('Push Job: User has no FCM token', ['user_id' => $this->user->id]);
+        if (!$this->user->fcm_token) {
+            Log::info('FCM Job: User has no token, skipping', ['user_id' => $this->user->id]);
             return;
         }
 
-        // Check user push notification preference
-        $preferences = $this->user->preferences ?? [];
-        if (isset($preferences['push_notifications']) && !$preferences['push_notifications']) {
-            Log::info('Push Job: User disabled push notifications', ['user_id' => $this->user->id]);
+        // Check user preferences
+        if (isset($this->user->preferences['push_notifications']) &&
+            !$this->user->preferences['push_notifications']) {
+            Log::info('FCM Job: User disabled push notifications', ['user_id' => $this->user->id]);
             return;
         }
-
-        Log::info('Push Job: Sending to user', [
-            'user_id' => $this->user->id,
-            'user_name' => $this->user->name,
-            'title' => $this->title,
-        ]);
 
         $result = $fcmService->sendToDevice(
             $this->user->fcm_token,
@@ -67,31 +60,21 @@ class SendPushNotificationJob implements ShouldQueue
             $this->data
         );
 
-        if ($result['success']) {
-            Log::info('Push Job: Sent successfully', ['user_id' => $this->user->id]);
-        } else {
-            $error = $result['error'] ?? 'Unknown error';
-            Log::warning('Push Job: Failed', [
+        if (!$result['success']) {
+            Log::warning('FCM Job: Failed to send', [
                 'user_id' => $this->user->id,
-                'error' => $error,
+                'error' => $result['error'] ?? 'Unknown error',
             ]);
 
             // If token is unregistered, clear it
-            if (str_contains(strtolower($error), 'unregistered') ||
-                str_contains(strtolower($error), 'not_found')) {
+            if (str_contains($result['error'] ?? '', 'unregistered')) {
                 $this->user->update(['fcm_token' => null]);
-                Log::info('Push Job: Cleared unregistered token', ['user_id' => $this->user->id]);
-                return; // Don't retry for invalid tokens
+                Log::info('FCM Job: Cleared unregistered token', ['user_id' => $this->user->id]);
             }
 
-            // Retry for transient errors
+            // Retry if not a permanent failure
             if ($this->attempts() < $this->tries) {
-                $delay = $this->backoff[$this->attempts() - 1] ?? 60;
-                $this->release($delay);
-                Log::info('Push Job: Retrying in ' . $delay . 's', [
-                    'user_id' => $this->user->id,
-                    'attempt' => $this->attempts(),
-                ]);
+                $this->release(30); // Retry after 30 seconds
             }
         }
     }
@@ -101,7 +84,7 @@ class SendPushNotificationJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        Log::error('Push Job Failed Permanently:', [
+        Log::error('FCM Job Failed Permanently:', [
             'user_id' => $this->user->id,
             'error' => $exception->getMessage(),
         ]);

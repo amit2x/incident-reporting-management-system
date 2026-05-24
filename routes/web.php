@@ -13,7 +13,10 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
+use App\Services\FCMService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -212,4 +215,125 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/system-settings', [SettingsController::class, 'updateSystemSettings'])
             ->name('system-settings.update');
     });
+});
+
+
+
+
+//for FCM token service
+
+// routes/api.php or routes/web.php
+
+Route::middleware('auth')->group(function () {
+    // Update FCM token
+    Route::put('/api/v1/user/fcm-token', function (Request $request) {
+        $request->validate([
+            'fcm_token' => 'required|string',
+            'device_type' => 'nullable|string|in:android,ios,web',
+        ]);
+
+        $user = $request->user();
+        $user->update([
+            'fcm_token' => $request->fcm_token,
+            'device_type' => $request->device_type ?? 'web',
+        ]);
+
+        // Log
+        Log::info('FCM token updated', [
+            'user_id' => $user->id,
+            'device_type' => $request->device_type,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'FCM token updated successfully',
+        ]);
+    })->name('fcm.token.update');
+});
+
+
+
+
+// Test FCM Configuration
+Route::get('/test-fcm-config', function () {
+    $credentials = config('firebase.projects.app.credentials');
+
+    return response()->json([
+        'credentials_path' => $credentials,
+        'credentials_exists' => file_exists($credentials),
+        'credentials_readable' => is_readable($credentials),
+        'sender_id' => env('FCM_SENDER_ID'),
+    ]);
+});
+
+// Test FCM Send
+Route::get('/test-fcm-send', function (FCMService $fcmService) {
+    // Get a user with FCM token
+    $user = \App\Models\User::whereNotNull('fcm_token')->first();
+
+    if (!$user || !$user->fcm_token) {
+        return response()->json([
+            'error' => 'No user with FCM token found.',
+            'help' => 'Visit /test-fcm-token?token=YOUR_DEVICE_TOKEN to add one',
+        ]);
+    }
+
+    $result = $fcmService->sendToDevice(
+        $user->fcm_token,
+        '🧪 Test Notification',
+        'This is a test from IRMSystem at ' . now()->format('H:i:s'),
+        [
+            'type' => 'test',
+            'incident_id' => '1',
+            'click_action' => url('/'),
+        ]
+    );
+
+    return response()->json([
+        'success' => $result,
+        'user' => $user->name,
+        'token_preview' => substr($user->fcm_token, 0, 30) . '...',
+    ]);
+});
+
+// Add test FCM token
+Route::get('/test-fcm-token', function (Request $request) {
+    $token = $request->get('token');
+
+    if (!$token) {
+        return response()->json([
+            'error' => 'Please provide a token parameter',
+            'example' => '/test-fcm-token?token=YOUR_FCM_TOKEN',
+        ]);
+    }
+
+    $user = \App\Models\User::first();
+
+    if ($user) {
+        $user->update(['fcm_token' => $token]);
+        return response()->json([
+            'success' => true,
+            'message' => 'FCM token added to ' . $user->name,
+            'token' => substr($token, 0, 30) . '...',
+        ]);
+    }
+
+    return response()->json(['error' => 'No user found']);
+});
+
+// View users with FCM tokens
+Route::get('/test-fcm-users', function () {
+    $users = \App\Models\User::whereNotNull('fcm_token')
+        ->get(['id', 'name', 'email', 'fcm_token'])
+        ->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'has_token' => !empty($user->fcm_token),
+                'token_preview' => $user->fcm_token ? substr($user->fcm_token, 0, 30) . '...' : null,
+            ];
+        });
+
+    return response()->json($users);
 });

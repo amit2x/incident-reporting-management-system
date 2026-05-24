@@ -2,163 +2,185 @@
 
 namespace App\Services;
 
-use App\Models\User;
-use Illuminate\Support\Facades\Http;
+use Kreait\Firebase\Factory;
+use Kreait\Firebase\Messaging\CloudMessage;
+use Kreait\Firebase\Messaging\Notification;
+use Kreait\Firebase\Exception\MessagingException;
 use Illuminate\Support\Facades\Log;
 
 class FCMService
 {
-    protected string $serverKey;
-    protected string $fcmUrl = 'https://fcm.googleapis.com/fcm/send';
+    protected $messaging;
+    protected $isInitialized = false;
 
     public function __construct()
     {
-        $this->serverKey = config('services.fcm.server_key');
-    }
-
-    /**
-     * Send push notification to single device
-     */
-    public function sendToDevice(string $token, string $title, string $body, array $data = []): bool
-    {
         try {
-            $payload = [
-                'to' => $token,
-                'notification' => [
-                    'title' => $title,
-                    'body' => $body,
-                    'sound' => 'default',
-                    'badge' => 1,
-                    'click_action' => $data['click_action'] ?? 'FLUTTER_NOTIFICATION_CLICK',
-                ],
-                'data' => array_merge($data, [
-                    'title' => $title,
-                    'body' => $body,
-                ]),
-                'priority' => 'high',
-                'time_to_live' => 86400,
-            ];
+            $credentials = config('firebase.projects.app.credentials');
 
-            $response = Http::withHeaders([
-                'Authorization' => 'key=' . $this->serverKey,
-                'Content-Type' => 'application/json',
-            ])->post($this->fcmUrl, $payload);
-
-            if ($response->successful()) {
-                Log::info('FCM notification sent successfully', [
-                    'token' => substr($token, 0, 20) . '...',
-                    'title' => $title,
-                ]);
-                return true;
+            // IMPORTANT: Resolve the path correctly
+            // If path starts with 'storage/', use storage_path()
+            // Otherwise use base_path() or treat as absolute
+            if (str_starts_with($credentials, 'storage/')) {
+                $credentials = storage_path(str_replace('storage/', '', $credentials));
+            } elseif (!str_starts_with($credentials, '/')) {
+                $credentials = base_path($credentials);
             }
 
-            Log::error('FCM notification failed', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
+            Log::info('FCM: Attempting to load credentials from: ' . $credentials);
 
-            return false;
-        } catch (\Exception $e) {
-            Log::error('FCM notification exception: ' . $e->getMessage());
-            return false;
-        }
-    }
+            if (!file_exists($credentials)) {
+                Log::error('FCM: Credentials file not found at: ' . $credentials);
 
-    /**
-     * Send push notification to multiple devices
-     */
-    public function sendToMultipleDevices(array $tokens, string $title, string $body, array $data = []): bool
-    {
-        try {
-            $payload = [
-                'registration_ids' => $tokens,
-                'notification' => [
-                    'title' => $title,
-                    'body' => $body,
-                    'sound' => 'default',
-                    'badge' => 1,
-                    'click_action' => $data['click_action'] ?? 'FLUTTER_NOTIFICATION_CLICK',
-                ],
-                'data' => array_merge($data, [
-                    'title' => $title,
-                    'body' => $body,
-                ]),
-                'priority' => 'high',
-                'time_to_live' => 86400,
-            ];
+                // Try alternative paths
+                $alternatives = [
+                    storage_path('app/firebase/firebase-adminsdk.json'),
+                    base_path('storage/app/firebase/firebase-adminsdk.json'),
+                    base_path('firebase-adminsdk.json'),
+                    storage_path('firebase/firebase-adminsdk.json'),
+                ];
 
-            $response = Http::withHeaders([
-                'Authorization' => 'key=' . $this->serverKey,
-                'Content-Type' => 'application/json',
-            ])->post($this->fcmUrl, $payload);
+                foreach ($alternatives as $alt) {
+                    if (file_exists($alt)) {
+                        Log::info('FCM: Found credentials at alternative path: ' . $alt);
+                        $credentials = $alt;
+                        break;
+                    }
+                }
 
-            if ($response->successful()) {
-                $result = $response->json();
-                Log::info('FCM multicast notification sent', [
-                    'success' => $result['success'] ?? 0,
-                    'failure' => $result['failure'] ?? 0,
-                    'total_tokens' => count($tokens),
-                ]);
-                return true;
+                if (!file_exists($credentials)) {
+                    $this->messaging = null;
+                    return;
+                }
             }
 
-            Log::error('FCM multicast notification failed', [
-                'status' => $response->status(),
-                'body' => $response->body(),
+            if (!is_readable($credentials)) {
+                Log::error('FCM: Credentials file not readable: ' . $credentials);
+                $this->messaging = null;
+                return;
+            }
+
+            $factory = (new Factory)->withServiceAccount($credentials);
+            $this->messaging = $factory->createMessaging();
+            $this->isInitialized = true;
+
+            Log::info('FCM Service initialized successfully with: ' . basename($credentials));
+        } catch (\Exception $e) {
+            Log::error('FCM Service initialization failed: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            $this->messaging = null;
+        }
+    }
+
+    /**
+     * Check if service is ready.
+     */
+    public function isReady(): bool
+    {
+        return $this->isInitialized && $this->messaging !== null;
+    }
+
+    /**
+     * Send push notification to a single device.
+     */
+    public function sendToDevice(string $deviceToken, string $title, string $body, array $data = []): array
+    {
+        if (!$this->isReady()) {
+            Log::error('FCM: Service not ready to send');
+            return ['success' => false, 'error' => 'Service not initialized'];
+        }
+
+        if (empty($deviceToken) || strlen($deviceToken) < 50) {
+            Log::error('FCM: Invalid token', ['token_length' => strlen($deviceToken)]);
+            return ['success' => false, 'error' => 'Invalid token'];
+        }
+
+        try {
+            $notification = Notification::create($title, $body);
+
+            $message = CloudMessage::withTarget('token', $deviceToken)
+                ->withNotification($notification)
+                ->withData(array_merge($data, [
+                    'click_action' => $data['click_action'] ?? url('/notifications'),
+                ]))
+                ->withHighestPossiblePriority();
+
+            $result = $this->messaging->send($message);
+
+            Log::info('FCM: Notification sent!', [
+                'token' => substr($deviceToken, 0, 20) . '...',
+                'title' => $title,
             ]);
 
-            return false;
+            return ['success' => true, 'message_id' => is_array($result) ? ($result['name'] ?? '') : (string)$result];
+        } catch (MessagingException $e) {
+            $error = $e->getMessage();
+
+            Log::error('FCM Error: ' . $error);
+
+            // Handle specific errors
+            if (str_contains($error, 'UNREGISTERED') || str_contains($error, 'NOT_FOUND')) {
+                return ['success' => false, 'error' => 'Token unregistered. Device may have uninstalled app.'];
+            }
+            if (str_contains($error, 'INVALID_ARGUMENT')) {
+                return ['success' => false, 'error' => 'Invalid token format.'];
+            }
+            if (str_contains($error, 'SENDER_ID_MISMATCH')) {
+                return ['success' => false, 'error' => 'Sender ID mismatch. Check Firebase config.'];
+            }
+            if (str_contains($error, 'PERMISSION_DENIED')) {
+                return ['success' => false, 'error' => 'Permission denied. Check service account permissions.'];
+            }
+
+            return ['success' => false, 'error' => $error];
         } catch (\Exception $e) {
-            Log::error('FCM multicast notification exception: ' . $e->getMessage());
-            return false;
+            Log::error('FCM Exception: ' . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
     /**
-     * Send to topic
+     * Send to multiple devices.
      */
-    public function sendToTopic(string $topic, string $title, string $body, array $data = []): bool
+    public function sendToMultipleDevices(array $deviceTokens, string $title, string $body, array $data = []): array
     {
+        if (!$this->isReady()) {
+            return ['success' => false, 'error' => 'Service not initialized'];
+        }
+
+        if (empty($deviceTokens)) {
+            return ['success' => false, 'error' => 'No tokens provided'];
+        }
+
         try {
-            $payload = [
-                'to' => '/topics/' . $topic,
-                'notification' => [
-                    'title' => $title,
-                    'body' => $body,
-                    'sound' => 'default',
-                    'badge' => 1,
-                ],
-                'data' => $data,
-                'priority' => 'high',
+            $notification = Notification::create($title, $body);
+
+            $message = CloudMessage::new()
+                ->withNotification($notification)
+                ->withData($data)
+                ->withHighestPossiblePriority();
+
+            $result = $this->messaging->sendMulticast($message, $deviceTokens);
+
+            $successCount = $result->successes()->count();
+            $failureCount = $result->failures()->count();
+
+            Log::info('FCM Multicast:', [
+                'success' => $successCount,
+                'failures' => $failureCount,
+            ]);
+
+            return [
+                'success' => $successCount > 0,
+                'sent' => $successCount,
+                'failed' => $failureCount,
             ];
-
-            $response = Http::withHeaders([
-                'Authorization' => 'key=' . $this->serverKey,
-                'Content-Type' => 'application/json',
-            ])->post($this->fcmUrl, $payload);
-
-            return $response->successful();
         } catch (\Exception $e) {
-            Log::error('FCM topic notification exception: ' . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Subscribe user to topic
-     */
-    public function subscribeToTopic(string $token, string $topic): bool
-    {
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => 'key=' . $this->serverKey,
-                'Content-Type' => 'application/json',
-            ])->post('https://iid.googleapis.com/iid/v1/' . $token . '/rel/topics/' . $topic);
-
-            return $response->successful();
-        } catch (\Exception $e) {
-            Log::error('FCM topic subscription exception: ' . $e->getMessage());
-            return false;
+            Log::error('FCM Multicast Error: ' . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 }

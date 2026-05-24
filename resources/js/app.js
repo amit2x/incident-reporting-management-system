@@ -266,3 +266,28 @@ $(document).ready(function() {
 
 import imageCompression from 'browser-image-compression';
 window.imageCompression = imageCompression;
+
+
+// Import Firebase
+import { requestFCMToken, onMessageListener } from './firebase';
+// Initialize Firebase Messaging when DOM is ready
+$(document).ready(function() {
+    // Only request token if user is authenticated
+    if (document.querySelector('meta[name="user-authenticated"]')?.getAttribute('content') === 'true') {
+        initializeFirebaseMessaging();
+    }
+});
+
+async function initializeFirebaseMessaging() {
+    try {
+        const token = await requestFCMToken();
+        if (token) {
+            console.log('✅ FCM Token obtained successfully');
+        }
+    } catch (error) {
+        console.warn('FCM initialization skipped:', error.message);
+    }
+
+    // Listen for foreground messages
+    onMessageListener();
+}

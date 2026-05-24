@@ -24,6 +24,7 @@
         "browser-image-compression": "^2.0.2",
         "chart.js": "^4.5.1",
         "dropzone": "^6.0.0-beta.2",
+        "firebase": "^12.13.0",
         "jquery": "^3.7.1",
         "laravel-echo": "^2.3.4",
         "moment": "^2.30.1",

@@ -29,6 +29,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'designation',
         'status',
         'fcm_token',
+        'device_type',
         'last_login_at',
         'last_login_ip',
         'preferences',

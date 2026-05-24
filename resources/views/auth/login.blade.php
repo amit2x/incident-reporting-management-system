@@ -1,4 +1,3 @@
-{{-- resources/views/auth/login.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Login - IRMSystem')
@@ -10,7 +9,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 10px;
+        padding: 20px;
         background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 50%, #f5f3ff 100%);
     }
 
@@ -124,6 +123,87 @@
         font-weight: 600;
     }
 
+    /* CAPTCHA Styles */
+    .captcha-section {
+        margin-bottom: 20px;
+    }
+
+    .captcha-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .captcha-image-wrapper {
+        flex-shrink: 0;
+        position: relative;
+        cursor: pointer;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 2px solid #e5e7eb;
+        transition: all 0.2s;
+    }
+
+    .captcha-image-wrapper:hover {
+        border-color: #1a56db;
+        box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.08);
+    }
+
+    .captcha-image-wrapper img {
+        display: block;
+        height: 46px;
+    }
+
+    .captcha-refresh-hint {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.75rem;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .captcha-image-wrapper:hover .captcha-refresh-hint {
+        opacity: 1;
+    }
+
+    .captcha-input-group {
+        flex: 1;
+        position: relative;
+    }
+
+    .captcha-input-group .form-control {
+        height: 46px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 10px 14px 10px 40px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+
+    .captcha-input-group .form-control:focus {
+        border-color: #1a56db;
+        box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.08);
+    }
+
+    .captcha-input-group .captcha-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 0.875rem;
+    }
+
+    .captcha-loading {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
     .btn-login {
         width: 100%;
         height: 48px;
@@ -144,6 +224,12 @@
 
     .btn-login:active {
         transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
     }
 
     .divider {
@@ -216,6 +302,24 @@
         accent-color: #1a56db;
     }
 
+    /* Alert styles */
+    .alert-captcha {
+        background: #fef3c7;
+        border: 1px solid #fcd34d;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 0.75rem;
+        color: #92400e;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .alert-captcha i {
+        font-size: 1rem;
+    }
+
     @media (max-width: 480px) {
         .login-card {
             border-radius: 16px;
@@ -225,6 +329,13 @@
         }
         .login-header {
             padding: 24px 20px;
+        }
+        .captcha-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .captcha-image-wrapper {
+            align-self: center;
         }
     }
 </style>
@@ -236,7 +347,8 @@
         {{-- Header --}}
         <div class="login-header">
             <div class="login-logo">
-                <img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-shield-halved\' style=\'font-size: 28px; color: #1a56db;\'></i>';">
+                <img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo"
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-shield-halved\' style=\'font-size: 28px; color: #1a56db;\'></i>';">
             </div>
             <h4>Welcome Back</h4>
             <p>Sign in to your IRMSystem account</p>
@@ -244,8 +356,16 @@
 
         {{-- Form --}}
         <div class="login-body">
-            <form method="POST" action="{{ route('login') }}">
+            <form method="POST" action="{{ route('login') }}" id="loginForm">
                 @csrf
+
+                {{-- CAPTCHA Notice --}}
+                @if($showCaptcha ?? false)
+                    <div class="alert-captcha">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>Additional verification required due to multiple login attempts.</span>
+                    </div>
+                @endif
 
                 {{-- Email --}}
                 <div class="form-floating-custom">
@@ -281,6 +401,31 @@
                     @enderror
                 </div>
 
+                {{-- CAPTCHA (Conditionally shown) --}}
+                <div class="captcha-section" id="captchaSection" style="{{ ($showCaptcha ?? false) ? '' : 'display: none;' }}">
+                    <label class="form-label small fw-semibold mb-2">Security Verification</label>
+                    <div class="captcha-row" id="captchaRow">
+                        <div class="captcha-image-wrapper" onclick="refreshCaptcha()" title="Click to refresh">
+                            <img src="{{ captcha_src('math') }}" alt="CAPTCHA" id="captchaImage">
+                            <div class="captcha-refresh-hint">
+                                <i class="fas fa-redo me-1"></i> Refresh
+                            </div>
+                        </div>
+                        <div class="captcha-input-group">
+                            <i class="fas fa-puzzle-piece captcha-icon"></i>
+                            <input type="text"
+                                   name="captcha"
+                                   class="form-control @error('captcha') is-invalid @enderror"
+                                   placeholder="Enter the answer"
+                                   id="captchaInput"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+                    @error('captcha')
+                        <small class="text-danger" style="font-size: 0.6875rem;">{{ $message }}</small>
+                    @enderror
+                </div>
+
                 {{-- Remember & Forgot --}}
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="remember-check">
@@ -295,7 +440,7 @@
                 </div>
 
                 {{-- Login Button --}}
-                <button type="submit" class="btn btn-login">
+                <button type="submit" class="btn btn-login" id="loginBtn">
                     <i class="fas fa-sign-in-alt me-2"></i> Sign In
                 </button>
 
@@ -314,3 +459,63 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // ==========================================
+    // CAPTCHA REFRESH
+    // ==========================================
+    window.refreshCaptcha = function() {
+        var img = document.getElementById('captchaImage');
+        var row = document.getElementById('captchaRow');
+        var input = document.getElementById('captchaInput');
+
+        if (!img || !row) return;
+
+        // Add loading state
+        row.classList.add('captcha-loading');
+
+        fetch('{{ route("captcha.refresh") }}', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                img.src = data.captcha_url + '?t=' + new Date().getTime();
+                if (input) {
+                    input.value = '';
+                    input.focus();
+                }
+            }
+        })
+        .catch(function(error) {
+            // Fallback: reload with timestamp
+            var currentSrc = img.src.split('?')[0];
+            img.src = currentSrc + '?t=' + new Date().getTime();
+        })
+        .finally(function() {
+            row.classList.remove('captcha-loading');
+        });
+    };
+
+    // ==========================================
+    // FORM SUBMISSION - Loading State
+    // ==========================================
+    var form = document.getElementById('loginForm');
+    var btn = document.getElementById('loginBtn');
+
+    if (form && btn) {
+        form.addEventListener('submit', function() {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Signing in...';
+        });
+    }
+
+});
+</script>
+@endpush

@@ -13,7 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
      ->withMiddleware(function (Middleware $middleware) {
-        
+
         // 1. Application's Global HTTP Middleware Stack
         $middleware->append([
             \App\Http\Middleware\SecurityHeaders::class,
@@ -37,7 +37,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'user.status' => \App\Http\Middleware\CheckUserStatus::class,
             'sanitize' => \App\Http\Middleware\SanitizeInput::class,
+            'captcha' => \App\Http\Middleware\CaptchaMiddleware::class,
+
         ]);
+
+        // 5. rate limiting for login
+        $middleware->throttleWithRedis();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
@@ -46,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // QUEUE PROCESSING (Windows/Local Development)
         // ==========================================
-        
+
         // Process queue jobs every minute (for Windows without Supervisor)
         $schedule->command('queue:process-scheduled --max-jobs=50')
             ->everyMinute()
@@ -79,7 +84,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // KPI REPORT GENERATION
         // ==========================================
-        
+
         // Generate daily KPI reports at midnight
         $schedule->job(new \App\Jobs\GenerateKpiReport('daily'))
             ->dailyAt('00:05')
@@ -107,7 +112,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // SLA MONITORING
         // ==========================================
-        
+
         // Check for SLA breaches every 30 minutes
         $schedule->command('incidents:check-sla')
             ->everyThirtyMinutes()
@@ -128,7 +133,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // DATA CLEANUP TASKS
         // ==========================================
-        
+
         // Clean up old notifications (older than 30 days) - Daily at 2:00 AM
         $schedule->command('notifications:clean --days=30')
             ->dailyAt('02:00')
@@ -160,7 +165,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // SYSTEM HEALTH CHECKS
         // ==========================================
-        
+
         // Check system health every hour
         $schedule->command('system:health-check')
             ->hourly()
@@ -186,7 +191,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // CACHE OPTIMIZATION (Production Only)
         // ==========================================
-        
+
         if (app()->environment('production')) {
             // Clear and rebuild cache weekly
             $schedule->command('optimize:clear')

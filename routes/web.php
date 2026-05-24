@@ -50,7 +50,7 @@ Route::get('/features', [HelpController::class, 'features'])->name('guest.featur
 
 // Authentication Routes
 Auth::routes(['verify' => true]);
-
+Route::get('/captcha/refresh', [App\Http\Controllers\Auth\LoginController::class, 'refreshCaptcha'])->name('captcha.refresh');
 // Protected Routes
 Route::middleware(['auth', 'verified'])->group(function () {
 

@@ -27,38 +27,38 @@ class AppServiceProvider extends ServiceProvider
         // Set default string length for MySQL
         Schema::defaultStringLength(191);
 
-        // Enable strict mode for Eloquent (disable in production to avoid issues)
+        // Disable strict mode completely to prevent memory issues
         Model::shouldBeStrict(false);
-        // Or if you want strict mode, handle lazy loading violations gracefully
-        Model::handleLazyLoadingViolationUsing(function ($model, $relation) {
-            \Illuminate\Support\Facades\Log::warning(
-                'Lazy loading attempted: ' . get_class($model) . '::' . $relation
-            );
-        });
+
+        // Comment out lazy loading handler - it can cause recursion
+        // Model::handleLazyLoadingViolationUsing(function ($model, $relation) {
+        //     \Illuminate\Support\Facades\Log::warning(
+        //         'Lazy loading attempted: ' . get_class($model) . '::' . $relation
+        //     );
+        // });
 
         // Register observers
         Incident::observe(IncidentObserver::class);
 
-        // Define gates - All gates should handle both single and double parameter calls
+        // Define gates with simple checks
         Gate::define('view-incident', function ($user, $incident = null) {
-            if (!$incident) return true; // Allow listing
+            if (!$incident) return true;
             return $user->canAccessIncident($incident);
         });
 
         Gate::define('edit-incident', function ($user, $incident = null) {
-            if (!$incident) return $user->can('edit-incident'); // Check general permission
+            if (!$incident) return $user->can('edit-incident');
             return $user->can('edit-incident') && $user->canAccessIncident($incident);
         });
 
         Gate::define('delete-incident', function ($user, $incident = null) {
-            if (!$incident) return $user->can('delete-incident'); // Check general permission
+            if (!$incident) return $user->can('delete-incident');
             return $user->can('delete-incident') &&
                    ($user->isAdmin() || $user->id === $incident->reported_by);
         });
 
-        // Department-based gates
         Gate::define('view-department-incidents', function ($user, $departmentId = null) {
-            if (!$departmentId) return true; // Allow viewing all if no department specified
+            if (!$departmentId) return true;
             return $user->isAdmin() || $user->department_id === $departmentId;
         });
 
@@ -69,14 +69,6 @@ class AppServiceProvider extends ServiceProvider
 
         \Blade::if('hod', function () {
             return auth()->check() && auth()->user()->isHOD();
-        });
-
-        \Blade::if('supervisor', function () {
-            return auth()->check() && auth()->user()->isSupervisor();
-        });
-
-        \Blade::if('staff', function () {
-            return auth()->check() && auth()->user()->isStaff();
         });
     }
 }

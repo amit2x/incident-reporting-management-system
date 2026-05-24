@@ -54,6 +54,49 @@ class User extends Authenticatable implements MustVerifyEmail
         'initials',
     ];
 
+
+
+
+    // In app/Models/User.php
+
+// Cache role checks to prevent repeated queries
+private $cachedRoles = null;
+
+private function getCachedRoles()
+{
+    if ($this->cachedRoles === null) {
+        $this->cachedRoles = $this->roles()->pluck('name')->toArray();
+    }
+    return $this->cachedRoles;
+}
+
+public function isSuperAdmin(): bool
+{
+    return in_array('super-admin', $this->getCachedRoles());
+}
+
+public function isAdmin(): bool
+{
+    $roles = $this->getCachedRoles();
+    return in_array('admin', $roles) || in_array('super-admin', $roles);
+}
+
+public function isHOD(): bool
+{
+    return in_array('hod', $this->getCachedRoles());
+}
+
+public function isSupervisor(): bool
+{
+    return in_array('supervisor', $this->getCachedRoles());
+}
+
+public function isStaff(): bool
+{
+    return in_array('staff', $this->getCachedRoles());
+}
+
+
     // ==========================================
     // RELATIONSHIPS
     // ==========================================
@@ -207,42 +250,42 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Check if user is super admin
      */
-    public function isSuperAdmin(): bool
-    {
-        return $this->hasRole('super-admin');
-    }
+    // public function isSuperAdmin(): bool
+    // {
+    //     return $this->hasRole('super-admin');
+    // }
 
-    /**
-     * Check if user is admin
-     */
-    public function isAdmin(): bool
-    {
-        return $this->hasRole('admin') || $this->hasRole('super-admin');
-    }
+    // /**
+    //  * Check if user is admin
+    //  */
+    // public function isAdmin(): bool
+    // {
+    //     return $this->hasRole('admin') || $this->hasRole('super-admin');
+    // }
 
-    /**
-     * Check if user is HOD
-     */
-    public function isHOD(): bool
-    {
-        return $this->hasRole('hod');
-    }
+    // /**
+    //  * Check if user is HOD
+    //  */
+    // public function isHOD(): bool
+    // {
+    //     return $this->hasRole('hod');
+    // }
 
-    /**
-     * Check if user is supervisor
-     */
-    public function isSupervisor(): bool
-    {
-        return $this->hasRole('supervisor');
-    }
+    // /**
+    //  * Check if user is supervisor
+    //  */
+    // public function isSupervisor(): bool
+    // {
+    //     return $this->hasRole('supervisor');
+    // }
 
-    /**
-     * Check if user is staff
-     */
-    public function isStaff(): bool
-    {
-        return $this->hasRole('staff');
-    }
+    // /**
+    //  * Check if user is staff
+    //  */
+    // public function isStaff(): bool
+    // {
+    //     return $this->hasRole('staff');
+    // }
 
     /**
      * Check if user can access an incident

@@ -258,3 +258,11 @@ $(document).ready(function() {
         document.documentElement.setAttribute('data-theme', savedTheme);
     }
 });
+
+
+// ======================================
+// Image compression
+// =====================================
+
+import imageCompression from 'browser-image-compression';
+window.imageCompression = imageCompression;

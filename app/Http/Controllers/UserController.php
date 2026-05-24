@@ -100,6 +100,9 @@ class UserController extends Controller
 
         $user->assignRole($validated['roles']);
 
+        // Send verification email immediately
+        $user->sendEmailVerificationNotification();
+
         return redirect()->route('admin.users.index')
             ->with('success', 'User created successfully.');
     }
@@ -110,7 +113,7 @@ class UserController extends Controller
     public function show(User $user)
     {
         $user->load(['department', 'roles', 'permissions']);
-        
+
         $stats = [
             'reported' => $user->reportedIncidents()->count(),
             'assigned' => $user->assignedIncidents()->count(),

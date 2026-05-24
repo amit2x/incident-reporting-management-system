@@ -114,4 +114,18 @@ return [
 
     'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-cache-'),
 
+    /*
+
+    |--------------------------------------------------------------------------
+    | Rate Limiting Cache Store
+    |--------------------------------------------------------------------------
+
+    |
+    | This option controls the cache store that will be used by the framework
+    | to track rate limiting information for your application's requests.
+    |
+    */
+
+    'limiter' => env('LIMITER_STORE', 'database'),
+
 ];

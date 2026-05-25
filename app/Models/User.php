@@ -60,42 +60,80 @@ class User extends Authenticatable implements MustVerifyEmail
     // In app/Models/User.php
 
 // Cache role checks to prevent repeated queries
-private $cachedRoles = null;
+ // Add this to cache roles
+    protected $cachedRoles = null;
+    protected $cachedPermissions = null;
 
-private function getCachedRoles()
-{
-    if ($this->cachedRoles === null) {
-        $this->cachedRoles = $this->roles()->pluck('name')->toArray();
+    /**
+     * Get cached roles to prevent repeated queries
+     */
+    public function getCachedRoles()
+    {
+        if ($this->cachedRoles === null) {
+            // Only query once per request
+            $this->cachedRoles = $this->getRoleNames()->toArray();
+        }
+        return $this->cachedRoles;
     }
-    return $this->cachedRoles;
-}
 
-public function isSuperAdmin(): bool
-{
-    return in_array('super-admin', $this->getCachedRoles());
-}
+    /**
+     * Clear role cache
+     */
+    public function clearRoleCache(): void
+    {
+        $this->cachedRoles = null;
+        $this->cachedPermissions = null;
+    }
 
-public function isAdmin(): bool
-{
-    $roles = $this->getCachedRoles();
-    return in_array('admin', $roles) || in_array('super-admin', $roles);
-}
+    /**
+     * Check if user is super admin - OPTIMIZED
+     */
+    public function isSuperAdmin(): bool
+    {
+        return in_array('super-admin', $this->getCachedRoles());
+    }
 
-public function isHOD(): bool
-{
-    return in_array('hod', $this->getCachedRoles());
-}
+    /**
+     * Check if user is admin - OPTIMIZED
+     */
+    public function isAdmin(): bool
+    {
+        $roles = $this->getCachedRoles();
+        return in_array('admin', $roles) || in_array('super-admin', $roles);
+    }
 
-public function isSupervisor(): bool
-{
-    return in_array('supervisor', $this->getCachedRoles());
-}
+    /**
+     * Check if user is HOD - OPTIMIZED
+     */
+    public function isHOD(): bool
+    {
+        return in_array('hod', $this->getCachedRoles());
+    }
 
-public function isStaff(): bool
-{
-    return in_array('staff', $this->getCachedRoles());
-}
+    /**
+     * Check if user is supervisor - OPTIMIZED
+     */
+    public function isSupervisor(): bool
+    {
+        return in_array('supervisor', $this->getCachedRoles());
+    }
 
+    /**
+     * Check if user is staff - OPTIMIZED
+     */
+    public function isStaff(): bool
+    {
+        return in_array('staff', $this->getCachedRoles());
+    }
+
+    /**
+     * Get role name - OPTIMIZED
+     */
+    // public function getRoleNameAttribute(): string
+    // {
+    //     $roles = $this->getCachedRoles();
+    //     return $roles[0] ?? 'No Role';
+    // }
 
     // ==========================================
     // RELATIONSHIPS
@@ -209,6 +247,7 @@ public function isStaff(): bool
      */
     public function getRoleNameAttribute(): string
     {
+
         // Check if roles relationship is already loaded
         if ($this->relationLoaded('roles')) {
             return $this->roles->first()?->name ?? 'No Role';
@@ -216,12 +255,17 @@ public function isStaff(): bool
 
         // If not loaded, query directly to avoid lazy loading exception
         try {
+
+            $roles = $this->getCachedRoles();
+            return $roles[0] ?? 'No Role';
             $role = $this->roles()->first();
             return $role?->name ?? 'No Role';
         } catch (\Exception $e) {
             return 'No Role';
         }
     }
+
+
 
     /**
      * Get initials

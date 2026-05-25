@@ -34,26 +34,98 @@ class IncidentController extends Controller
         $this->middleware('auth');
     }
 
-    public function index(Request $request)
-    {
+    // public function index(Request $request)
+    // {
+    //     $filters = $request->only([
+    //         'department_id', 'category_id', 'severity', 'priority',
+    //         'status', 'assigned_to', 'date_from', 'date_to', 'search',
+    //     ]);
+
+    //     // Apply role-based filters
+    //     if (! Auth::user()->isAdmin()) {
+    //         $filters['department_id'] = Auth::user()->department_id;
+    //     }
+
+    //     $incidents = $this->incidentRepository->getFeedIncidents($filters, 15);
+
+    //     if ($request->ajax()) {
+    //         return $this->paginatedResponse($incidents);
+    //     }
+
+    //     return view('incidents.index', compact('incidents', 'filters'));
+    // }
+
+    // In IncidentController - update index method
+public function index(Request $request)
+{
         $filters = $request->only([
             'department_id', 'category_id', 'severity', 'priority',
             'status', 'assigned_to', 'date_from', 'date_to', 'search',
         ]);
 
-        // Apply role-based filters
-        if (! Auth::user()->isAdmin()) {
-            $filters['department_id'] = Auth::user()->department_id;
-        }
+    $user = Auth::user();
 
-        $incidents = $this->incidentRepository->getFeedIncidents($filters, 15);
-
-        if ($request->ajax()) {
-            return $this->paginatedResponse($incidents);
-        }
-
-        return view('incidents.index', compact('incidents', 'filters'));
+    // Apply role-based filters
+    if (!$user->isAdmin()) {
+        $filters['department_id'] = $user->department_id;
     }
+
+    // Get stats efficiently
+    $stats = $this->getQuickStats($filters);
+
+    $incidents = $this->incidentRepository->getFeedIncidents($filters, 15);
+
+    if ($request->ajax()) {
+        return $this->paginatedResponse($incidents);
+    }
+
+    return view('incidents.index', compact('incidents', 'filters', 'stats'));
+}
+
+/**
+ * Get quick stats without multiple queries
+ */
+// app/Http/Controllers/IncidentController.php
+
+/**
+ * Get quick stats - fixed to return ONLY counts, not the full model
+ */
+private function getQuickStats(array $filters): array
+{
+    $query = \App\Models\Incident::query();
+
+    if (!empty($filters['department_id'])) {
+        $query->where('department_id', $filters['department_id']);
+    }
+
+    // Use DB::raw to get pure counts without loading the model
+    $result = $query->selectRaw("
+        COUNT(*) as total,
+        COALESCE(SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END), 0) as open,
+        COALESCE(SUM(CASE WHEN status = 'acknowledged' THEN 1 ELSE 0 END), 0) as acknowledged,
+        COALESCE(SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END), 0) as in_progress,
+        COALESCE(SUM(CASE WHEN status = 'escalated' THEN 1 ELSE 0 END), 0) as escalated,
+        COALESCE(SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END), 0) as resolved,
+        COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0) as closed
+    ")->first();
+
+    if ($result) {
+        return [
+            'total' => (int) ($result->total ?? 0),
+            'open' => (int) ($result->open ?? 0),
+            'acknowledged' => (int) ($result->acknowledged ?? 0),
+            'in_progress' => (int) ($result->in_progress ?? 0),
+            'escalated' => (int) ($result->escalated ?? 0),
+            'resolved' => (int) ($result->resolved ?? 0),
+            'closed' => (int) ($result->closed ?? 0),
+        ];
+    }
+
+    return [
+        'total' => 0, 'open' => 0, 'acknowledged' => 0,
+        'in_progress' => 0, 'escalated' => 0, 'resolved' => 0, 'closed' => 0
+    ];
+}
 
     public function show(Request $request, Incident $incident)
     {
@@ -422,7 +494,7 @@ class IncidentController extends Controller
             return redirect()->route('incidents.show', $incident)
                 ->with('success', 'Incident updated successfully');
         } catch (\Exception $e) {
-            \Log::error('Incident update failed: '.$e->getMessage());
+            Log::error('Incident update failed: '.$e->getMessage());
 
             if ($request->ajax()) {
                 return $this->errorResponse('Failed to update incident', 500);
@@ -466,7 +538,7 @@ class IncidentController extends Controller
         try {
             $user->notify(new \App\Notifications\IncidentAssignedNotification($incident));
         } catch (\Exception $e) {
-            \Log::warning('Assignment notification failed: ' . $e->getMessage());
+            Log::warning('Assignment notification failed: ' . $e->getMessage());
         }
 
         if ($request->ajax() || $request->wantsJson()) {
@@ -514,7 +586,7 @@ class IncidentController extends Controller
                 $escalatedUser->notify(new \App\Notifications\IncidentEscalatedNotification($incident, $escalation));
             }
         } catch (\Exception $e) {
-            \Log::warning('Escalation notification failed: ' . $e->getMessage());
+            Log::warning('Escalation notification failed: ' . $e->getMessage());
         }
 
         if ($request->ajax() || $request->wantsJson()) {
@@ -549,7 +621,7 @@ class IncidentController extends Controller
                 $incident->reporter->notify(new \App\Notifications\IncidentResolvedNotification($incident));
             }
         } catch (\Exception $e) {
-            \Log::warning('Resolve notification failed: ' . $e->getMessage());
+            Log::warning('Resolve notification failed: ' . $e->getMessage());
         }
 
         if ($request->ajax() || $request->wantsJson()) {

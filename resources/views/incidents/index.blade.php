@@ -24,129 +24,123 @@
 
     {{-- Filters Card --}}
     <div class="card mb-3">
-        <div class="card-body py-2">
-            <form id="filterForm" method="GET" action="{{ route('incidents.index') }}">
-                <div class="row g-2 align-items-end">
-                    {{-- Search --}}
-                    <div class="col-md-3 col-sm-6">
-                        <label class="form-label" style="font-size: 0.6875rem;">Search</label>
-                        <input type="text" name="search" class="form-control form-control-sm"
-                               placeholder="Search incidents..." value="{{ request('search') }}">
-                    </div>
+        {{-- Mobile Toggle Header: Only visible on small screens --}}
+        <div class="card-header d-md-none bg-transparent border-0 py-2">
+            <button class="btn btn-outline-secondary btn-sm w-100 d-flex align-items-center justify-content-between"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#mobileFilterCollapse"
+                    aria-expanded="false"
+                    aria-controls="mobileFilterCollapse">
+                <span><i class="fas fa-filter me-2"></i>Filter Incidents</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </button>
+        </div>
 
-                    {{-- Status Filter --}}
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label" style="font-size: 0.6875rem;">Status</label>
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">All Status</option>
-                            <option value="open" {{ request('status') == 'open' ? 'selected' : '' }}>Open</option>
-                            <option value="acknowledged" {{ request('status') == 'acknowledged' ? 'selected' : '' }}>Acknowledged</option>
-                            <option value="in_progress" {{ request('status') == 'in_progress' ? 'selected' : '' }}>In Progress</option>
-                            <option value="escalated" {{ request('status') == 'escalated' ? 'selected' : '' }}>Escalated</option>
-                            <option value="resolved" {{ request('status') == 'resolved' ? 'selected' : '' }}>Resolved</option>
-                            <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>Closed</option>
-                        </select>
-                    </div>
+        {{-- Collapsible Container: Hidden on mobile by default, always visible on desktop via d-md-block --}}
+        <div class="collapse d-md-block" id="mobileFilterCollapse">
+            <div class="card-body py-2 pt-0 pt-md-2">
+                <form id="filterForm" method="GET" action="{{ route('incidents.index') }}">
+                    <div class="row g-2 align-items-end">
+                        {{-- Search --}}
+                        <div class="col-12 col-md-3">
+                            <label class="form-label mb-1" style="font-size: 0.6875rem;">Search</label>
+                            <input type="text" name="search" class="form-control form-control-sm"
+                                placeholder="Search incidents..." value="{{ request('search') }}">
+                        </div>
 
-                    {{-- Severity Filter --}}
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label" style="font-size: 0.6875rem;">Severity</label>
-                        <select name="severity" class="form-select form-select-sm">
-                            <option value="">All Severity</option>
-                            <option value="critical" {{ request('severity') == 'critical' ? 'selected' : '' }}>Critical</option>
-                            <option value="high" {{ request('severity') == 'high' ? 'selected' : '' }}>High</option>
-                            <option value="medium" {{ request('severity') == 'medium' ? 'selected' : '' }}>Medium</option>
-                            <option value="low" {{ request('severity') == 'low' ? 'selected' : '' }}>Low</option>
-                        </select>
-                    </div>
+                        {{-- Status & Severity (Paired 50/50 on mobile) --}}
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1" style="font-size: 0.6875rem;">Status</label>
+                            <select name="status" class="form-select form-select-sm">
+                                <option value="">All Status</option>
+                                <option value="open" {{ request('status') == 'open' ? 'selected' : '' }}>Open</option>
+                                <option value="acknowledged" {{ request('status') == 'acknowledged' ? 'selected' : '' }}>Acknowledged</option>
+                                <option value="in_progress" {{ request('status') == 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                                <option value="escalated" {{ request('status') == 'escalated' ? 'selected' : '' }}>Escalated</option>
+                                <option value="resolved" {{ request('status') == 'resolved' ? 'selected' : '' }}>Resolved</option>
+                                <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>Closed</option>
+                            </select>
+                        </div>
 
-                    {{-- Department Filter (Admin Only) --}}
-                    @if(Auth::user()->isAdmin())
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label" style="font-size: 0.6875rem;">Department</label>
-                        <select name="department_id" class="form-select form-select-sm">
-                            <option value="">All Departments</option>
-                            @foreach(\App\Models\Department::active()->ordered()->get() as $dept)
-                                <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>
-                                    {{ $dept->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endif
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1" style="font-size: 0.6875rem;">Severity</label>
+                            <select name="severity" class="form-select form-select-sm">
+                                <option value="">All Severity</option>
+                                <option value="critical" {{ request('severity') == 'critical' ? 'selected' : '' }}>Critical</option>
+                                <option value="high" {{ request('severity') == 'high' ? 'selected' : '' }}>High</option>
+                                <option value="medium" {{ request('severity') == 'medium' ? 'selected' : '' }}>Medium</option>
+                                <option value="low" {{ request('severity') == 'low' ? 'selected' : '' }}>Low</option>
+                            </select>
+                        </div>
 
-                    {{-- Date Range --}}
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label" style="font-size: 0.6875rem;">Date From</label>
-                        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
-                    </div>
+                        {{-- Department Filter (Admin Only) --}}
+                        @if(Auth::user()->isAdmin())
+                        <div class="col-12 col-md-2">
+                            <label class="form-label mb-1" style="font-size: 0.6875rem;">Department</label>
+                            <select name="department_id" class="form-select form-select-sm">
+                                <option value="">All Departments</option>
+                                @foreach(\App\Models\Department::active()->ordered()->get() as $dept)
+                                    <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>
+                                        {{ $dept->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
 
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label" style="font-size: 0.6875rem;">Date To</label>
-                        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
-                    </div>
+                        {{-- Date From & Date To (Paired 50/50 on mobile) --}}
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1" style="font-size: 0.6875rem;">Date From</label>
+                            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
+                        </div>
 
-                    {{-- Buttons --}}
-                    <div class="col-md-1 col-sm-6 d-flex gap-1">
-                        <button type="submit" class="btn btn-primary btn-sm">
-                            <i class="fas fa-filter"></i>
-                        </button>
-                        <a href="{{ route('incidents.index') }}" class="btn btn-light btn-sm">
-                            <i class="fas fa-redo"></i>
-                        </a>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1" style="font-size: 0.6875rem;">Date To</label>
+                            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
+                        </div>
+
+                        {{-- Action Buttons --}}
+                        <div class="col-12 col-md-auto ms-md-auto d-flex gap-1 pt-2 pt-md-0">
+                            <button type="submit" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 px-3">
+                                <i class="fas fa-filter me-1 d-md-none"></i>Filter
+                            </button>
+                            <a href="{{ route('incidents.index') }}" class="btn btn-light btn-sm flex-fill flex-md-grow-0">
+                                <i class="fas fa-redo"></i>
+                            </a>
+                        </div>
                     </div>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
+
 
     {{-- Quick Stats --}}
     <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3 col-lg-2">
-            <a href="{{ route('incidents.index', ['status' => 'open']) }}"
-               class="text-decoration-none">
-                <div class="stat-card p-3 text-center {{ request('status') == 'open' ? 'border-primary' : '' }}">
-                    <div class="fw-bold" style="color: #3B82F6;">
-                        {{ \App\Models\Incident::where('status', 'open')->when(!Auth::user()->isAdmin(), fn($q) => $q->where('department_id', Auth::user()->department_id))->count() }}
-                    </div>
-                    <small class="text-muted">Open</small>
+        @php
+            $statusList = [
+                'open' => ['label' => 'Open', 'color' => '#3B82F6'],
+                'acknowledged' => ['label' => 'Acknowledged', 'color' => '#F59E0B'],
+                'in_progress' => ['label' => 'In Progress', 'color' => '#8B5CF6'],
+                'escalated' => ['label' => 'Escalated', 'color' => '#EF4444'],
+                'resolved' => ['label' => 'Resolved', 'color' => '#10B981'],
+                'closed' => ['label' => 'Closed', 'color' => '#6B7280']
+            ];
+        @endphp
+        @foreach($statusList as $key => $status)
+        <div class="col-4 col-md-2">
+            <a href="{{ route('incidents.index', ['status' => $key]) }}" class="text-decoration-none">
+                <div class="border rounded-3 p-2 text-center {{ request('status') == $key ? 'border-primary bg-light' : '' }}"
+                     style="transition: all 0.2s;">
+                    <div class="fw-bold fs-5" style="color: {{ $status['color'] }}">{{ $stats[$key] ?? 0 }}</div>
+                    <small class="text-muted" style="font-size: 0.65rem;">{{ $status['label'] }}</small>
                 </div>
             </a>
         </div>
-        <div class="col-6 col-md-3 col-lg-2">
-            <a href="{{ route('incidents.index', ['status' => 'in_progress']) }}"
-               class="text-decoration-none">
-                <div class="stat-card p-3 text-center {{ request('status') == 'in_progress' ? 'border-primary' : '' }}">
-                    <div class="fw-bold" style="color: #8B5CF6;">
-                        {{ \App\Models\Incident::where('status', 'in_progress')->when(!Auth::user()->isAdmin(), fn($q) => $q->where('department_id', Auth::user()->department_id))->count() }}
-                    </div>
-                    <small class="text-muted">In Progress</small>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-lg-2">
-            <a href="{{ route('incidents.index', ['status' => 'escalated']) }}"
-               class="text-decoration-none">
-                <div class="stat-card p-3 text-center {{ request('status') == 'escalated' ? 'border-primary' : '' }}">
-                    <div class="fw-bold" style="color: #EF4444;">
-                        {{ \App\Models\Incident::where('status', 'escalated')->when(!Auth::user()->isAdmin(), fn($q) => $q->where('department_id', Auth::user()->department_id))->count() }}
-                    </div>
-                    <small class="text-muted">Escalated</small>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-lg-2">
-            <a href="{{ route('incidents.index', ['status' => 'resolved']) }}"
-               class="text-decoration-none">
-                <div class="stat-card p-3 text-center {{ request('status') == 'resolved' ? 'border-primary' : '' }}">
-                    <div class="fw-bold" style="color: #10B981;">
-                        {{ \App\Models\Incident::where('status', 'resolved')->when(!Auth::user()->isAdmin(), fn($q) => $q->where('department_id', Auth::user()->department_id))->count() }}
-                    </div>
-                    <small class="text-muted">Resolved</small>
-                </div>
-            </a>
-        </div>
+        @endforeach
     </div>
+
 
     {{-- Incidents List --}}
     <div class="card">

@@ -1,136 +1,90 @@
-<div class="incident-card" data-incident-id="{{ $incident->id }}">
-    {{-- Header --}}
-    <div class="incident-header">
-        @if(!$incident->is_anonymous)
-            <img src="{{ $incident->reporter->avatar_url }}" alt="{{ $incident->reporter->name }}" class="user-avatar">
-        @else
-            <div class="user-avatar bg-secondary d-flex align-items-center justify-content-center">
-                <i class="fas fa-user-secret text-white"></i>
-            </div>
-        @endif
-        
-        <div class="incident-meta">
-            <div class="d-flex align-items-center gap-2">
-                <span class="user-name">
-                    {{ $incident->is_anonymous ? 'Anonymous' : $incident->reporter->name }}
-                </span>
-                <span class="badge" style="background: {{ $incident->department->color }}20; color: {{ $incident->department->color }}; font-size: 0.625rem;">
-                    {{ $incident->department->code }}
-                </span>
-            </div>
-            <div class="incident-time">
-                <i class="far fa-clock me-1"></i>
-                {{ $incident->created_at->diffForHumans() }}
-                @if($incident->location)
-                    <i class="fas fa-map-marker-alt ms-2 me-1"></i>
-                    {{ $incident->location }}
-                @endif
-            </div>
-        </div>
-        
-        <div class="dropdown">
-            <button class="btn btn-light btn-sm" data-bs-toggle="dropdown">
-                <i class="fas fa-ellipsis-v"></i>
-            </button>
-            <div class="dropdown-menu dropdown-menu-end">
-                <a href="{{ route('incidents.show', $incident) }}" class="dropdown-item">
-                    <i class="fas fa-eye me-2"></i>View Details
-                </a>
-                @can('edit-incident')
-                <a href="{{ route('incidents.edit', $incident) }}" class="dropdown-item">
-                    <i class="fas fa-edit me-2"></i>Edit
-                </a>
-                @endcan
-                @can('delete-incident')
-                <div class="dropdown-divider"></div>
-                <button class="dropdown-item text-danger" onclick="deleteIncident({{ $incident->id }})">
-                    <i class="fas fa-trash me-2"></i>Delete
-                </button>
-                @endcan
+{{-- resources/views/incidents/partials/incident-card.blade.php --}}
+<div class="card shadow-sm mb-2 incident-card-mobile" style="border-radius: 12px; cursor: pointer;"
+     onclick="window.location='{{ route('incidents.show', $incident) }}'">
+    <div class="card-body p-3">
+        {{-- Header --}}
+        <div class="d-flex align-items-start gap-2 mb-2">
+            @if(!$incident->is_anonymous && $incident->reporter)
+                <img src="{{ $incident->reporter->avatar_url }}" alt="Reporter"
+                     class="rounded-circle flex-shrink-0" width="36" height="36" style="object-fit: cover;">
+            @else
+                <div class="rounded-circle bg-secondary flex-shrink-0 d-flex align-items-center justify-content-center"
+                     style="width: 36px; height: 36px;">
+                    <i class="fas fa-user-secret text-white" style="font-size: 0.75rem;"></i>
+                </div>
+            @endif
+            <div class="flex-grow-1 min-width-0">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="fw-semibold" style="font-size: 0.8125rem;">
+                            {{ $incident->is_anonymous ? 'Anonymous' : ($incident->reporter?->name ?? 'Unknown') }}
+                        </div>
+                        <small class="text-muted" style="font-size: 0.6875rem;">
+                            {{ $incident->created_at->diffForHumans() }}
+                            @if($incident->location)
+                                <span class="ms-1"><i class="fas fa-map-marker-alt"></i> {{ Str::limit($incident->location, 20) }}</span>
+                            @endif
+                        </small>
+                    </div>
+                    <span class="badge status-{{ str_replace('_', '-', $incident->status) }}" style="font-size: 0.6rem;">
+                        {{ str_replace('_', ' ', ucfirst($incident->status)) }}
+                    </span>
+                </div>
             </div>
         </div>
-    </div>
-    
-    {{-- Body --}}
-    <div class="incident-body">
-        <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="incident-id-badge badge bg-light text-dark">
-                #{{ $incident->incident_id }}
-            </span>
-            <span class="status-badge {{ str_replace('_', '-', $incident->status) }}">
-                {{ str_replace('_', ' ', ucfirst($incident->status)) }}
-            </span>
-            <span class="priority-badge {{ $incident->priority }}">
-                <i class="fas fa-flag me-1"></i>{{ ucfirst($incident->priority) }}
-            </span>
-        </div>
-        
-        <h5 class="incident-title">{{ $incident->title }}</h5>
-        <p class="incident-description">
-            {{ Str::limit($incident->description, 200) }}
+
+        {{-- Title --}}
+        <h6 class="mb-1" style="font-size: 0.875rem;">
+            <span class="text-muted small">#{{ $incident->incident_id }}</span>
+            {{ Str::limit($incident->title, 60) }}
+        </h6>
+
+        {{-- Description --}}
+        <p class="text-muted mb-2" style="font-size: 0.75rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+            {{ $incident->description }}
         </p>
-        
-        {{-- Category & Tags --}}
-        <div class="d-flex flex-wrap gap-2 mb-2">
-            <span class="badge" style="background: {{ $incident->category->color }}20; color: {{ $incident->category->color }}">
-                <i class="{{ $incident->category->icon }} me-1"></i>
+
+        {{-- Badges Row --}}
+        <div class="d-flex flex-wrap align-items-center gap-1">
+            <span class="badge priority-{{ $incident->priority }}" style="font-size: 0.6rem;">
+                {{ ucfirst($incident->priority) }}
+            </span>
+            @if($incident->category)
+            <span class="badge" style="background: {{ $incident->category->color }}15; color: {{ $incident->category->color }}; font-size: 0.6rem;">
                 {{ $incident->category->name }}
             </span>
-            @if($incident->tags)
-                @foreach($incident->tags as $tag)
-                    <span class="badge bg-light text-dark">{{ $tag }}</span>
-                @endforeach
+            @endif
+            @if($incident->department)
+            <span class="badge" style="background: {{ $incident->department->color }}15; color: {{ $incident->department->color }}; font-size: 0.6rem;">
+                {{ $incident->department->code }}
+            </span>
+            @endif
+            @if($incident->is_overdue)
+            <span class="badge bg-danger" style="font-size: 0.6rem;">Overdue</span>
+            @endif
+            @if($incident->assignedTo)
+            <span class="badge bg-light text-dark ms-auto" style="font-size: 0.6rem;" onclick="event.stopPropagation();">
+                <i class="fas fa-user me-1"></i>{{ $incident->assignedTo->name }}
+            </span>
             @endif
         </div>
-        
-        {{-- Media Preview --}}
+
+        {{-- Media Thumbnails --}}
         @if($incident->media->count() > 0)
-            <div class="media-preview">
-                @foreach($incident->media->take(4) as $media)
+            <div class="d-flex gap-1 mt-2" style="overflow-x: auto;">
+                @foreach($incident->media->take(3) as $media)
                     @if($media->isImage())
-                        <img src="{{ $media->thumbnail_url }}" alt="Incident media" 
-                             loading="lazy" onclick="openImagePreview('{{ $media->url }}')">
-                    @elseif($media->isVideo())
-                        <video src="{{ $media->url }}" preload="metadata"></video>
-                    @else
-                        <div class="document-preview d-flex align-items-center justify-content-center">
-                            <i class="fas fa-file-pdf fa-2x text-danger"></i>
-                        </div>
+                        <img src="{{ $media->url }}" alt="Media"
+                             style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0;"
+                             onclick="event.stopPropagation(); window.open('{{ $media->url }}', '_blank')">
                     @endif
                 @endforeach
-                @if($incident->media->count() > 4)
-                    <div class="more-media d-flex align-items-center justify-content-center">
-                        <span>+{{ $incident->media->count() - 4 }}</span>
+                @if($incident->media->count() > 3)
+                    <div class="d-flex align-items-center justify-content-center bg-light rounded"
+                         style="width: 60px; height: 60px; flex-shrink: 0; font-size: 0.75rem; color: #6b7280;">
+                        +{{ $incident->media->count() - 3 }}
                     </div>
                 @endif
-            </div>
-        @endif
-    </div>
-    
-    {{-- Footer --}}
-    <div class="incident-footer">
-        <button class="action-btn like-btn {{ $incident->likes_count > 0 ? 'text-primary' : '' }}" 
-                onclick="toggleLike({{ $incident->id }})">
-            <i class="far fa-thumbs-up"></i>
-            <span>{{ $incident->likes_count }}</span>
-        </button>
-        
-        <button class="action-btn" onclick="expandComments({{ $incident->id }})">
-            <i class="far fa-comment"></i>
-            <span>{{ $incident->comments_count }}</span>
-        </button>
-        
-        <button class="action-btn" onclick="shareIncident({{ $incident->id }})">
-            <i class="far fa-share-square"></i>
-            Share
-        </button>
-        
-        @if($incident->assignedTo)
-            <div class="ms-auto d-flex align-items-center">
-                <small class="text-muted me-2">Assigned to:</small>
-                <img src="{{ $incident->assignedTo->avatar_url }}" alt="Assignee" 
-                     class="rounded-circle" width="24" height="24"
-                     data-bs-toggle="tooltip" title="{{ $incident->assignedTo->name }}">
             </div>
         @endif
     </div>

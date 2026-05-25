@@ -5,6 +5,41 @@
     <li class="breadcrumb-item active">Dashboard</li>
 @endsection
 
+@push('styles')
+    <style>
+    /* Responsive overrides for smaller screen viewports */
+    @media (max-width: 575.98px) {
+        .stat-card {
+            padding: 0.75rem !important; /* Slightly more compact padding */
+            position: relative;
+        }
+        .stat-icon {
+            width: 32px !important;
+            height: 32px !important;
+            font-size: 0.875rem !important;
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+        }
+        .stat-value {
+            font-size: 1.25rem !important; /* Prevents text overflow */
+            line-height: 1.2;
+            margin-bottom: 0.125rem;
+        }
+        .stat-label {
+            font-size: 0.75rem !important;
+            margin-bottom: 0.25rem !important;
+            max-width: 80%; /* Keeps text from clipping underneath the absolute icon */
+        }
+        .stat-change {
+            font-size: 0.65rem !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+</style>
+@endpush
 @section('content')
 <div class="page-enter">
 
@@ -21,36 +56,38 @@
         </a>
     </div>
 
+
     {{-- Statistics Cards --}}
-    <div class="row g-3 mb-4">
-        <div class="col-xl-3 col-md-6">
-            <div class="stat-card">
+    <div class="row g-2 g-md-3 mb-4"> {{-- Thinner gutter grids on mobile to save spacing --}}
+        {{-- Changed col-md-6 to col-6 for mobile pairing --}}
+        <div class="col-6 col-md-6 col-xl-3">
+            <div class="stat-card h-100">
                 <div class="stat-icon bg-primary bg-opacity-10">
                     <i class="fas fa-clipboard-list text-primary"></i>
                 </div>
                 <div class="stat-value">{{ $stats['total_incidents'] ?? 0 }}</div>
                 <div class="stat-label">Total Incidents</div>
                 <div class="stat-change positive">
-                    <i class="fas fa-arrow-up"></i> 12% from last month
+                    <i class="fas fa-arrow-up"></i> 12% <span class="d-none d-sm-inline">last month</span>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="stat-card">
+        <div class="col-6 col-md-6 col-xl-3">
+            <div class="stat-card h-100">
                 <div class="stat-icon bg-warning bg-opacity-10">
                     <i class="fas fa-clock text-warning"></i>
                 </div>
                 <div class="stat-value">{{ $stats['open_incidents'] ?? 0 }}</div>
                 <div class="stat-label">Open Incidents</div>
                 <div class="stat-change negative">
-                    <i class="fas fa-exclamation-circle"></i> Needs attention
+                    <i class="fas fa-exclamation-circle"></i> <span class="d-none d-sm-inline">Needs attention</span><span class="d-inline d-sm-none">Urgent</span>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="stat-card">
+        <div class="col-6 col-md-6 col-xl-3">
+            <div class="stat-card h-100">
                 <div class="stat-icon bg-success bg-opacity-10">
                     <i class="fas fa-check-circle text-success"></i>
                 </div>
@@ -62,8 +99,8 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="stat-card">
+        <div class="col-6 col-md-6 col-xl-3">
+            <div class="stat-card h-100">
                 <div class="stat-icon bg-danger bg-opacity-10">
                     <i class="fas fa-arrow-up text-danger"></i>
                 </div>

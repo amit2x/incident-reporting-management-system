@@ -27,12 +27,13 @@
             {{-- Right: Actions --}}
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
                 @auth
-                <a href="{{ route('incidents.create') }}" class="btn btn-primary btn-sm d-none d-md-flex align-items-center gap-1" style="border-radius: var(--radius-full); padding: 8px 16px;">
+                <a href="{{ route('incidents.create') }}" class="btn btn-primary btn-sm d-none d-md-flex align-items-center gap-1"
+                   style="border-radius: var(--radius-full); padding: 8px 16px;">
                     <i class="fas fa-plus"></i>
                     <span>Report</span>
                 </a>
 
-                {{-- Notifications - Using onclick instead of data-bs-toggle --}}
+                {{-- Notifications --}}
                 <div class="position-relative">
                     <button class="btn btn-light position-relative d-flex align-items-center justify-content-center"
                             onclick="toggleNotificationDropdown(event)"
@@ -46,14 +47,17 @@
                         </span>
                     </button>
 
-                    {{-- Dropdown Menu --}}
+                    {{-- Dropdown Menu - Fixed positioning for mobile --}}
                     <div class="notification-dropdown-menu" id="notificationDropdownMenu"
-                         style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; width: 360px; max-height: 480px; background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); z-index: 1050; overflow: hidden;">
+                         style="display: none; position: fixed; top: var(--topbar-height, 60px); right: 8px; left: 8px;
+                                max-width: 400px; max-height: 70vh; margin-left: auto;
+                                background: white; border-radius: 12px;
+                                box-shadow: 0 20px 60px rgba(0,0,0,0.2); z-index: 1050; overflow: hidden;">
                         <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
                             <h6 class="mb-0 fw-semibold">Notifications</h6>
                             <a href="{{ route('notifications.index') }}" class="text-decoration-none small fw-medium">View All</a>
                         </div>
-                        <div id="notificationDropdownContent" style="max-height: 380px; overflow-y: auto;">
+                        <div id="notificationDropdownContent" style="max-height: calc(70vh - 60px); overflow-y: auto;">
                             <div class="text-center py-4">
                                 <div class="spinner-border spinner-border-sm text-primary" role="status">
                                     <span class="visually-hidden">Loading...</span>
@@ -142,8 +146,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isVisible) {
             notificationDropdown.style.display = 'none';
+            document.body.style.overflow = ''; // Restore scrolling
         } else {
             notificationDropdown.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // Prevent background scroll on mobile
             loadNotificationDropdown();
         }
     };
@@ -155,7 +161,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (notificationDropdown && notificationDropdown.style.display === 'block') {
             if (!notificationBell.contains(event.target) && !notificationDropdown.contains(event.target)) {
                 notificationDropdown.style.display = 'none';
+                document.body.style.overflow = '';
             }
+        }
+    });
+
+    // ==========================================
+    // CLOSE ON ESCAPE KEY
+    // ==========================================
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && notificationDropdown && notificationDropdown.style.display === 'block') {
+            notificationDropdown.style.display = 'none';
+            document.body.style.overflow = '';
         }
     });
 
@@ -177,7 +194,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
-            console.log('Unread count:', data.count); // Debug
             if (notificationBadge) {
                 if (data.count > 0) {
                     notificationBadge.textContent = data.count > 99 ? '99+' : data.count;
@@ -196,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadNotificationDropdown() {
         if (!notificationContent) return;
 
-        // Show loading
         notificationContent.innerHTML = `
             <div class="text-center py-4">
                 <div class="spinner-border spinner-border-sm text-primary" role="status">
@@ -213,8 +228,6 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(res => res.json())
         .then(notifications => {
-            console.log('Notifications loaded:', notifications); // Debug
-
             if (!notifications || notifications.length === 0) {
                 notificationContent.innerHTML = `
                     <div class="text-center py-4 text-muted">
@@ -225,11 +238,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             notificationContent.innerHTML = notifications.map(n => `
-                <a href="${n.url || '#'}" class="text-decoration-none">
-                    <div class="px-3 py-2 border-bottom ${n.read ? '' : 'bg-light'}"
-                         style="cursor:pointer; transition: background 0.15s;"
-                         onmouseover="this.style.background='#f8fafc'"
-                         onmouseout="this.style.background='${n.read ? 'transparent' : '#f8fafc'}'">
+                <a href="${n.url || '#'}" class="text-decoration-none" onclick="closeNotificationDropdown()">
+                    <div class="px-3 py-2 border-bottom ${n.read ? '' : 'bg-light'}" style="cursor:pointer;">
                         <div class="d-flex align-items-start gap-2">
                             <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
                                  style="width:36px;height:36px;background:${n.color || '#6B7280'}15;color:${n.color || '#6B7280'};">
@@ -247,7 +257,6 @@ document.addEventListener('DOMContentLoaded', function() {
             `).join('');
         })
         .catch(err => {
-            console.log('Dropdown error:', err);
             notificationContent.innerHTML = `
                 <div class="text-center py-4 text-muted">
                     <small>Failed to load notifications</small>
@@ -256,12 +265,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ==========================================
+    // CLOSE DROPDOWN HELPER
+    // ==========================================
+    window.closeNotificationDropdown = function() {
+        if (notificationDropdown) {
+            notificationDropdown.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    };
+
+    // ==========================================
     // INITIALIZE
     // ==========================================
     loadUnreadCount();
     setInterval(loadUnreadCount, 30000);
 
-    console.log('Notification system initialized'); // Debug
 });
 </script>
 @endpush

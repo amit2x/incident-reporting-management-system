@@ -277,13 +277,7 @@
         {{-- Pagination --}}
         @if(isset($incidents) && $incidents->hasPages())
             <div class="card-footer">
-                <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        Showing {{ $incidents->firstItem() ?? 0 }} - {{ $incidents->lastItem() ?? 0 }}
-                        of {{ $incidents->total() }} incidents
-                    </small>
-                    {{ $incidents->appends(request()->query())->links() }}
-                </div>
+                {{ $incidents->appends(request()->query())->links('pagination::bootstrap-5') }}
             </div>
         @endif
     </div>

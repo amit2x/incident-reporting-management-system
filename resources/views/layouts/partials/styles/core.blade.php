@@ -12,32 +12,32 @@
         --primary-500: #3b82f6;
         --primary-600: #2563eb;
         --primary-700: #1d4ed8;
-        
+
         --secondary: #7c3aed;
         --secondary-light: #a78bfa;
-        
+
         --accent: #f59e0b;
         --accent-light: #fcd34d;
-        
+
         /* ==========================================
            STATUS COLORS
            ========================================== */
         --success: #059669;
         --success-light: #d1fae5;
         --success-bg: #ecfdf5;
-        
+
         --danger: #dc2626;
         --danger-light: #fee2e2;
         --danger-bg: #fef2f2;
-        
+
         --warning: #d97706;
         --warning-light: #fef3c7;
         --warning-bg: #fffbeb;
-        
+
         --info: #0891b2;
         --info-light: #cffafe;
         --info-bg: #ecfeff;
-        
+
         /* ==========================================
            NEUTRAL COLORS
            ========================================== */
@@ -51,16 +51,16 @@
         --gray-700: #374151;
         --gray-800: #1f2937;
         --gray-900: #111827;
-        
+
         --white: #ffffff;
         --black: #000000;
-        
+
         /* ==========================================
            TYPOGRAPHY
            ========================================== */
         --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         --font-heading: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        
+
         --text-xs: 0.75rem;
         --text-sm: 0.8125rem;
         --text-base: 0.875rem;
@@ -69,7 +69,7 @@
         --text-2xl: 1.25rem;
         --text-3xl: 1.5rem;
         --text-4xl: 1.875rem;
-        
+
         /* ==========================================
            SPACING & LAYOUT
            ========================================== */
@@ -78,7 +78,7 @@
         --bottom-nav-height: 64px;
         --safe-area-bottom: env(safe-area-inset-bottom, 0px);
         --safe-area-top: env(safe-area-inset-top, 0px);
-        
+
         /* ==========================================
            BORDERS & RADIUS
            ========================================== */
@@ -90,7 +90,7 @@
         --radius-xl: 16px;
         --radius-2xl: 20px;
         --radius-full: 9999px;
-        
+
         /* ==========================================
            SHADOWS
            ========================================== */
@@ -100,7 +100,7 @@
         --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
         --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        
+
         /* ==========================================
            TRANSITIONS
            ========================================== */
@@ -157,7 +157,7 @@
     }
     a:hover { color: var(--primary-dark); }
 
-    img { max-width: 100%; height: auto; }
+    img { max-width: 100%; }
 
     ul, ol { list-style: none; padding: 0; margin: 0; }
 

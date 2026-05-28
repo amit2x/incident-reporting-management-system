@@ -3,6 +3,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -114,7 +115,7 @@ class UserController extends BaseApiController
         }
 
         $data = $request->except('password');
-        
+
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }
@@ -196,5 +197,45 @@ class UserController extends BaseApiController
             ->paginate(50);
 
         return $this->paginatedResponse($activities);
+    }
+
+
+    /**
+     * Get users for @mention suggestions
+     */
+    public function mentionSuggestions()
+    {
+        $users = User::active()
+            ->select('id', 'name', 'username', 'avatar')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'avatar_url' => $user->avatar_url,
+                ];
+            });
+
+        return response()->json(['success' => true, 'data' => $users]);
+    }
+
+    /**
+     * Get users by department for escalation
+     */
+    public function departmentUsers(Department $department)
+    {
+        $users = $department->users()->active()
+            ->get(['id', 'name', 'username', 'designation'])
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'role_name' => $user->getFirstRoleName(),
+                ];
+            });
+
+        return response()->json(['success' => true, 'data' => $users]);
     }
 }

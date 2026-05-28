@@ -97,46 +97,85 @@ class IncidentRepository extends BaseRepository
     // }
 
 
+// public function getIncidentDetails(int $id): Incident
+// {
+//     return $this->model->with([
+//         'reporter' => function ($query) {
+//             $query->with('roles'); // Eager load roles
+//         },
+//         'assignedTo' => function ($query) {
+//             $query->with('roles'); // Eager load roles
+//         },
+//         'department',
+//         'category',
+//         'escalatedTo' => function ($query) {
+//             $query->with('roles'); // Eager load roles
+//         },
+//         'media',
+//         'comments' => function ($query) {
+//             $query->with(['user' => function ($q) {
+//                 $q->with('roles'); // Eager load roles for comment users
+//             }, 'replies.user' => function ($q) {
+//                 $q->with('roles'); // Eager load roles for reply users
+//             }])->latest();
+//         },
+//         'logs' => function ($query) {
+//             $query->with('user')->latest()->limit(50);
+//         },
+//         'escalations' => function ($query) {
+//             $query->with(['escalatedBy' => function ($q) {
+//                 $q->with('roles');
+//             }, 'escalatedTo' => function ($q) {
+//                 $q->with('roles');
+//             }])->latest();
+//         },
+//         'assignments' => function ($query) {
+//             $query->with(['assignedBy' => function ($q) {
+//                 $q->with('roles');
+//             }, 'assignedTo' => function ($q) {
+//                 $q->with('roles');
+//             }])->latest();
+//         },
+//     ])->findOrFail($id);
+// }
+
+// app/Repositories/IncidentRepository.php
+
 public function getIncidentDetails(int $id): Incident
 {
     return $this->model->with([
         'reporter' => function ($query) {
-            $query->with('roles'); // Eager load roles
+            $query->with('roles');
         },
         'assignedTo' => function ($query) {
-            $query->with('roles'); // Eager load roles
+            $query->with('roles');
         },
         'department',
         'category',
         'escalatedTo' => function ($query) {
-            $query->with('roles'); // Eager load roles
+            $query->with('roles');
         },
         'media',
+        // CRITICAL: Load comments properly with nested relationships
         'comments' => function ($query) {
-            $query->with(['user' => function ($q) {
-                $q->with('roles'); // Eager load roles for comment users
-            }, 'replies.user' => function ($q) {
-                $q->with('roles'); // Eager load roles for reply users
-            }])->latest();
+            $query->whereNull('parent_id') // Only root comments
+                  ->with(['user', 'replies' => function ($q) {
+                      $q->with('user')->oldest();
+                  }])
+                  ->latest();
         },
         'logs' => function ($query) {
             $query->with('user')->latest()->limit(50);
         },
         'escalations' => function ($query) {
-            $query->with(['escalatedBy' => function ($q) {
-                $q->with('roles');
-            }, 'escalatedTo' => function ($q) {
-                $q->with('roles');
-            }])->latest();
+            $query->with(['escalatedBy', 'escalatedTo', 'fromDepartment', 'toDepartment'])->latest();
         },
         'assignments' => function ($query) {
-            $query->with(['assignedBy' => function ($q) {
-                $q->with('roles');
-            }, 'assignedTo' => function ($q) {
-                $q->with('roles');
-            }])->latest();
+            $query->with(['assignedBy', 'assignedTo'])->latest();
         },
-    ])->findOrFail($id);
+    ])
+    ->withCount('comments')
+    ->findOrFail($id);
 }
 
     public function getDepartmentIncidents(int $departmentId, array $filters = []): LengthAwarePaginator

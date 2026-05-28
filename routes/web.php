@@ -61,7 +61,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // ==========================================
-    // INCIDENT ROUTES (Using explicit routes instead of resource to avoid conflicts)
+    // INCIDENT ROUTES
     // ==========================================
 
     // List incidents
@@ -93,12 +93,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/incidents/{incident}/close', [IncidentController::class, 'close'])->name('incidents.close');
     Route::post('/incidents/{incident}/reopen', [IncidentController::class, 'reopen'])->name('incidents.reopen');
 
+     // Newly added Incident Actions
+    Route::post('/incidents/{incident}/reopen', [IncidentController::class, 'reopen'])->name('incidents.reopen');
+    Route::post('/incidents/{incident}/reject', [IncidentController::class, 'reject'])->name('incidents.reject');
+    Route::post('/incidents/{incident}/reassign', [IncidentController::class, 'reassign'])->name('incidents.reassign');
+
+
     // Comments
     Route::post('/incidents/{incident}/comments', [IncidentController::class, 'addComment'])->name('incidents.comments.store');
+     // Edit comment
+    Route::put('/incidents/{incident}/comments/{comment}', [IncidentController::class, 'editComment'])->name('incidents.comments.update');
+
+    // Delete comment
+    Route::delete('/incidents/{incident}/comments/{comment}', [IncidentController::class, 'deleteComment'])->name('incidents.comments.destroy');
+
+
+    // Comment with media
+    Route::post('/incidents/{incident}/comments', [IncidentController::class, 'addComment'])->name('incidents.comments.store');
+
 
     // Media
     Route::post('/incidents/{incident}/media', [IncidentController::class, 'uploadMedia'])->name('incidents.media.store');
     Route::delete('/incidents/{incident}/media/{media}', [IncidentController::class, 'deleteMedia'])->name('incidents.media.destroy');
+
+
+    // Incident share data
+    Route::get('/incidents/{incident}/share', [IncidentController::class, 'shareData'])->name('incidents.share');
 
     // ==========================================
     // REPORT ROUTES
@@ -215,6 +235,93 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/system-settings', [SettingsController::class, 'updateSystemSettings'])
             ->name('system-settings.update');
     });
+
+
+    // API-like routes for AJAX calls (using web session auth)
+    Route::prefix('api/v1')->name('api.')->group(function () {
+
+        // Get users for @mention suggestions
+        Route::get('/ajax/users/mention-suggestions', function () {
+            $users = \App\Models\User::active()
+                ->select('id', 'name', 'username', 'avatar')
+                ->get()
+                ->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'username' => $user->username,
+                        'avatar_url' => $user->avatar_url,
+                    ];
+                });
+
+            return response()->json(['success' => true, 'data' => $users]);
+        })->name('users.mention-suggestions');
+
+        // Get users by department (for escalation modal)
+        Route::get('/departments/{department}/users', function (\App\Models\Department $department) {
+            $users = $department->users()->active()
+                ->get(['id', 'name', 'username', 'designation'])
+                ->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'username' => $user->username,
+                        'role_name' => $user->getFirstRoleName(),
+                    ];
+                });
+
+            return response()->json(['success' => true, 'data' => $users]);
+        })->name('department.users');
+
+        // Get notification unread count
+        Route::get('/notifications/unread-count', function () {
+            $count = Auth::user()->unreadNotifications()->count();
+            return response()->json(['count' => $count]);
+        })->name('notifications.unread-count');
+
+        // Get latest notifications for dropdown
+        Route::get('/notifications/latest', function () {
+            $notifications = Auth::user()->notifications()
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(function ($n) {
+                    $type = $n->data['type'] ?? 'general';
+                    return [
+                        'id' => $n->id,
+                        'title' => $n->data['title'] ?? 'Notification',
+                        'message' => $n->data['message'] ?? '',
+                        'type' => $type,
+                        'icon' => match($type) {
+                            'new_incident' => 'fa-exclamation-triangle',
+                            'incident_assigned' => 'fa-user-plus',
+                            'incident_escalated' => 'fa-arrow-up',
+                            'incident_resolved' => 'fa-check-circle',
+                            'incident_closed' => 'fa-lock',
+                            'new_comment' => 'fa-comment',
+                            'mentioned' => 'fa-at',
+                            default => 'fa-bell',
+                        },
+                        'color' => match($type) {
+                            'new_incident', 'incident_escalated' => '#EF4444',
+                            'incident_assigned' => '#3B82F6',
+                            'incident_resolved' => '#10B981',
+                            'incident_closed' => '#6B7280',
+                            'new_comment' => '#8B5CF6',
+                            'mentioned' => '#EC4899',
+                            default => '#6B7280',
+                        },
+                        'time' => $n->created_at->diffForHumans(),
+                        'read' => !is_null($n->read_at),
+                        'url' => $n->data['url'] ?? route('notifications.index'),
+                    ];
+                });
+
+            return response()->json($notifications);
+        })->name('notifications.latest');
+
+    });
+
 });
 
 

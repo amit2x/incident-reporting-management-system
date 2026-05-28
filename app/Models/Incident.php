@@ -534,6 +534,9 @@ class Incident extends Model
         return false;
     }
 
+    /**
+     * Get escalation level (count of escalations)
+     */
     public function getEscalationLevel(): int
     {
         return $this->escalations()->count();
@@ -567,4 +570,89 @@ class Incident extends Model
         if (!$user) return false;
         return $this->likes()->where('user_id', $user->id)->exists();
     }
+
+    //  New methods and relationships for handling historical and reopen case
+
+    /**
+     * Get assignment history for tracking
+     */
+    public function assignmentHistory(): HasMany
+    {
+        return $this->hasMany(IncidentAssignment::class)
+            ->with(['assignedBy', 'assignedTo'])
+            ->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Get current active assignment
+     */
+    public function currentAssignment(): ?IncidentAssignment
+    {
+        return $this->assignments()
+            ->where('is_active', true)
+            ->with(['assignedBy', 'assignedTo'])
+            ->first();
+    }
+
+    /**
+     * Check if incident can be reopened
+     */
+    public function canBeReopened(): bool
+    {
+        return in_array($this->status, ['resolved', 'closed']);
+    }
+
+    /**
+     * Check if incident can be rejected
+     */
+    public function canBeRejected(): bool
+    {
+        return in_array($this->status, ['open', 'acknowledged']);
+    }
+
+    /**
+     * Check if incident can be reassigned
+     */
+    public function canBeReassigned(): bool
+    {
+        return in_array($this->status, ['open', 'acknowledged', 'in_progress', 'escalated']);
+    }
+
+    /**
+     * Get share data for WhatsApp/web sharing
+     */
+    public function getShareData(): array
+    {
+        return [
+            'title' => "Incident #{$this->incident_id}: {$this->title}",
+            'description' => \Str::limit(strip_tags($this->description), 200),
+            'status' => ucfirst(str_replace('_', ' ', $this->status)),
+            'severity' => ucfirst($this->severity),
+            'priority' => ucfirst($this->priority),
+            'department' => $this->department?->name,
+            'category' => $this->category?->name,
+            'location' => $this->location,
+            'reported_by' => $this->is_anonymous ? 'Anonymous' : $this->reporter?->name,
+            'reported_at' => $this->created_at->format('d M Y, H:i'),
+            'url' => route('incidents.show', $this->id),
+        ];
+    }
+
+    /**
+     * Get WhatsApp share URL
+     */
+    public function getWhatsAppShareUrl(): string
+    {
+        $text = "*Incident #{$this->incident_id}: {$this->title}*\n";
+        $text .= "Status: " . ucfirst(str_replace('_', ' ', $this->status)) . "\n";
+        $text .= "Severity: " . ucfirst($this->severity) . " | Priority: " . ucfirst($this->priority) . "\n";
+        $text .= "Department: " . ($this->department?->name ?? 'N/A') . "\n";
+        if ($this->location) {
+            $text .= "Location: {$this->location}\n";
+        }
+        $text .= "\nView Details: " . route('incidents.show', $this->id);
+
+        return 'https://wa.me/?text=' . urlencode($text);
+    }
+
 }

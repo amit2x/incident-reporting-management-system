@@ -23,3 +23,25 @@ php artisan queue:work database --queue=default,notifications,emails,reports --t
 echo [%date% %time%] Batch complete. Waiting 5 seconds...
 timeout /t 5 /nobreak > nul
 goto loop
+
+
+
+
+
+
+Laravel App
+    ↓
+Run Artisan Command
+    ↓
+Fetch Public X Search Page HTML
+    ↓
+Extract Posts
+    ↓
+Store in DB
+    ↓
+Show Dashboard
+
+
+
+
+

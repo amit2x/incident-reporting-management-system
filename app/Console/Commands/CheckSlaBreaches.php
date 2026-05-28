@@ -19,21 +19,51 @@ class CheckSlaBreaches extends Command
         $this->notificationService = $notificationService;
     }
 
+    // public function handle()
+    // {
+    //     $breachedIncidents = Incident::where('sla_due_at', '<', now())
+    //         ->whereIn('status', ['open', 'acknowledged', 'in_progress', 'escalated'])
+    //         ->where(function ($query) {
+    //             $query->whereNull('sla_breach_notified_at')
+    //                 ->orWhere('sla_breach_count', '>', 0);
+    //         })
+    //         ->get();
+
+    //     foreach ($breachedIncidents as $incident) {
+    //         $this->handleSlaBreach($incident);
+    //     }
+
+    //     $this->info("Checked SLA for {$breachedIncidents->count()} incidents");
+    // }
+
+    // app/Console/Commands/CheckSlaBreaches.php - Update handle method
+
     public function handle()
     {
         $breachedIncidents = Incident::where('sla_due_at', '<', now())
             ->whereIn('status', ['open', 'acknowledged', 'in_progress', 'escalated'])
-            ->where(function ($query) {
-                $query->whereNull('sla_breach_notified_at')
-                    ->orWhere('sla_breach_count', '>', 0);
-            })
             ->get();
 
+        $notificationService = app(\App\Services\NotificationService::class);
+        $escalatedCount = 0;
+
         foreach ($breachedIncidents as $incident) {
-            $this->handleSlaBreach($incident);
+            // Increment breach count
+            $incident->increment('sla_breach_count');
+
+            // Auto-escalate based on breach count (every 3 breaches = 1 escalation level)
+            if ($incident->sla_breach_count % 3 === 0) {
+                $notificationService->notifySlaBreachAndEscalate($incident);
+                $escalatedCount++;
+                $this->info("Auto-escalated incident #{$incident->incident_id}");
+            } else {
+                // Just notify about SLA breach
+                $notificationService->notifySlaBreach($incident);
+                $this->info("SLA breach notification for #{$incident->incident_id}");
+            }
         }
 
-        $this->info("Checked SLA for {$breachedIncidents->count()} incidents");
+        $this->info("Processed {$breachedIncidents->count()} breached incidents. Escalated: {$escalatedCount}");
     }
 
     protected function handleSlaBreach(Incident $incident): void

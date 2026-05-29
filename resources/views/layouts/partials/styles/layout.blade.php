@@ -89,7 +89,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .desktop-sidebar .sidebar-brand i {
@@ -151,12 +151,12 @@
     }
 
     .desktop-sidebar .nav-link:hover {
-        background: rgba(255,255,255,0.08);
+        background: rgba(255, 255, 255, 0.08);
         color: white;
     }
 
     .desktop-sidebar .nav-link.active {
-        background: rgba(59,130,246,0.2);
+        background: rgba(59, 130, 246, 0.2);
         color: white;
         font-weight: 600;
     }
@@ -173,7 +173,7 @@
 
     .desktop-sidebar .sidebar-footer {
         padding: 16px;
-        border-top: 1px solid rgba(255,255,255,0.06);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     /* ==========================================
@@ -192,7 +192,7 @@
         border-top: 1px solid var(--gray-200);
         padding: 4px 8px;
         padding-bottom: calc(4px + var(--safe-area-bottom));
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
     }
 
     .mobile-bottom-nav .nav-grid {
@@ -272,7 +272,7 @@
     .drawer-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0,0,0,0.5);
+        background: rgba(0, 0, 0, 0.5);
         z-index: 1040;
         opacity: 0;
         visibility: hidden;
@@ -305,12 +305,26 @@
     }
 
     .mobile-drawer .drawer-header {
-        padding: 20px;
-        background: var(--primary);
+        padding: 10px;
+        /* background: var(--primary); */
         color: white;
         display: flex;
         align-items: center;
-        gap: 12px;
+        /* gap: 12px; */
+        border-bottom: 1px solid #3b82f6;
+    }
+
+    .drawer-logo {
+        max-height: 100px;
+        width: auto;
+        object-fit: contain;
+    }
+
+    .brand-name {
+        font-weight: 800;
+        font-size: 1.8rem;
+        white-space: nowrap;
+        color: darkblue;
     }
 
     .mobile-drawer .drawer-avatar {
@@ -379,7 +393,7 @@
         background: var(--primary);
         color: white;
         border: none;
-        box-shadow: 0 8px 24px rgba(26,86,219,0.4);
+        box-shadow: 0 8px 24px rgba(26, 86, 219, 0.4);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -390,6 +404,6 @@
 
     .fab:active {
         transform: scale(0.9);
-        box-shadow: 0 4px 12px rgba(26,86,219,0.3);
+        box-shadow: 0 4px 12px rgba(26, 86, 219, 0.3);
     }
 </style>

@@ -108,7 +108,7 @@ class EscalationMatrix extends Model
     {
         return $query->where(function ($q) use ($categoryId) {
             $q->where('category_id', $categoryId)
-              ->orWhereNull('category_id');
+                ->orWhereNull('category_id');
         });
     }
 
@@ -129,7 +129,7 @@ class EscalationMatrix extends Model
      */
     public function getLevelLabelAttribute(): string
     {
-        return match($this->level) {
+        return match ($this->level) {
             1 => 'Level 1 - Supervisor',
             2 => 'Level 2 - HOD',
             3 => 'Level 3 - Admin',
@@ -151,7 +151,7 @@ class EscalationMatrix extends Model
         $minutes = $this->timeout_minutes % 60;
 
         if ($minutes === 0) {
-            return "{$hours} hr" . ($hours > 1 ? 's' : '');
+            return "{$hours} hr".($hours > 1 ? 's' : '');
         }
 
         return "{$hours}h {$minutes}m";
@@ -190,7 +190,7 @@ class EscalationMatrix extends Model
         $matrix = static::where('department_id', $incident->department_id)
             ->where(function ($query) use ($incident) {
                 $query->where('category_id', $incident->category_id)
-                      ->orWhereNull('category_id');
+                    ->orWhereNull('category_id');
             })
             ->active()
             ->orderedByLevel()
@@ -216,10 +216,112 @@ class EscalationMatrix extends Model
         return static::where('department_id', $incident->department_id)
             ->where(function ($query) use ($incident) {
                 $query->where('category_id', $incident->category_id)
-                      ->orWhereNull('category_id');
+                    ->orWhereNull('category_id');
             })
             ->where('level', $currentLevel + 1)
             ->active()
             ->first();
+    }
+
+    // ==========================================
+    // STATIC HELPER METHODS
+    // ==========================================
+
+    /**
+     * Get the escalation entry for a specific incident at a given level.
+     * First tries exact department+category match, then falls back to department default.
+     */
+    public static function getEscalationForIncident(Incident $incident, int $level): ?self
+    {
+        // First try: Exact department + category match
+        $entry = static::where('department_id', $incident->department_id)
+            ->where('category_id', $incident->category_id)
+            ->where('level', $level)
+            ->active()
+            ->first();
+
+        if ($entry) {
+            return $entry;
+        }
+
+        // Second try: Department default (category_id = NULL means all categories)
+        $entry = static::where('department_id', $incident->department_id)
+            ->whereNull('category_id')
+            ->where('level', $level)
+            ->active()
+            ->first();
+
+        return $entry;
+    }
+
+    /**
+     * Get the maximum escalation level for a department + category combination.
+     */
+    public static function getMaxLevel(int $departmentId, ?int $categoryId): int
+    {
+        return (int) static::where('department_id', $departmentId)
+            ->where(function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId)
+                    ->orWhereNull('category_id');
+            })
+            ->active()
+            ->max('level') ?? 0;
+    }
+
+    /**
+     * Get all escalation levels for a department + category combination.
+     */
+    public static function getEscalationLevels(int $departmentId, ?int $categoryId): array
+    {
+        return static::where('department_id', $departmentId)
+            ->where(function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId)
+                    ->orWhereNull('category_id');
+            })
+            ->active()
+            ->orderBy('level')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Check if escalation matrix exists for a department.
+     */
+    public static function hasMatrix(int $departmentId, ?int $categoryId = null): bool
+    {
+        return static::where('department_id', $departmentId)
+            ->where(function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId)
+                    ->orWhereNull('category_id');
+            })
+            ->active()
+            ->exists();
+    }
+
+    /**
+     * Get escalation chain for an incident (all levels).
+     */
+    public static function getEscalationChain(int $departmentId, ?int $categoryId): array
+    {
+        return static::with(['escalateToUser', 'escalateToDepartment'])
+            ->where('department_id', $departmentId)
+            ->where(function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId)
+                    ->orWhereNull('category_id');
+            })
+            ->active()
+            ->orderBy('level')
+            ->get()
+            ->map(function ($entry) {
+                return [
+                    'level' => $entry->level,
+                    'timeout_minutes' => $entry->timeout_minutes,
+                    'escalate_to_user' => $entry->escalateToUser?->name,
+                    'escalate_to_department' => $entry->escalateToDepartment?->name,
+                    'notify_via_email' => $entry->notify_via_email,
+                    'notify_via_push' => $entry->notify_via_push,
+                ];
+            })
+            ->toArray();
     }
 }

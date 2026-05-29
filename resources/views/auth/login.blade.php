@@ -96,7 +96,7 @@
         pointer-events: none;
     }
 
-    .form-floating-custom .form-control:focus ~ .form-icon {
+    .form-floating-custom .form-control:focus~.form-icon {
         color: #1a56db;
     }
 
@@ -113,8 +113,8 @@
         padding: 0 4px;
     }
 
-    .form-floating-custom .form-control:focus ~ .form-label-floating,
-    .form-floating-custom .form-control:not(:placeholder-shown) ~ .form-label-floating {
+    .form-floating-custom .form-control:focus~.form-label-floating,
+    .form-floating-custom .form-control:not(:placeholder-shown)~.form-label-floating {
         top: 0;
         left: 40px;
         font-size: 0.6875rem;
@@ -157,7 +157,7 @@
     .captcha-refresh-hint {
         position: absolute;
         inset: 0;
-        background: rgba(0,0,0,0.6);
+        background: rgba(0, 0, 0, 0.6);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -324,16 +324,20 @@
         .login-card {
             border-radius: 16px;
         }
+
         .login-body {
             padding: 24px 20px;
         }
+
         .login-header {
             padding: 24px 20px;
         }
+
         .captcha-row {
             flex-direction: column;
             align-items: stretch;
         }
+
         .captcha-image-wrapper {
             align-self: center;
         }
@@ -348,7 +352,7 @@
         <div class="login-header">
             <div class="login-logo">
                 <img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo"
-                     onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-shield-halved\' style=\'font-size: 28px; color: #1a56db;\'></i>';">
+                    onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-shield-halved\' style=\'font-size: 28px; color: #1a56db;\'></i>';">
             </div>
             <h4>Welcome Back</h4>
             <p>Sign in to your IRMSystem account</p>
@@ -361,48 +365,37 @@
 
                 {{-- CAPTCHA Notice --}}
                 @if($showCaptcha ?? false)
-                    <div class="alert-captcha">
-                        <i class="fas fa-shield-halved"></i>
-                        <span>Additional verification required due to multiple login attempts.</span>
-                    </div>
+                <div class="alert-captcha">
+                    <i class="fas fa-shield-halved"></i>
+                    <span>Additional verification required due to multiple login attempts.</span>
+                </div>
                 @endif
 
                 {{-- Email --}}
                 <div class="form-floating-custom">
                     <i class="fas fa-envelope form-icon"></i>
-                    <input id="email"
-                           type="email"
-                           class="form-control @error('email') is-invalid @enderror"
-                           name="email"
-                           value="{{ old('email') }}"
-                           placeholder=" "
-                           required
-                           autocomplete="email"
-                           autofocus>
+                    <input id="email" type="email" class="form-control @error('email') is-invalid @enderror"
+                        name="email" value="{{ old('email') }}" placeholder=" " required autocomplete="email" autofocus>
                     <label class="form-label-floating" for="email">Email Address</label>
                     @error('email')
-                        <small class="text-danger" style="font-size: 0.6875rem;">{{ $message }}</small>
+                    <small class="text-danger" style="font-size: 0.6875rem;">{{ $message }}</small>
                     @enderror
                 </div>
 
                 {{-- Password --}}
                 <div class="form-floating-custom">
                     <i class="fas fa-lock form-icon"></i>
-                    <input id="password"
-                           type="password"
-                           class="form-control @error('password') is-invalid @enderror"
-                           name="password"
-                           placeholder=" "
-                           required
-                           autocomplete="current-password">
+                    <input id="password" type="password" class="form-control @error('password') is-invalid @enderror"
+                        name="password" placeholder=" " required autocomplete="current-password">
                     <label class="form-label-floating" for="password">Password</label>
                     @error('password')
-                        <small class="text-danger" style="font-size: 0.6875rem;">{{ $message }}</small>
+                    <small class="text-danger" style="font-size: 0.6875rem;">{{ $message }}</small>
                     @enderror
                 </div>
 
                 {{-- CAPTCHA (Conditionally shown) --}}
-                <div class="captcha-section" id="captchaSection" style="{{ ($showCaptcha ?? false) ? '' : 'display: none;' }}">
+                <div class="captcha-section" id="captchaSection"
+                    style="{{ ($showCaptcha ?? false) ? '' : 'display: none;' }}">
                     <label class="form-label small fw-semibold mb-2">Security Verification</label>
                     <div class="captcha-row" id="captchaRow">
                         <div class="captcha-image-wrapper" onclick="refreshCaptcha()" title="Click to refresh">
@@ -413,16 +406,13 @@
                         </div>
                         <div class="captcha-input-group">
                             <i class="fas fa-puzzle-piece captcha-icon"></i>
-                            <input type="text"
-                                   name="captcha"
-                                   class="form-control @error('captcha') is-invalid @enderror"
-                                   placeholder="Enter the answer"
-                                   id="captchaInput"
-                                   autocomplete="off">
+                            <input type="text" name="captcha"
+                                class="form-control @error('captcha') is-invalid @enderror"
+                                placeholder="Enter the answer" id="captchaInput" autocomplete="off">
                         </div>
                     </div>
                     @error('captcha')
-                        <small class="text-danger" style="font-size: 0.6875rem;">{{ $message }}</small>
+                    <small class="text-danger" style="font-size: 0.6875rem;">{{ $message }}</small>
                     @enderror
                 </div>
 
@@ -433,9 +423,9 @@
                         <label for="remember">Remember me</label>
                     </div>
                     @if (Route::has('password.request'))
-                        <div class="forgot-link">
-                            <a href="{{ route('password.request') }}">Forgot password?</a>
-                        </div>
+                    <div class="forgot-link">
+                        <a href="{{ route('password.request') }}">Forgot password?</a>
+                    </div>
                     @endif
                 </div>
 
@@ -452,7 +442,7 @@
                 {{-- Register Link --}}
                 <div class="register-link">
                     Don't have an account?
-                    <a href="{{ route('register') }}">Create one now</a>
+                    <a href="{{ route('contact.form') }}">Contact IT team to create your account</a>
                 </div>
             </form>
         </div>
@@ -462,7 +452,7 @@
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {
 
     // ==========================================
     // CAPTCHA REFRESH

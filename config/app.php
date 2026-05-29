@@ -15,6 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'email' => env('ADMIN_EMAIL', 'support@ddg.oneplaceweb.com'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment
@@ -131,7 +133,7 @@ return [
         'allowed_file_types' => [
             'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp',
             'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm',
-            'mp3', 'wav', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'zip'
+            'mp3', 'wav', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'zip',
         ],
         'thumbnail_width' => 300,
         'thumbnail_height' => 300,

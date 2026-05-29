@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EscalationMatrixController;
@@ -9,10 +11,13 @@ use App\Http\Controllers\FeedController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
+use App\Models\Department;
+use App\Models\User;
 use App\Services\FCMService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -38,7 +43,7 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('welcome');
 
-//public feed route:-
+// public feed route:-
 
 Route::get('/feed', [FeedController::class, 'index'])->name('guest.home');
 Route::get('/search', [FeedController::class, 'search'])->name('search');
@@ -47,13 +52,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/incidents/{incident}/like', [FeedController::class, 'toggleLike'])->name('incidents.like');
 });
 
-
 Route::get('/help', [HelpController::class, 'index'])->name('guest.help');
 Route::get('/features', [HelpController::class, 'features'])->name('guest.features');
+// Contact routes (no auth required)
+Route::get('/contact', [ContactController::class, 'showForm'])->name('contact.form');
+Route::post('/contact', [ContactController::class, 'submit'])->name('contact.submit');
+
+// for onboarding the department
+Route::get('/onboarding', [OnboardingController::class, 'create'])->name('onboarding.create');
+Route::post('/onboarding', [OnboardingController::class, 'submit'])->name('onboarding.submit');
 
 // Authentication Routes
-Auth::routes(['verify' => true]);
-Route::get('/captcha/refresh', [App\Http\Controllers\Auth\LoginController::class, 'refreshCaptcha'])->name('captcha.refresh');
+Auth::routes(['verify' => true, 'register' => false]);
+Route::get('/captcha/refresh', [LoginController::class, 'refreshCaptcha'])->name('captcha.refresh');
 // Protected Routes
 Route::middleware(['auth', 'verified'])->group(function () {
 
@@ -93,7 +104,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/incidents/{incident}/close', [IncidentController::class, 'close'])->name('incidents.close');
     Route::post('/incidents/{incident}/reopen', [IncidentController::class, 'reopen'])->name('incidents.reopen');
 
-     // Newly added Incident Actions
+    // Newly added Incident Actions
     Route::post('/incidents/{incident}/reopen', [IncidentController::class, 'reopen'])->name('incidents.reopen');
     Route::post('/incidents/{incident}/reject', [IncidentController::class, 'reject'])->name('incidents.reject');
     Route::post('/incidents/{incident}/reassign', [IncidentController::class, 'reassign'])->name('incidents.reassign');
@@ -103,21 +114,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Comments
     Route::post('/incidents/{incident}/comments', [IncidentController::class, 'addComment'])->name('incidents.comments.store');
-     // Edit comment
+    // Edit comment
     Route::put('/incidents/{incident}/comments/{comment}', [IncidentController::class, 'editComment'])->name('incidents.comments.update');
 
     // Delete comment
     Route::delete('/incidents/{incident}/comments/{comment}', [IncidentController::class, 'deleteComment'])->name('incidents.comments.destroy');
 
-
     // Comment with media
     Route::post('/incidents/{incident}/comments', [IncidentController::class, 'addComment'])->name('incidents.comments.store');
-
 
     // Media
     Route::post('/incidents/{incident}/media', [IncidentController::class, 'uploadMedia'])->name('incidents.media.store');
     Route::delete('/incidents/{incident}/media/{media}', [IncidentController::class, 'deleteMedia'])->name('incidents.media.destroy');
-
 
     // Incident share data
     Route::get('/incidents/{incident}/share', [IncidentController::class, 'shareData'])->name('incidents.share');
@@ -128,9 +136,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('/kpi', [ReportController::class, 'kpiReport'])->name('kpi');
+        Route::get('/kpi/export/{format}', [ReportController::class, 'exportKpi'])->name('kpi.export');
+
         Route::get('/department', [ReportController::class, 'departmentReport'])->name('department');
+        Route::get('/department/export/{format}', [ReportController::class, 'exportDepartment'])->name('department.export');
+
         Route::get('/sla', [ReportController::class, 'slaReport'])->name('sla');
+        Route::get('/sla/export/{format}', [ReportController::class, 'exportSla'])->name('sla.export');
+
+        Route::get('/category', [ReportController::class, 'categoryReport'])->name('category');
+        Route::get('/category/export/{format}', [ReportController::class, 'exportCategory'])->name('category.export');
+        Route::get('/user-performance', [ReportController::class, 'userPerformanceReport'])->name('user-performance');
+        Route::get('/escalation', [ReportController::class, 'escalationReport'])->name('escalation');
+        Route::get('/custom', [ReportController::class, 'customReport'])->name('custom');
+        Route::get('/custom/export/{format}', [ReportController::class, 'exportCustom'])->name('custom.export');
         Route::get('/export/{type}', [ReportController::class, 'export'])->name('export');
+
     });
 
     // ==========================================
@@ -219,9 +240,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             // AJAX route for getting users by department
         });
 
-
-
-
         // Audit Logs
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
 
@@ -238,13 +256,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('system-settings.update');
     });
 
-
     // API-like routes for AJAX calls (using web session auth)
     Route::prefix('api/v1')->name('api.')->group(function () {
 
         // Get users for @mention suggestions
         Route::get('/ajax/users/mention-suggestions', function () {
-            $users = \App\Models\User::active()
+            $users = User::active()
                 ->select('id', 'name', 'username', 'avatar')
                 ->get()
                 ->map(function ($user) {
@@ -260,7 +277,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         })->name('users.mention-suggestions');
 
         // Get users by department (for escalation modal)
-        Route::get('/departments/{department}/users', function (\App\Models\Department $department) {
+        Route::get('/departments/{department}/users', function (Department $department) {
             $users = $department->users()->active()
                 ->get(['id', 'name', 'username', 'designation'])
                 ->map(function ($user) {
@@ -278,6 +295,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Get notification unread count
         Route::get('/notifications/unread-count', function () {
             $count = Auth::user()->unreadNotifications()->count();
+
             return response()->json(['count' => $count]);
         })->name('notifications.unread-count');
 
@@ -289,12 +307,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->get()
                 ->map(function ($n) {
                     $type = $n->data['type'] ?? 'general';
+
                     return [
                         'id' => $n->id,
                         'title' => $n->data['title'] ?? 'Notification',
                         'message' => $n->data['message'] ?? '',
                         'type' => $type,
-                        'icon' => match($type) {
+                        'icon' => match ($type) {
                             'new_incident' => 'fa-exclamation-triangle',
                             'incident_assigned' => 'fa-user-plus',
                             'incident_escalated' => 'fa-arrow-up',
@@ -304,7 +323,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                             'mentioned' => 'fa-at',
                             default => 'fa-bell',
                         },
-                        'color' => match($type) {
+                        'color' => match ($type) {
                             'new_incident', 'incident_escalated' => '#EF4444',
                             'incident_assigned' => '#3B82F6',
                             'incident_resolved' => '#10B981',
@@ -314,7 +333,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                             default => '#6B7280',
                         },
                         'time' => $n->created_at->diffForHumans(),
-                        'read' => !is_null($n->read_at),
+                        'read' => ! is_null($n->read_at),
                         'url' => $n->data['url'] ?? route('notifications.index'),
                     ];
                 });
@@ -326,10 +345,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 });
 
-
-
-
-//for FCM token service
+// for FCM token service
 
 // routes/api.php or routes/web.php
 
@@ -360,9 +376,6 @@ Route::middleware('auth')->group(function () {
     })->name('fcm.token.update');
 });
 
-
-
-
 // Test FCM Configuration
 Route::get('/test-fcm-config', function () {
     $credentials = config('firebase.projects.app.credentials');
@@ -378,9 +391,9 @@ Route::get('/test-fcm-config', function () {
 // Test FCM Send
 Route::get('/test-fcm-send', function (FCMService $fcmService) {
     // Get a user with FCM token
-    $user = \App\Models\User::whereNotNull('fcm_token')->first();
+    $user = User::whereNotNull('fcm_token')->first();
 
-    if (!$user || !$user->fcm_token) {
+    if (! $user || ! $user->fcm_token) {
         return response()->json([
             'error' => 'No user with FCM token found.',
             'help' => 'Visit /test-fcm-token?token=YOUR_DEVICE_TOKEN to add one',
@@ -390,7 +403,7 @@ Route::get('/test-fcm-send', function (FCMService $fcmService) {
     $result = $fcmService->sendToDevice(
         $user->fcm_token,
         '🧪 Test Notification',
-        'This is a test from IRMSystem at ' . now()->format('H:i:s'),
+        'This is a test from IRMSystem at '.now()->format('H:i:s'),
         [
             'type' => 'test',
             'incident_id' => '1',
@@ -401,7 +414,7 @@ Route::get('/test-fcm-send', function (FCMService $fcmService) {
     return response()->json([
         'success' => $result,
         'user' => $user->name,
-        'token_preview' => substr($user->fcm_token, 0, 30) . '...',
+        'token_preview' => substr($user->fcm_token, 0, 30).'...',
     ]);
 });
 
@@ -409,21 +422,22 @@ Route::get('/test-fcm-send', function (FCMService $fcmService) {
 Route::get('/test-fcm-token', function (Request $request) {
     $token = $request->get('token');
 
-    if (!$token) {
+    if (! $token) {
         return response()->json([
             'error' => 'Please provide a token parameter',
             'example' => '/test-fcm-token?token=YOUR_FCM_TOKEN',
         ]);
     }
 
-    $user = \App\Models\User::first();
+    $user = User::first();
 
     if ($user) {
         $user->update(['fcm_token' => $token]);
+
         return response()->json([
             'success' => true,
-            'message' => 'FCM token added to ' . $user->name,
-            'token' => substr($token, 0, 30) . '...',
+            'message' => 'FCM token added to '.$user->name,
+            'token' => substr($token, 0, 30).'...',
         ]);
     }
 
@@ -432,15 +446,15 @@ Route::get('/test-fcm-token', function (Request $request) {
 
 // View users with FCM tokens
 Route::get('/test-fcm-users', function () {
-    $users = \App\Models\User::whereNotNull('fcm_token')
+    $users = User::whereNotNull('fcm_token')
         ->get(['id', 'name', 'email', 'fcm_token'])
         ->map(function ($user) {
             return [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'has_token' => !empty($user->fcm_token),
-                'token_preview' => $user->fcm_token ? substr($user->fcm_token, 0, 30) . '...' : null,
+                'has_token' => ! empty($user->fcm_token),
+                'token_preview' => $user->fcm_token ? substr($user->fcm_token, 0, 30).'...' : null,
             ];
         });
 

@@ -68,7 +68,7 @@
 @endpush
 
 @section('content')
-<div class="container-fluid px-3 py-3">
+<div class="py-3">
 
     {{-- Header with Actions --}}
     <div class="d-flex flex-wrap justify-content-between align-items-start mb-3">
@@ -282,63 +282,87 @@
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
-                        {{-- Basic Info --}}
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">Category</small>
-                            <span class="fw-medium">{{ $incident->category?->name ?? 'N/A' }}</span>
+                        {{-- Basic Info - Each item takes full width on mobile, half on desktop --}}
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">Category</small>
+                                <span class="fw-medium text-break">{{ $incident->category?->name ?? 'N/A' }}</span>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">Department</small>
-                            <span class="fw-medium">{{ $incident->department?->name ?? 'N/A' }}</span>
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">Department</small>
+                                <span class="fw-medium text-break">{{ $incident->department?->name ?? 'N/A' }}</span>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">Reported By</small>
-                            <span class="fw-medium">
-                                @if($incident->is_anonymous)
-                                <i class="fas fa-user-secret me-1"></i>Anonymous
-                                @else
-                                {{ $incident->reporter?->name ?? 'N/A' }}
-                                @endif
-                            </span>
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">Reported By</small>
+                                <span class="fw-medium text-break">
+                                    @if($incident->is_anonymous)
+                                    <i class="fas fa-user-secret me-1"></i>Anonymous
+                                    @else
+                                    {{ $incident->reporter?->name ?? 'N/A' }}
+                                    @endif
+                                </span>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">Assigned To</small>
-                            <span class="fw-medium">
-                                @if($incident->assignedTo)
-                                <img src="{{ $incident->assignedTo->avatar_url }}" class="rounded-circle me-1"
-                                    width="20" height="20">
-                                {{ $incident->assignedTo->name }}
-                                @else
-                                <span class="text-warning">Unassigned</span>
-                                @endif
-                            </span>
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">Assigned To</small>
+                                <span class="fw-medium text-break">
+                                    @if($incident->assignedTo)
+                                    <img src="{{ $incident->assignedTo->avatar_url }}" class="rounded-circle me-1"
+                                        width="20" height="20">
+                                    {{ $incident->assignedTo->name }}
+                                    @else
+                                    <span class="text-warning">Unassigned</span>
+                                    @endif
+                                </span>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">Location</small>
-                            <span class="fw-medium">{{ $incident->location ?? 'Not specified' }}</span>
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">Location</small>
+                                <span class="fw-medium text-break">{{ $incident->location ?? 'Not specified' }}</span>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">Reported On</small>
-                            <span class="fw-medium">{{ $incident->created_at->format('d M Y, H:i') }}</span>
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">Reported On</small>
+                                <span class="fw-medium">{{ $incident->created_at->format('d M Y, H:i') }}</span>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">SLA Due</small>
-                            <span class="fw-medium {{ $incident->is_overdue ? 'text-danger' : '' }}">
-                                {{ $incident->sla_due_at?->format('d M Y, H:i') ?? 'N/A' }}
-                                @if($incident->is_overdue)
-                                <span class="badge bg-danger ms-1" style="font-size:0.6rem;">Overdue</span>
-                                @endif
-                            </span>
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">SLA Due</small>
+                                <span class="fw-medium {{ $incident->is_overdue ? 'text-danger' : '' }}">
+                                    {{ $incident->sla_due_at?->format('d M Y, H:i') ?? 'N/A' }}
+                                    @if($incident->is_overdue)
+                                    <span class="badge bg-danger ms-1" style="font-size:0.6rem;">Overdue</span>
+                                    @endif
+                                </span>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <small class="text-muted d-block">Last Updated</small>
-                            <span class="fw-medium">{{ $incident->updated_at->format('d M Y, H:i') }}</span>
+                        <div class="col-12 col-sm-6">
+                            <div
+                                class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
+                                <small class="text-muted flex-shrink-0" style="min-width:80px;">Last Updated</small>
+                                <span class="fw-medium">{{ $incident->updated_at->format('d M Y, H:i') }}</span>
+                            </div>
                         </div>
 
-                        {{-- Resolution Notes --}}
+                        {{-- Resolution Notes - Full width always --}}
                         @if($incident->resolution_notes)
                         <div class="col-12 border-top pt-3 mt-1">
-                            <small class="text-muted d-block mb-1 fw-semibold">
+                            <small class="text-muted d-block mb-2 fw-semibold">
                                 <i class="fas fa-check-circle text-success me-1"></i>Resolution Notes
                             </small>
                             <div class="bg-light rounded p-3">
@@ -355,14 +379,14 @@
                                 ->get();
                                 @endphp
                                 @if($resolutionMedia->count() > 0)
-                                <div class="mt-2">
+                                <div class="mt-3">
                                     <small class="text-muted d-block mb-2">📎 Resolution Attachments</small>
                                     <div class="d-flex flex-wrap gap-2">
                                         @foreach($resolutionMedia as $media)
                                         @if($media->isImage())
                                         <a href="{{ $media->url }}" target="_blank" class="d-inline-block">
                                             <img src="{{ $media->url }}"
-                                                style="max-width:120px;max-height:120px;object-fit:cover;border-radius:8px;cursor:pointer;"
+                                                style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;cursor:pointer;"
                                                 class="border shadow-sm">
                                         </a>
                                         @else
@@ -382,10 +406,10 @@
                         </div>
                         @endif
 
-                        {{-- Rejection Reason --}}
+                        {{-- Rejection Reason - Full width always --}}
                         @if($incident->rejection_reason)
                         <div class="col-12 border-top pt-3 mt-1">
-                            <small class="text-muted d-block mb-1 fw-semibold">
+                            <small class="text-muted d-block mb-2 fw-semibold">
                                 <i class="fas fa-times-circle text-danger me-1"></i>Rejection Reason
                             </small>
                             <div class="bg-danger bg-opacity-10 rounded p-3 border border-danger border-opacity-25">
@@ -394,7 +418,7 @@
                         </div>
                         @endif
 
-                        {{-- Closing Information --}}
+                        {{-- Closing Information - Full width always --}}
                         @if($incident->status === 'closed')
                         @php
                         $closingComment = $incident->comments()
@@ -410,7 +434,7 @@
                         @endphp
                         @if($closingComment || $closingMedia->count() > 0)
                         <div class="col-12 border-top pt-3 mt-1">
-                            <small class="text-muted d-block mb-1 fw-semibold">
+                            <small class="text-muted d-block mb-2 fw-semibold">
                                 <i class="fas fa-lock text-dark me-1"></i>Closing Information
                             </small>
                             <div class="bg-light rounded p-3">
@@ -425,7 +449,7 @@
                                     @if($media->isImage())
                                     <a href="{{ $media->url }}" target="_blank">
                                         <img src="{{ $media->url }}"
-                                            style="max-width:120px;max-height:120px;object-fit:cover;border-radius:8px;"
+                                            style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;"
                                             class="border shadow-sm">
                                     </a>
                                     @else

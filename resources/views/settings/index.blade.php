@@ -13,9 +13,11 @@
         background: white;
         transition: all 0.2s;
     }
+
     .setting-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
+
     .setting-card .setting-icon {
         width: 44px;
         height: 44px;
@@ -30,7 +32,7 @@
 @endpush
 
 @section('content')
-<div class="container-fluid px-3 py-3">
+<div class="py-3">
 
     <div class="mb-3">
         <h4 class="fw-bold mb-1">Settings</h4>
@@ -54,8 +56,8 @@
                             <p class="text-muted small mb-0">Toggle between light and dark theme</p>
                         </div>
                         <div class="form-check form-switch">
-                            <input type="checkbox" name="preferences[dark_mode]" class="form-check-input" value="1" id="darkMode"
-                                   {{ ($user->preferences['dark_mode'] ?? false) ? 'checked' : '' }}>
+                            <input type="checkbox" name="preferences[dark_mode]" class="form-check-input" value="1"
+                                id="darkMode" {{ ($user->preferences['dark_mode'] ?? false) ? 'checked' : '' }}>
                         </div>
                     </div>
                 </div>
@@ -71,8 +73,9 @@
                             <p class="text-muted small mb-0">Receive incident updates via email</p>
                         </div>
                         <div class="form-check form-switch">
-                            <input type="checkbox" name="preferences[email_notifications]" class="form-check-input" value="1" id="emailNotif"
-                                   {{ ($user->preferences['email_notifications'] ?? true) ? 'checked' : '' }}>
+                            <input type="checkbox" name="preferences[email_notifications]" class="form-check-input"
+                                value="1" id="emailNotif" {{ ($user->preferences['email_notifications'] ?? true) ?
+                            'checked' : '' }}>
                         </div>
                     </div>
 
@@ -85,8 +88,9 @@
                             <p class="text-muted small mb-0">Receive push notifications on your device</p>
                         </div>
                         <div class="form-check form-switch">
-                            <input type="checkbox" name="preferences[push_notifications]" class="form-check-input" value="1" id="pushNotif"
-                                   {{ ($user->preferences['push_notifications'] ?? true) ? 'checked' : '' }}>
+                            <input type="checkbox" name="preferences[push_notifications]" class="form-check-input"
+                                value="1" id="pushNotif" {{ ($user->preferences['push_notifications'] ?? true) ?
+                            'checked' : '' }}>
                         </div>
                     </div>
                 </div>
@@ -101,8 +105,10 @@
                             <h6 class="mb-1">Language</h6>
                             <p class="text-muted small mb-2">Select your preferred language</p>
                             <select name="preferences[language]" class="form-select" style="max-width: 200px;">
-                                <option value="en" {{ ($user->preferences['language'] ?? 'en') == 'en' ? 'selected' : '' }}>English</option>
-                                <option value="hi" {{ ($user->preferences['language'] ?? '') == 'hi' ? 'selected' : '' }}>हिन्दी (Hindi)</option>
+                                <option value="en" {{ ($user->preferences['language'] ?? 'en') == 'en' ? 'selected' : ''
+                                    }}>English</option>
+                                <option value="hi" {{ ($user->preferences['language'] ?? '') == 'hi' ? 'selected' : ''
+                                    }}>हिन्दी (Hindi)</option>
                             </select>
                         </div>
                     </div>
@@ -120,7 +126,8 @@
         {{-- Sidebar Info --}}
         <div class="col-lg-4 d-none d-lg-block">
             <div class="card shadow-sm">
-                <div class="card-header bg-white"><strong><i class="fas fa-shield-alt me-2"></i>Account Info</strong></div>
+                <div class="card-header bg-white"><strong><i class="fas fa-shield-alt me-2"></i>Account Info</strong>
+                </div>
                 <div class="card-body small">
                     <div class="mb-2">
                         <strong>Name:</strong> {{ $user->name }}
@@ -138,7 +145,8 @@
                         <strong>Member Since:</strong> {{ $user->created_at->format('d M Y') }}
                     </div>
                     <div>
-                        <strong>Last Login:</strong> {{ $user->last_login_at ? $user->last_login_at->format('d M Y, H:i') : 'N/A' }}
+                        <strong>Last Login:</strong> {{ $user->last_login_at ? $user->last_login_at->format('d M Y,
+                        H:i') : 'N/A' }}
                     </div>
                 </div>
             </div>

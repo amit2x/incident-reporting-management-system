@@ -459,9 +459,20 @@ class IncidentController extends Controller
         return view('incidents.edit', compact('incident', 'departments', 'categories'));
     }
 
+    // app/Http/Controllers/IncidentController.php
+
+    /**
+     * Update the specified incident in storage.
+     */
+    // app/Http/Controllers/IncidentController.php
+
+    /**
+     * Update the specified incident in storage.
+     */
     public function update(Request $request, Incident $incident)
     {
         $this->authorize('edit-incident');
+
         if (! Auth::user()->canAccessIncident($incident)) {
             abort(403);
         }
@@ -474,33 +485,161 @@ class IncidentController extends Controller
             'priority' => 'sometimes|in:low,medium,high,critical',
             'location' => 'nullable|string|max:255',
             'tags' => 'nullable|string|max:500',
+            'files.*' => 'nullable|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,mp4,avi,mov,pdf,doc,docx,xls,xlsx',
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return $this->errorResponse('Validation failed', 422, $validator->errors());
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                ], 422);
             }
 
             return back()->withErrors($validator)->withInput();
         }
 
+        DB::beginTransaction();
         try {
-            $incident = $this->incidentService->updateIncident($incident, $request->all());
-            if ($request->ajax()) {
-                return $this->successResponse($incident, 'Incident updated');
+            // Update basic incident data
+            $updateData = ['updated_at' => now()];
+
+            if ($request->has('title')) {
+                $updateData['title'] = $request->title;
+            }
+            if ($request->has('description')) {
+                $updateData['description'] = $request->description;
+            }
+            if ($request->has('category_id')) {
+                $updateData['category_id'] = $request->category_id;
+            }
+            if ($request->has('severity')) {
+                $updateData['severity'] = $request->severity;
+            }
+            if ($request->has('priority')) {
+                $updateData['priority'] = $request->priority;
+            }
+            if ($request->has('location')) {
+                $updateData['location'] = $request->location;
             }
 
-            return redirect()->route('incidents.show', $incident)->with('success', 'Incident updated.');
+            // Handle tags
+            if ($request->filled('tags')) {
+                $tags = array_filter(array_map('trim', explode(',', $request->tags)));
+                $updateData['tags'] = json_encode(array_values($tags));
+            }
+
+            DB::table('incidents')->where('id', $incident->id)->update($updateData);
+
+            // Handle file uploads - FIXED: Get sort_order separately
+            if ($request->hasFile('files')) {
+                // Get current max sort_order for this incident (separate query, not subquery)
+                $maxSortOrder = DB::table('incident_media')
+                    ->where('incident_id', $incident->id)
+                    ->max('sort_order') ?? 0;
+
+                foreach ($request->file('files') as $index => $file) {
+                    $mediaType = $this->getMediaType($file);
+                    $path = 'incidents/'.$incident->id.'/'.date('Y/m');
+                    $fileName = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
+                    $filePath = $file->storeAs($path, $fileName, 'public');
+
+                    // Generate thumbnail for images
+                    $thumbnailPath = null;
+                    if ($mediaType === 'image' && $file->getSize() < 10485760) {
+                        try {
+                            $manager = new ImageManager(new Driver);
+                            $image = $manager->read($file);
+                            $image->resize(300, 300, function ($constraint) {
+                                $constraint->aspectRatio();
+                                $constraint->upsize();
+                            });
+                            $thumbPath = $path.'/thumbnails/'.$fileName;
+                            Storage::disk('public')->put($thumbPath, $image->toJpeg(80));
+                            $thumbnailPath = $thumbPath;
+                        } catch (\Exception $e) {
+                            Log::warning('Thumbnail failed: '.$e->getMessage());
+                        }
+                    }
+
+                    // Insert with incremented sort order (no subquery on same table)
+                    DB::table('incident_media')->insert([
+                        'incident_id' => $incident->id,
+                        'uploaded_by' => Auth::id(),
+                        'media_type' => $mediaType,
+                        'file_path' => $filePath,
+                        'file_name' => $fileName,
+                        'original_name' => $file->getClientOriginalName(),
+                        'mime_type' => $file->getMimeType(),
+                        'file_size' => $file->getSize(),
+                        'thumbnail_path' => $thumbnailPath,
+                        'sort_order' => $maxSortOrder + $index + 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+
+            // Log activity if changes were made
+            $hasChanges = false;
+            foreach ($updateData as $key => $value) {
+                if ($key !== 'updated_at' && $value != $incident->$key) {
+                    $hasChanges = true;
+                    break;
+                }
+            }
+
+            if ($hasChanges || $request->hasFile('files')) {
+                DB::table('incident_logs')->insert([
+                    'incident_id' => $incident->id,
+                    'user_id' => Auth::id(),
+                    'action' => 'updated',
+                    'old_values' => json_encode(['title' => $incident->title, 'description' => Str::limit($incident->description, 100)]),
+                    'new_values' => json_encode($request->hasFile('files') ? ['files_added' => count($request->file('files'))] : $updateData),
+                    'description' => 'Incident details updated'.($request->hasFile('files') ? ' with '.count($request->file('files')).' new attachment(s)' : ''),
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::commit();
+
+            // Reload incident with relationships
+            $incident->refresh();
+            $incident->load(['department', 'category', 'media', 'reporter', 'assignedTo']);
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Incident updated successfully.',
+                    'files_added' => $request->hasFile('files') ? count($request->file('files')) : 0,
+                ]);
+            }
+
+            return redirect()->route('incidents.show', $incident)
+                ->with('success', 'Incident updated successfully.');
+
         } catch (\Exception $e) {
-            Log::error('Update failed: '.$e->getMessage());
-            if ($request->ajax()) {
-                return $this->errorResponse('Update failed', 500);
+            DB::rollBack();
+            Log::error('Update failed: '.$e->getMessage(), [
+                'incident_id' => $incident->id,
+                'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to update incident. Please try again.',
+                ], 500);
             }
 
-            return back()->with('error', 'Update failed.')->withInput();
+            return back()->with('error', 'Update failed. Please try again.')->withInput();
         }
     }
-
     // ==========================================
     // ASSIGN
     // ==========================================
@@ -1971,16 +2110,72 @@ class IncidentController extends Controller
         return back()->with('success', 'Files uploaded.');
     }
 
+    // public function deleteMedia(Request $request, Incident $incident, $mediaId)
+    // {
+    //     $this->authorize('delete-media');
+    //     $media = $incident->media()->findOrFail($mediaId);
+    //     $this->incidentService->deleteMedia($media);
+    //     if ($request->ajax()) {
+    //         return response()->json(['success' => true, 'message' => 'Media deleted']);
+    //     }
+
+    //     return back()->with('success', 'Media deleted.');
+    // }
+    // app/Http/Controllers/IncidentController.php
+
+    /**
+     * Delete media from incident.
+     */
     public function deleteMedia(Request $request, Incident $incident, $mediaId)
     {
         $this->authorize('delete-media');
-        $media = $incident->media()->findOrFail($mediaId);
-        $this->incidentService->deleteMedia($media);
-        if ($request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'Media deleted']);
-        }
 
-        return back()->with('success', 'Media deleted.');
+        try {
+            $media = $incident->media()->findOrFail($mediaId);
+
+            // Delete physical files
+            if ($media->file_path && Storage::disk('public')->exists($media->file_path)) {
+                Storage::disk('public')->delete($media->file_path);
+            }
+            if ($media->thumbnail_path && Storage::disk('public')->exists($media->thumbnail_path)) {
+                Storage::disk('public')->delete($media->thumbnail_path);
+            }
+
+            // Delete database record
+            $media->delete();
+
+            // Log activity
+            $incident->logActivity('media_deleted', null, [
+                'media_id' => $mediaId,
+                'file_name' => $media->original_name,
+            ]);
+
+            // Always return JSON for AJAX requests
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Attachment removed successfully.',
+                    'media_id' => $mediaId,
+                ]);
+            }
+
+            return back()->with('success', 'Attachment removed successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('Delete media failed: '.$e->getMessage(), [
+                'incident_id' => $incident->id,
+                'media_id' => $mediaId,
+            ]);
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to remove attachment.',
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to remove attachment.');
+        }
     }
 
     // ==========================================

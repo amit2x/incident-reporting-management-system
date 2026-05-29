@@ -11,7 +11,8 @@
 
         {{-- Features --}}
         <div class="nav-item">
-            <a href="{{ route('guest.features') }}" class="nav-link {{ request()->routeIs('guest.features') ? 'active' : '' }}">
+            <a href="{{ route('guest.features') }}"
+                class="nav-link {{ request()->routeIs('guest.features') ? 'active' : '' }}">
                 <i class="fas fa-star"></i>
                 <span>Features</span>
             </a>
@@ -20,18 +21,11 @@
         {{-- Login (Center - Prominent) --}}
         <div class="nav-item">
             <a href="{{ route('login') }}" class="nav-link nav-link-create">
-                <div style="background: var(--primary); color: white; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: -16px; box-shadow: 0 4px 12px rgba(26,86,219,0.4);">
+                <div
+                    style="background: var(--primary); color: white; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: -16px; box-shadow: 0 4px 12px rgba(26,86,219,0.4);">
                     <i class="fas fa-right-to-bracket"></i>
                 </div>
                 <span style="margin-top: 2px;">Login</span>
-            </a>
-        </div>
-
-        {{-- Register --}}
-        <div class="nav-item">
-            <a href="{{ route('register') }}" class="nav-link {{ request()->routeIs('register') ? 'active' : '' }}">
-                <i class="fas fa-user-plus"></i>
-                <span>Register</span>
             </a>
         </div>
 
@@ -42,5 +36,10 @@
                 <span>Help</span>
             </a>
         </div>
+
+        <a href="{{ route('contact.form') }}" class="nav-link {{ request()->routeIs('contact.*') ? 'active' : '' }}">
+            <i class="fas fa-headset"></i>
+            <span>Contact</span>
+        </a>
     </div>
 </nav>

@@ -330,7 +330,7 @@
 @endpush
 
 @section('content')
-<div class="container-fluid px-3 py-3">
+<div class="py-3">
 
     <div class="mb-4">
         <a href="{{ route('incidents.index') }}" class="text-muted text-decoration-none small">

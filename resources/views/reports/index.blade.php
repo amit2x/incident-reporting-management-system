@@ -85,7 +85,7 @@
 @endpush
 
 @section('content')
-<div class="container-fluid px-3 py-3">
+<div class="py-3">
 
     {{-- Header --}}
     <div class="mb-4">

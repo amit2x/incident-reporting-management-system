@@ -12,13 +12,13 @@
 
     @else
     <div class="drawer-header">
-        <div
-            style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-            <i class="fas fa-user"></i>
-        </div>
-        <div>
-            <div class="fw-bold">Welcome</div>
-            <small class="opacity-75">Incident Management System</small>
+
+        <div class="drawer-header guest-header">
+            <img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo" class="drawer-logo">
+            <div>
+                <span class="brand-name d-block">IRMSystem</span>
+                <small class="text-muted">Welcome, Guest</small>
+            </div>
         </div>
     </div>
     @endauth
@@ -91,7 +91,7 @@
             </button>
         </form>
         @else
-        <a href="{{ url('/') }}" class="drawer-link {{ request()->routeIs('home') ? 'active' : '' }}">
+        <a href="{{ route('guest.home') }}" class="drawer-link {{ request()->routeIs('home') ? 'active' : '' }}">
             <i class="fas fa-house"></i> Home
         </a>
         <a href="{{ route('login') }}" class="drawer-link">

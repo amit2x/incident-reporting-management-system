@@ -265,8 +265,13 @@
         gap: 4px;
     }
 
-    .stat-card .stat-change.positive { color: var(--success); }
-    .stat-card .stat-change.negative { color: var(--danger); }
+    .stat-card .stat-change.positive {
+        color: var(--success);
+    }
+
+    .stat-card .stat-change.negative {
+        color: var(--danger);
+    }
 
     /* ==========================================
        BADGES
@@ -282,13 +287,40 @@
         line-height: 1;
     }
 
-    .badge-primary { background: var(--primary-100); color: var(--primary-700); }
-    .badge-success { background: var(--success-light); color: var(--success); }
-    .badge-danger { background: var(--danger-light); color: var(--danger); }
-    .badge-warning { background: var(--warning-light); color: var(--warning); }
-    .badge-info { background: var(--info-light); color: var(--info); }
-    .badge-secondary { background: var(--gray-100); color: var(--gray-600); }
-    .badge-dark { background: var(--gray-800); color: white; }
+    .badge-primary {
+        background: var(--primary-100);
+        color: var(--primary-700);
+    }
+
+    .badge-success {
+        background: var(--success-light);
+        color: var(--success);
+    }
+
+    .badge-danger {
+        background: var(--danger-light);
+        color: var(--danger);
+    }
+
+    .badge-warning {
+        background: var(--warning-light);
+        color: var(--warning);
+    }
+
+    .badge-info {
+        background: var(--info-light);
+        color: var(--info);
+    }
+
+    .badge-secondary {
+        background: var(--gray-100);
+        color: var(--gray-600);
+    }
+
+    .badge-dark {
+        background: var(--gray-800);
+        color: white;
+    }
 
     .badge-dot {
         width: 8px;
@@ -300,21 +332,67 @@
     /* ==========================================
        STATUS BADGES
        ========================================== */
-    .status-open { background: #dbeafe; color: #1e40af; }
-    .status-acknowledged { background: #fef3c7; color: #92400e; }
-    .status-in_progress { background: #ede9fe; color: #5b21b6; }
-    .status-escalated { background: #fce7f3; color: #9b1c1c; }
-    .status-resolved { background: #d1fae5; color: #065f46; }
-    .status-closed { background: #e2e8f0; color: #475569; }
-    .status-rejected { background: #fee2e2; color: #991b1b; }
+    .status-open {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .status-acknowledged {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-in_progress {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+
+    .status-escalated {
+        background: #fce7f3;
+        color: #9b1c1c;
+    }
+
+    .status-resolved {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-closed {
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    .status-rejected {
+        background: #fee2e2;
+        color: #991b1b;
+    }
 
     /* ==========================================
        PRIORITY BADGES
        ========================================== */
-    .priority-critical { background: #fee2e2; color: #991b1b; border-left: 3px solid #dc2626; }
-    .priority-high { background: #fed7aa; color: #9a3412; border-left: 3px solid #ea580c; }
-    .priority-medium { background: #fef3c7; color: #92400e; border-left: 3px solid #d97706; }
-    .priority-low { background: #d1fae5; color: #065f46; border-left: 3px solid #059669; }
+    .priority-critical {
+        background: #fee2e2;
+        color: #991b1b;
+        border-left: 3px solid #dc2626;
+    }
+
+    .priority-high {
+        background: #fed7aa;
+        color: #9a3412;
+        border-left: 3px solid #ea580c;
+    }
+
+    .priority-medium {
+        background: #fef3c7;
+        color: #92400e;
+        border-left: 3px solid #d97706;
+    }
+
+    .priority-low {
+        background: #d1fae5;
+        color: #065f46;
+        border-left: 3px solid #059669;
+    }
 
     /* ==========================================
        FORMS
@@ -334,7 +412,7 @@
     .form-control,
     .form-select {
         font-size: 0.875rem;
-        padding: 10px 14px;
+        /* padding: 10px 14px; */
         border: 1px solid var(--gray-300);
         border-radius: var(--radius);
         background: white;
@@ -617,8 +695,13 @@
     }
 
     @keyframes shimmer {
-        0% { background-position: -200% 0; }
-        100% { background-position: 200% 0; }
+        0% {
+            background-position: -200% 0;
+        }
+
+        100% {
+            background-position: 200% 0;
+        }
     }
 
     /* ==========================================

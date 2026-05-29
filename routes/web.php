@@ -98,6 +98,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/incidents/{incident}/reject', [IncidentController::class, 'reject'])->name('incidents.reject');
     Route::post('/incidents/{incident}/reassign', [IncidentController::class, 'reassign'])->name('incidents.reassign');
 
+    // routes/web.php
+    Route::post('/incidents/{incident}/escalation-respond', [IncidentController::class, 'respondToEscalation'])->name('incidents.escalation.respond');
 
     // Comments
     Route::post('/incidents/{incident}/comments', [IncidentController::class, 'addComment'])->name('incidents.comments.store');

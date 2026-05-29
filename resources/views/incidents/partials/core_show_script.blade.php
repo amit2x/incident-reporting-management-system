@@ -1,7 +1,11 @@
 {{-- resources/views/incidents/partials/core_show_script.blade.php --}}
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {
+
+        // Initialize all tooltips on the page
+const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="modal"][title]')
+const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
 
     // ==========================================
     // REUSABLE IMAGE COMPRESSION UTILITY
@@ -759,6 +763,11 @@ if (commentsList) {
     setupModalForm('resolveForm', '{{ route("incidents.resolve", $incident) }}', 'Resolved!', resolveFiles);
     setupModalForm('rejectForm', '{{ route("incidents.reject", $incident) }}', 'Rejected!');
     setupModalForm('closeForm', '{{ route("incidents.close", $incident) }}', 'Closed!', closeFiles);
+
+    setupModalForm('acceptEscalationForm', '{{ route("incidents.escalation.respond", $incident) }}', 'Escalation accepted!');
+    setupModalForm('returnEscalationForm', '{{ route("incidents.escalation.respond", $incident) }}', 'Escalation returned!');
+    setupModalForm('rejectEscalationForm', '{{ route("incidents.escalation.respond", $incident) }}', 'Escalation rejected!');
+
 
     // Quick actions
     window.closeIncident = function() { if(!confirm('Close?'))return; fetch('{{ route("incidents.close", $incident) }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'},body:JSON.stringify({closing_remarks:'Closed'})}).then(r=>r.json()).then(d=>{if(d.success){toastr.success('Closed!');setTimeout(()=>location.reload(),1000);}}); };

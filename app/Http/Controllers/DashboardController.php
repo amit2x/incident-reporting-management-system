@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Incident;
 use App\Models\Department;
+use App\Models\Incident;
 use App\Repositories\IncidentRepository;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -22,63 +22,148 @@ class DashboardController extends Controller
     /**
      * Show the application dashboard.
      */
+    /**
+     * Show the application dashboard.
+     */
     public function index(Request $request)
     {
         $user = Auth::user();
 
-        // Get user stats
+        // ==========================================
+        // STATISTICS
+        // ==========================================
         $stats = $user->getDashboardStats();
 
-        // Filters
+        // Filters for department-based users
         $filters = [];
-        if (!$user->isAdmin()) {
+        if (! $user->isAdmin()) {
             $filters['department_id'] = $user->department_id;
         }
 
-        // Get recent incidents for feed
+        // ==========================================
+        // RECENT INCIDENTS FEED
+        // ==========================================
         $recentIncidents = $this->incidentRepository->getFeedIncidents($filters, 10);
 
-        // Get chart data
+        // ==========================================
+        // CHART DATA
+        // ==========================================
         $severityDistribution = $this->getSeverityDistribution($filters);
         $dailyTrends = $this->getDailyTrends($filters);
+        $statusDistribution = $this->getStatusDistribution($filters);
 
-        // Department performance (admin only)
+        // ==========================================
+        // DEPARTMENT PERFORMANCE (Admin Only)
+        // ==========================================
         $departmentPerformance = [];
         if ($user->isAdmin()) {
             $departmentPerformance = $this->getDepartmentPerformance();
         }
 
-        // Get critical/overdue counts
-        $criticalCount = Incident::critical()
-            ->when(!$user->isAdmin(), fn($q) => $q->where('department_id', $user->department_id))
+        // ==========================================
+        // CRITICAL & OVERDUE COUNTS
+        // ==========================================
+        $criticalIncidents = Incident::critical()
+            ->when(! $user->isAdmin(), fn ($q) => $q->where('department_id', $user->department_id))
             ->whereIn('status', ['open', 'acknowledged', 'in_progress', 'escalated'])
-            ->count();
+            ->with(['department', 'category', 'assignedTo'])
+            ->latest()
+            ->limit(10)
+            ->get();
 
-        $overdueCount = Incident::overdue()
-            ->when(!$user->isAdmin(), fn($q) => $q->where('department_id', $user->department_id))
-            ->count();
+        $criticalCount = $criticalIncidents->count();
 
-        if ($request->ajax()) {
+        $overdueIncidents = Incident::overdue()
+            ->when(! $user->isAdmin(), fn ($q) => $q->where('department_id', $user->department_id))
+            ->with(['department', 'category', 'assignedTo'])
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $overdueCount = $overdueIncidents->count();
+
+        // ==========================================
+        // MY INCIDENTS - ESCALATED TO ME
+        // ==========================================
+        $escalatedToMe = Incident::where('escalated_to', $user->id)
+            ->where('status', 'escalated')
+            ->with(['department', 'category', 'reporter', 'assignedTo'])
+            ->latest('escalated_at')
+            ->limit(5)
+            ->get();
+
+        // ==========================================
+        // MY INCIDENTS - ASSIGNED TO ME
+        // ==========================================
+        $assignedToMe = Incident::where('assigned_to', $user->id)
+            ->whereIn('status', ['open', 'acknowledged', 'in_progress'])
+            ->with(['department', 'category', 'reporter'])
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        // ==========================================
+        // MY INCIDENTS - REPORTED BY ME
+        // ==========================================
+        $reportedByMe = Incident::where('reported_by', $user->id)
+            ->with(['department', 'category', 'assignedTo'])
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        // ==========================================
+        // QUICK STATS FOR CARDS
+        // ==========================================
+        $myStats = [
+            'assigned_count' => Incident::where('assigned_to', $user->id)
+                ->whereIn('status', ['open', 'acknowledged', 'in_progress'])->count(),
+            'escalated_count' => $escalatedToMe->count(),
+            'reported_count' => Incident::where('reported_by', $user->id)->count(),
+            'resolved_count' => Incident::where('assigned_to', $user->id)
+                ->whereIn('status', ['resolved', 'closed'])->count(),
+        ];
+
+        // ==========================================
+        // AJAX RESPONSE
+        // ==========================================
+        if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'data' => [
                     'stats' => $stats,
+                    'my_stats' => $myStats,
                     'recent_incidents' => $recentIncidents->items(),
                     'severity_distribution' => $severityDistribution,
+                    'status_distribution' => $statusDistribution,
                     'daily_trends' => $dailyTrends,
                     'department_performance' => $departmentPerformance,
+                    'critical_incidents' => $criticalIncidents,
+                    'overdue_incidents' => $overdueIncidents,
+                    'escalated_to_me' => $escalatedToMe,
+                    'assigned_to_me' => $assignedToMe,
+                    'reported_by_me' => $reportedByMe,
                     'critical_count' => $criticalCount,
                     'overdue_count' => $overdueCount,
-                ]
+                ],
             ]);
         }
 
+        // ==========================================
+        // RETURN VIEW
+        // ==========================================
         return view('dashboard', compact(
             'stats',
+            'myStats',
             'recentIncidents',
             'severityDistribution',
             'dailyTrends',
+            'statusDistribution',
             'departmentPerformance',
+            'criticalIncidents',
+            'overdueIncidents',
+            'escalatedToMe',
+            'assignedToMe',
+            'reportedByMe',
             'criticalCount',
             'overdueCount'
         ));
@@ -90,8 +175,7 @@ class DashboardController extends Controller
     protected function getSeverityDistribution(array $filters = []): array
     {
         $query = Incident::query();
-
-        if (!empty($filters['department_id'])) {
+        if (! empty($filters['department_id'])) {
             $query->where('department_id', $filters['department_id']);
         }
 
@@ -102,13 +186,28 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get daily trends for last 30 days
+     * Get status distribution for charts
+     */
+    protected function getStatusDistribution(array $filters = []): array
+    {
+        $query = Incident::query();
+        if (! empty($filters['department_id'])) {
+            $query->where('department_id', $filters['department_id']);
+        }
+
+        return $query->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+    }
+
+    /**
+     * Get daily trends for charts
      */
     protected function getDailyTrends(array $filters = [], int $days = 30): array
     {
         $query = Incident::whereDate('created_at', '>=', Carbon::now()->subDays($days));
-
-        if (!empty($filters['department_id'])) {
+        if (! empty($filters['department_id'])) {
             $query->where('department_id', $filters['department_id']);
         }
 
@@ -126,14 +225,7 @@ class DashboardController extends Controller
             ->pluck('count', 'date')
             ->toArray();
 
-        // Merge actual data
-        foreach ($actualData as $date => $count) {
-            if (isset($trends[$date])) {
-                $trends[$date] = $count;
-            }
-        }
-
-        return $trends;
+        return array_merge($trends, $actualData);
     }
 
     /**
@@ -162,4 +254,83 @@ class DashboardController extends Controller
             })
             ->toArray();
     }
+
+    // /**
+    //  * Get severity distribution for charts
+    //  */
+    // protected function getSeverityDistribution(array $filters = []): array
+    // {
+    //     $query = Incident::query();
+
+    //     if (! empty($filters['department_id'])) {
+    //         $query->where('department_id', $filters['department_id']);
+    //     }
+
+    //     return $query->selectRaw('severity, COUNT(*) as count')
+    //         ->groupBy('severity')
+    //         ->pluck('count', 'severity')
+    //         ->toArray();
+    // }
+
+    /**
+     * Get daily trends for last 30 days
+     */
+    // protected function getDailyTrends(array $filters = [], int $days = 30): array
+    // {
+    //     $query = Incident::whereDate('created_at', '>=', Carbon::now()->subDays($days));
+
+    //     if (! empty($filters['department_id'])) {
+    //         $query->where('department_id', $filters['department_id']);
+    //     }
+
+    //     // Fill all days with 0
+    //     $trends = [];
+    //     for ($i = $days - 1; $i >= 0; $i--) {
+    //         $date = Carbon::now()->subDays($i)->format('Y-m-d');
+    //         $trends[$date] = 0;
+    //     }
+
+    //     // Get actual counts
+    //     $actualData = $query->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+    //         ->groupBy('date')
+    //         ->orderBy('date')
+    //         ->pluck('count', 'date')
+    //         ->toArray();
+
+    //     // Merge actual data
+    //     foreach ($actualData as $date => $count) {
+    //         if (isset($trends[$date])) {
+    //             $trends[$date] = $count;
+    //         }
+    //     }
+
+    //     return $trends;
+    // }
+
+    /**
+     * Get department performance data
+     */
+    // protected function getDepartmentPerformance(): array
+    // {
+    //     return Department::active()
+    //         ->withCount(['incidents as total_incidents'])
+    //         ->withCount(['incidents as open_incidents_count' => function ($query) {
+    //             $query->whereIn('status', ['open', 'acknowledged', 'in_progress']);
+    //         }])
+    //         ->withCount(['incidents as resolved_incidents_count' => function ($query) {
+    //             $query->whereIn('status', ['resolved', 'closed']);
+    //         }])
+    //         ->get()
+    //         ->map(function ($dept) {
+    //             return [
+    //                 'name' => $dept->name,
+    //                 'code' => $dept->code,
+    //                 'color' => $dept->color,
+    //                 'total_incidents' => $dept->total_incidents,
+    //                 'open_incidents_count' => $dept->open_incidents_count,
+    //                 'resolved_incidents_count' => $dept->resolved_incidents_count,
+    //             ];
+    //         })
+    //         ->toArray();
+    // }
 }

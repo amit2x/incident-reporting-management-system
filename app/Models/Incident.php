@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Events\IncidentCreated;
+use App\Events\IncidentUpdated;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\DatabaseNotification;
 
 class Incident extends Model
 {
@@ -96,7 +99,7 @@ class Incident extends Model
 
         static::created(function ($incident) {
             $incident->logActivity('created', null, $incident->toArray());
-            event(new \App\Events\IncidentCreated($incident));
+            event(new IncidentCreated($incident));
         });
 
         static::updated(function ($incident) {
@@ -183,7 +186,7 @@ class Incident extends Model
 
     public function notifications(): HasMany
     {
-        return $this->hasMany(\Illuminate\Notifications\DatabaseNotification::class, 'data->incident_id')
+        return $this->hasMany(DatabaseNotification::class, 'data->incident_id')
             ->where('data->incident_id', $this->id);
     }
 
@@ -206,6 +209,7 @@ class Incident extends Model
         if (is_array($status)) {
             return $query->whereIn('status', $status);
         }
+
         return $query->where('status', $status);
     }
 
@@ -214,6 +218,7 @@ class Incident extends Model
         if (is_array($severity)) {
             return $query->whereIn('severity', $severity);
         }
+
         return $query->where('severity', $severity);
     }
 
@@ -222,6 +227,7 @@ class Incident extends Model
         if (is_array($priority)) {
             return $query->whereIn('priority', $priority);
         }
+
         return $query->where('priority', $priority);
     }
 
@@ -260,9 +266,9 @@ class Incident extends Model
     {
         return $query->where(function ($q) use ($search) {
             $q->where('title', 'like', "%{$search}%")
-              ->orWhere('description', 'like', "%{$search}%")
-              ->orWhere('incident_id', 'like', "%{$search}%")
-              ->orWhere('location', 'like', "%{$search}%");
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('incident_id', 'like', "%{$search}%")
+                ->orWhere('location', 'like', "%{$search}%");
         });
     }
 
@@ -277,7 +283,7 @@ class Incident extends Model
 
     public function getStatusColorAttribute(): string
     {
-        return match($this->status) {
+        return match ($this->status) {
             'open' => '#3B82F6',
             'acknowledged' => '#F59E0B',
             'in_progress' => '#8B5CF6',
@@ -291,7 +297,7 @@ class Incident extends Model
 
     public function getSeverityColorAttribute(): string
     {
-        return match($this->severity) {
+        return match ($this->severity) {
             'critical' => '#DC2626',
             'high' => '#EF4444',
             'medium' => '#F59E0B',
@@ -302,7 +308,7 @@ class Incident extends Model
 
     public function getPriorityColorAttribute(): string
     {
-        return match($this->priority) {
+        return match ($this->priority) {
             'critical' => '#DC2626',
             'high' => '#EF4444',
             'medium' => '#F59E0B',
@@ -327,8 +333,10 @@ class Incident extends Model
     {
         if ($this->acknowledged_at && $this->created_at) {
             $minutes = $this->created_at->diffInMinutes($this->acknowledged_at);
+
             return $this->formatDuration($minutes);
         }
+
         return null;
     }
 
@@ -336,8 +344,10 @@ class Incident extends Model
     {
         if ($this->resolved_at && $this->created_at) {
             $minutes = $this->created_at->diffInMinutes($this->resolved_at);
+
             return $this->formatDuration($minutes);
         }
+
         return null;
     }
 
@@ -484,7 +494,7 @@ class Incident extends Model
             $this->increment('sla_breach_count');
         }
 
-        event(new \App\Events\IncidentUpdated($this, [
+        event(new IncidentUpdated($this, [
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
         ]));
@@ -492,12 +502,12 @@ class Incident extends Model
 
     private function getActionDescription(string $action): string
     {
-        return match($action) {
+        return match ($action) {
             'created' => 'Incident was created',
             'updated' => 'Incident details were updated',
             'status_changed' => "Status changed from {$this->getOriginal('status')} to {$this->status}",
-            'assigned' => 'Incident assigned to ' . ($this->assignedTo->name ?? 'Unknown'),
-            'escalated' => 'Incident escalated to ' . ($this->escalatedTo->name ?? 'Unknown'),
+            'assigned' => 'Incident assigned to '.($this->assignedTo->name ?? 'Unknown'),
+            'escalated' => 'Incident escalated to '.($this->escalatedTo->name ?? 'Unknown'),
             'resolved' => 'Incident resolved with notes',
             'closed' => 'Incident closed',
             'reopened' => 'Incident reopened',
@@ -517,7 +527,7 @@ class Incident extends Model
         $remainingMinutes = $minutes % 60;
 
         if ($remainingMinutes === 0) {
-            return "{$hours} hr" . ($hours > 1 ? 's' : '');
+            return "{$hours} hr".($hours > 1 ? 's' : '');
         }
 
         return "{$hours} hr {$remainingMinutes} min";
@@ -529,8 +539,10 @@ class Incident extends Model
             in_array($this->status, ['open', 'acknowledged', 'in_progress', 'escalated'])) {
             $this->increment('sla_breach_count');
             $this->update(['sla_breach_notified_at' => now()]);
+
             return true;
         }
+
         return false;
     }
 
@@ -552,11 +564,10 @@ class Incident extends Model
         return in_array($this->status, ['resolved', 'closed']);
     }
 
-
     /**
      * Users who liked this incident
      */
-    public function likes(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function likes(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'incident_likes')
             ->withTimestamps();
@@ -567,7 +578,10 @@ class Incident extends Model
      */
     public function isLikedBy(?User $user): bool
     {
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
+
         return $this->likes()->where('user_id', $user->id)->exists();
     }
 
@@ -644,15 +658,155 @@ class Incident extends Model
     public function getWhatsAppShareUrl(): string
     {
         $text = "*Incident #{$this->incident_id}: {$this->title}*\n";
-        $text .= "Status: " . ucfirst(str_replace('_', ' ', $this->status)) . "\n";
-        $text .= "Severity: " . ucfirst($this->severity) . " | Priority: " . ucfirst($this->priority) . "\n";
-        $text .= "Department: " . ($this->department?->name ?? 'N/A') . "\n";
+        $text .= 'Status: '.ucfirst(str_replace('_', ' ', $this->status))."\n";
+        $text .= 'Severity: '.ucfirst($this->severity).' | Priority: '.ucfirst($this->priority)."\n";
+        $text .= 'Department: '.($this->department?->name ?? 'N/A')."\n";
         if ($this->location) {
             $text .= "Location: {$this->location}\n";
         }
-        $text .= "\nView Details: " . route('incidents.show', $this->id);
+        $text .= "\nView Details: ".route('incidents.show', $this->id);
 
-        return 'https://wa.me/?text=' . urlencode($text);
+        return 'https://wa.me/?text='.urlencode($text);
     }
 
+    /**
+     * Check if user can take action on this incident
+     */
+    // public function canTakeAction(?User $user): bool
+    // {
+    //     if (!$user) return false;
+
+    //     // Admin can always take action
+    //     if ($user->isAdmin()) return true;
+
+    //     // Assigned user can take action
+    //     if ($this->assigned_to === $user->id) return true;
+
+    //     // Currently escalated user can take action
+    //     if ($this->escalated_to === $user->id && $this->status === 'escalated') return true;
+
+    //     // Reporter can view but limited actions
+    //     if ($this->reported_by === $user->id) return true;
+
+    //     // HOD of the department can take action
+    //     if ($user->isHOD() && $user->department_id === $this->department_id) return true;
+
+    //     return false;
+    // }
+
+    // app/Models/Incident.php
+
+    /**
+     * Check if user can take action on this incident
+     */
+    public function canTakeAction(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        // Admin can always take action
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Assigned user can take action
+        if ($this->assigned_to === $user->id) {
+            return true;
+        }
+
+        // Currently escalated user can take action
+        if ($this->escalated_to === $user->id && $this->status === 'escalated') {
+            return true;
+        }
+
+        // Reporter can take limited action
+        if ($this->reported_by === $user->id && in_array($this->status, ['open', 'acknowledged'])) {
+            return true;
+        }
+
+        // HOD of the incident's department can take action
+        if ($user->isHOD() && $user->department_id === $this->department_id) {
+            return true;
+        }
+
+        // Supervisor of the incident's department can take action
+        if ($user->isSupervisor() && $user->department_id === $this->department_id) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if user can view this incident (broader access than canTakeAction)
+     */
+    public function canBeViewedBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        // Admin can view all
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // Anyone who can take action can view
+        if ($this->canTakeAction($user)) {
+            return true;
+        }
+
+        // Reporter can always view their own incidents
+        if ($this->reported_by === $user->id) {
+            return true;
+        }
+
+        // Anyone in the same department can view
+        if ($user->department_id === $this->department_id) {
+            return true;
+        }
+
+        // Anyone who was ever escalated to can view
+        $wasEscalated = Escalation::where('incident_id', $this->id)
+            ->where('escalated_to', $user->id)
+            ->exists();
+        if ($wasEscalated) {
+            return true;
+        }
+
+        // Anyone who was ever assigned can view
+        $wasAssigned = IncidentAssignment::where('incident_id', $this->id)
+            ->where('assigned_to', $user->id)
+            ->exists();
+        if ($wasAssigned) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get pending escalations for a user
+     */
+    public static function pendingEscalationsForUser(int $userId)
+    {
+        return static::where('escalated_to', $userId)
+            ->where('status', 'escalated')
+            ->with(['department', 'category', 'reporter', 'assignedTo'])
+            ->latest('escalated_at')
+            ->get();
+    }
+
+    /**
+     * Get incidents assigned to user
+     */
+    public static function assignedToUser(int $userId)
+    {
+        return static::where('assigned_to', $userId)
+            ->whereIn('status', ['open', 'acknowledged', 'in_progress'])
+            ->with(['department', 'category', 'reporter'])
+            ->latest()
+            ->get();
+    }
 }

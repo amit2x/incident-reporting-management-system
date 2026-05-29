@@ -181,31 +181,31 @@ class Escalation extends Model
     /**
      * Accept the escalation
      */
-    public function accept(?string $response = null): void
-    {
-        $this->update([
-            'status' => 'accepted',
-            'response' => $response,
-            'responded_at' => now(),
-        ]);
+    // public function accept(?string $response = null): void
+    // {
+    //     $this->update([
+    //         'status' => 'accepted',
+    //         'response' => $response,
+    //         'responded_at' => now(),
+    //     ]);
 
-        // Update incident if needed
-        if ($this->incident->status === 'escalated') {
-            $this->incident->startProgress();
-        }
-    }
+    //     // Update incident if needed
+    //     if ($this->incident->status === 'escalated') {
+    //         $this->incident->startProgress();
+    //     }
+    // }
 
     /**
      * Reject the escalation
      */
-    public function reject(?string $response = null): void
-    {
-        $this->update([
-            'status' => 'rejected',
-            'response' => $response,
-            'responded_at' => now(),
-        ]);
-    }
+    // public function reject(?string $response = null): void
+    // {
+    //     $this->update([
+    //         'status' => 'rejected',
+    //         'response' => $response,
+    //         'responded_at' => now(),
+    //     ]);
+    // }
 
     /**
      * Check if response is overdue (more than 2 hours)
@@ -229,4 +229,57 @@ class Escalation extends Model
             ->get()
             ->toArray();
     }
+
+
+    /**
+     * Accept the escalation
+     */
+    public function accept(?string $response = null): void
+    {
+        $this->update([
+            'status' => 'accepted',
+            'response' => $response,
+            'responded_by' => auth()->id(),
+            'responded_at' => now(),
+            'response_type' => 'accepted',
+        ]);
+    }
+
+    /**
+     * Reject the escalation
+     */
+    public function reject(?string $response = null): void
+    {
+        $this->update([
+            'status' => 'rejected',
+            'response' => $response,
+            'responded_by' => auth()->id(),
+            'responded_at' => now(),
+            'response_type' => 'rejected',
+        ]);
+    }
+
+    /**
+     * Return escalation back to previous level
+     */
+    public function returnBack(?string $response = null): void
+    {
+        $this->update([
+            'status' => 'rejected',
+            'response' => $response ?? 'Returned back - not applicable',
+            'responded_by' => auth()->id(),
+            'responded_at' => now(),
+            'response_type' => 'returned',
+        ]);
+    }
+
+    /**
+     * Check if escalation can be responded to by current user
+     */
+    public function canBeRespondedBy(User $user): bool
+    {
+        return $this->escalated_to === $user->id && $this->status === 'pending';
+    }
+
+
 }

@@ -4,18 +4,18 @@ namespace App\Models;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -54,14 +54,12 @@ class User extends Authenticatable implements MustVerifyEmail
         'initials',
     ];
 
-
-
-
     // In app/Models/User.php
 
-// Cache role checks to prevent repeated queries
- // Add this to cache roles
+    // Cache role checks to prevent repeated queries
+    // Add this to cache roles
     protected $cachedRoles = null;
+
     protected $cachedPermissions = null;
 
     /**
@@ -73,6 +71,7 @@ class User extends Authenticatable implements MustVerifyEmail
             // Only query once per request
             $this->cachedRoles = $this->getRoleNames()->toArray();
         }
+
         return $this->cachedRoles;
     }
 
@@ -99,6 +98,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isAdmin(): bool
     {
         $roles = $this->getCachedRoles();
+
         return in_array('admin', $roles) || in_array('super-admin', $roles);
     }
 
@@ -212,10 +212,10 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'like', "%{$search}%")
-              ->orWhere('email', 'like', "%{$search}%")
-              ->orWhere('username', 'like', "%{$search}%")
-              ->orWhere('employee_id', 'like', "%{$search}%")
-              ->orWhere('phone', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('username', 'like', "%{$search}%")
+                ->orWhere('employee_id', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%");
         });
     }
 
@@ -231,7 +231,8 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($this->avatar) {
             return Storage::url($this->avatar);
         }
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&background=random&size=128&bold=true&color=fff';
+
+        return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=random&size=128&bold=true&color=fff';
     }
 
     /**
@@ -257,15 +258,15 @@ class User extends Authenticatable implements MustVerifyEmail
         try {
 
             $roles = $this->getCachedRoles();
+
             return $roles[0] ?? 'No Role';
             $role = $this->roles()->first();
+
             return $role?->name ?? 'No Role';
         } catch (\Exception $e) {
             return 'No Role';
         }
     }
-
-
 
     /**
      * Get initials
@@ -274,8 +275,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $words = explode(' ', trim($this->name));
         if (count($words) >= 2) {
-            return strtoupper(substr($words[0], 0, 1) . substr(end($words), 0, 1));
+            return strtoupper(substr($words[0], 0, 1).substr(end($words), 0, 1));
         }
+
         return strtoupper(substr($this->name, 0, 2));
     }
 
@@ -334,25 +336,121 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Check if user can access an incident
      */
+    // public function canAccessIncident(Incident $incident): bool
+    // {
+    //     if ($this->isAdmin()) {
+    //         return true;
+    //     }
+
+    //     if ($this->isHOD() && $this->department_id === $incident->department_id) {
+    //         return true;
+    //     }
+
+    //     if ($this->id === $incident->reported_by) {
+    //         return true;
+    //     }
+
+    //     if ($this->id === $incident->assigned_to) {
+    //         return true;
+    //     }
+
+    //     if ($this->department_id === $incident->department_id && $this->isSupervisor()) {
+    //         return true;
+    //     }
+
+    //     return false;
+    // }
+
+    // app/Models/User.php
+
+    /**
+     * Check if user can access/view an incident
+     */
     public function canAccessIncident(Incident $incident): bool
     {
+        // Admin can access all incidents
         if ($this->isAdmin()) {
             return true;
         }
 
+        // HOD can access own department incidents
         if ($this->isHOD() && $this->department_id === $incident->department_id) {
             return true;
         }
 
+        // Reporter can access their own incidents
         if ($this->id === $incident->reported_by) {
             return true;
         }
 
+        // Assigned user can access
         if ($this->id === $incident->assigned_to) {
             return true;
         }
 
-        if ($this->department_id === $incident->department_id && $this->isSupervisor()) {
+        // ==========================================
+        // ESCALATED USER CAN ACCESS (CRITICAL FIX)
+        // ==========================================
+        // If incident is currently escalated to this user, they can access it
+        if ($this->id === $incident->escalated_to && $incident->status === 'escalated') {
+            return true;
+        }
+
+        // If incident was ever escalated to this user, they can still access it
+        // (for viewing history, even if they accepted/rejected/returned)
+        $wasEscalatedToUser = Escalation::where('incident_id', $incident->id)
+            ->where('escalated_to', $this->id)
+            ->exists();
+
+        if ($wasEscalatedToUser) {
+            return true;
+        }
+
+        // Supervisor can access own department incidents
+        if ($this->isSupervisor() && $this->department_id === $incident->department_id) {
+            return true;
+        }
+
+        // Same department staff can view (but limited actions)
+        if ($this->department_id === $incident->department_id) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if user can take action on this incident (beyond just viewing)
+     */
+    public function canTakeActionOnIncident(Incident $incident): bool
+    {
+        // Admin can always take action
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        // HOD can take action on own department incidents
+        if ($this->isHOD() && $this->department_id === $incident->department_id) {
+            return true;
+        }
+
+        // Assigned user can take action
+        if ($this->id === $incident->assigned_to) {
+            return true;
+        }
+
+        // Currently escalated user can take action (accept/reject/return)
+        if ($this->id === $incident->escalated_to && $incident->status === 'escalated') {
+            return true;
+        }
+
+        // Reporter can take limited action (edit if still open)
+        if ($this->id === $incident->reported_by && in_array($incident->status, ['open', 'acknowledged'])) {
+            return true;
+        }
+
+        // Supervisor can take action on own department incidents
+        if ($this->isSupervisor() && $this->department_id === $incident->department_id) {
             return true;
         }
 

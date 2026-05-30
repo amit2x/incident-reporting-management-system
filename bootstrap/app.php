@@ -1,9 +1,19 @@
 <?php
 
+use App\Http\Middleware\CaptchaMiddleware;
+use App\Http\Middleware\CheckUserStatus;
+use App\Http\Middleware\LogUserActivity;
+use App\Http\Middleware\RateLimitMiddleware;
+use App\Http\Middleware\SanitizeInput;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Facades\Log;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,32 +22,32 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-     ->withMiddleware(function (Middleware $middleware) {
+    ->withMiddleware(function (Middleware $middleware) {
 
         // 1. Application's Global HTTP Middleware Stack
         $middleware->append([
-            \App\Http\Middleware\SecurityHeaders::class,
+            SecurityHeaders::class,
         ]);
 
         // 2. Web Middleware Group Updates
         $middleware->web(append: [
-            \App\Http\Middleware\SanitizeInput::class,
-            \App\Http\Middleware\LogUserActivity::class,
+            SanitizeInput::class,
+            LogUserActivity::class,
         ]);
 
         // 3. API Middleware Group Updates
         $middleware->api(append: [
-            \App\Http\Middleware\RateLimitMiddleware::class,
+            RateLimitMiddleware::class,
         ]);
 
         // 4. Middleware Aliases
         $middleware->alias([
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
-            'user.status' => \App\Http\Middleware\CheckUserStatus::class,
-            'sanitize' => \App\Http\Middleware\SanitizeInput::class,
-            'captcha' => \App\Http\Middleware\CaptchaMiddleware::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'user.status' => CheckUserStatus::class,
+            'sanitize' => SanitizeInput::class,
+            'captcha' => CaptchaMiddleware::class,
 
         ]);
 
@@ -47,45 +57,14 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule) {
         // ==========================================
-        // QUEUE PROCESSING (Windows/Local Development)
+        // QUEUE PROCESSING
         // ==========================================
 
-         $schedule->command('queue:work --queue=notifications,emails,default,reports --max-time=55 --sleep=3 --tries=3 --no-interaction')
-        ->everyMinute()
-        ->withoutOverlapping()
-        ->runInBackground()
-        ->appendOutputTo(storage_path('logs/queue-worker.log'));
-
-
-
-        // Process queue jobs every minute (for Windows without Supervisor)
-        // $schedule->command('queue:process-scheduled --max-jobs=50')
-        //     ->everyMinute()
-        //     ->withoutOverlapping(5)
-        //     ->runInBackground()
-        //     ->appendOutputTo(storage_path('logs/queue-scheduler.log'))
-        //     ->onFailure(function () {
-        //         \Illuminate\Support\Facades\Log::error('Queue scheduler failed');
-        //     });
-
-        // // Alternative: Process specific queues at different intervals
-        // $schedule->command('queue:work database --queue=notifications --max-jobs=20 --stop-when-empty')
-        //     ->everyMinute()
-        //     ->withoutOverlapping(5)
-        //     ->runInBackground()
-        //     ->appendOutputTo(storage_path('logs/queue-notifications.log'));
-
-        // $schedule->command('queue:work database --queue=emails --max-jobs=20 --stop-when-empty')
-        //     ->everyTwoMinutes()
-        //     ->withoutOverlapping(5)
-        //     ->runInBackground()
-        //     ->appendOutputTo(storage_path('logs/queue-emails.log'));
-
-        // $schedule->command('queue:work database --queue=reports --max-jobs=10 --stop-when-empty')
-        //     ->everyFiveMinutes()
-        //     ->withoutOverlapping(10)
-        //     ->runInBackground()
-        //     ->appendOutputTo(storage_path('logs/queue-reports.log'));
+        $schedule->command('queue:work --queue=notifications,emails,default,reports --max-time=55 --tries=3')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/queue-worker.log'));
 
         // // ==========================================
         // // KPI REPORT GENERATION
@@ -115,26 +94,26 @@ return Application::configure(basePath: dirname(__DIR__))
         //         \Illuminate\Support\Facades\Log::error('Monthly KPI report generation failed');
         //     });
 
-        // // ==========================================
-        // // SLA MONITORING
-        // // ==========================================
+        // ==========================================
+        // SLA MONITORING
+        // ==========================================
 
-        // // Check for SLA breaches every 30 minutes
-        // $schedule->command('incidents:check-sla')
-        //     ->everyThirtyMinutes()
-        //     ->withoutOverlapping()
-        //     ->runInBackground()
-        //     ->appendOutputTo(storage_path('logs/sla-check.log'))
-        //     ->onFailure(function () {
-        //         \Illuminate\Support\Facades\Log::error('SLA check failed');
-        //     });
+        // Check for SLA breaches every 30 minutes
+        $schedule->command('incidents:check-sla')
+            ->everyThirtyMinutes()
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/sla-check.log'))
+            ->onFailure(function () {
+                Log::error('SLA check failed');
+            });
 
-        // // Send SLA breach notifications every 15 minutes for critical incidents
-        // $schedule->command('incidents:check-sla --critical-only')
-        //     ->everyFifteenMinutes()
-        //     ->withoutOverlapping()
-        //     ->runInBackground()
-        //     ->appendOutputTo(storage_path('logs/sla-critical-check.log'));
+        // Send SLA breach notifications every 15 minutes for critical incidents
+        $schedule->command('incidents:check-sla --critical-only')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/sla-critical-check.log'));
 
         // // ==========================================
         // // DATA CLEANUP TASKS
@@ -173,37 +152,30 @@ return Application::configure(basePath: dirname(__DIR__))
         // // ==========================================
 
         // // Check system health every hour
-        // $schedule->command('system:health-check')
-        //     ->hourly()
-        //     ->withoutOverlapping(5)
-        //     ->runInBackground()
-        //     ->appendOutputTo(storage_path('logs/health-check.log'))
-        //     ->onFailure(function () {
-        //         \Illuminate\Support\Facades\Log::error('System health check failed');
-        //     });
+        $schedule->command('system:health-check')
+            ->hourly()
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/health-check.log'))
+            ->onFailure(function () {
+                Log::error('System health check failed');
+            });
 
         // Backup database daily at 1:00 AM (only in production)
+        // composer require spatie/laravel-backup
+        // php artisan vendor:publish --provider="Spatie\Backup\BackupServiceProvider"
+
         if (app()->environment('production')) {
+            // Spatie Database Backup: Fires daily at 1:00 AM
             $schedule->command('backup:run --only-db')
                 ->dailyAt('01:00')
                 ->withoutOverlapping()
                 ->runInBackground()
                 ->appendOutputTo(storage_path('logs/backup.log'))
                 ->onFailure(function () {
-                    \Illuminate\Support\Facades\Log::error('Database backup failed');
+                    Log::error('Database backup failed');
                 });
         }
 
-        // ==========================================
-        // CACHE OPTIMIZATION (Production Only)
-        // ==========================================
-
-        // if (app()->environment('production')) {
-        //     // Clear and rebuild cache weekly
-        //     $schedule->command('optimize:clear')
-        //         ->weeklyOn(1, '03:00')
-        //         ->withoutOverlapping()
-        //         ->thenPing('https://healthchecks.io/ping/your-uuid'); // Optional health check ping
-        // }
     })
     ->create();

@@ -145,7 +145,7 @@
             </a>
             @empty
             <div class="text-center py-5">
-                <i class="fas fa-bell-slash fa-3x text-muted mb-3 d-block"></i>
+                <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
                 <h6 class="text-muted">No notifications</h6>
                 <p class="text-muted small mb-0">You'll be notified about incidents, assignments, and updates</p>
             </div>

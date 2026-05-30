@@ -72,6 +72,60 @@ class IncidentController extends Controller
     //     return view('incidents.index', compact('incidents', 'filters', 'stats'));
     // }
 
+    // last-version
+    // public function index(Request $request)
+    // {
+    //     $filters = $request->only([
+    //         'department_id', 'category_id', 'severity', 'priority',
+    //         'status', 'assigned_to', 'date_from', 'date_to', 'search',
+    //     ]);
+
+    //     $user = Auth::user();
+    //     $tab = $request->input('tab', 'all');
+
+    //     // Apply role-based filters for non-admin
+    //     if (! $user->isAdmin()) {
+    //         $filters['department_id'] = $user->department_id;
+    //     }
+
+    //     // Get stats (always for all incidents in user's scope)
+    //     $stats = $this->getQuickStats($filters);
+
+    //     // Get incidents based on tab
+    //     switch ($tab) {
+    //         case 'escalated':
+    //             // Show incidents escalated to current user
+    //             $incidents = Incident::where('escalated_to', $user->id)
+    //                 ->where('status', 'escalated')
+    //                 ->with(['department', 'category', 'reporter', 'assignedTo'])
+    //                 ->latest('escalated_at')
+    //                 ->paginate(15);
+    //             break;
+
+    //         case 'assigned':
+    //             // Show incidents assigned to current user
+    //             $incidents = Incident::where('assigned_to', $user->id)
+    //                 ->whereIn('status', ['open', 'acknowledged', 'in_progress'])
+    //                 ->with(['department', 'category', 'reporter'])
+    //                 ->latest()
+    //                 ->paginate(15);
+    //             break;
+
+    //         default:
+    //             // Show all incidents (filtered)
+    //             $incidents = $this->incidentRepository->getFeedIncidents($filters, 15);
+    //             break;
+    //     }
+
+    //     if ($request->ajax()) {
+    //         return $this->paginatedResponse($incidents);
+    //     }
+
+    //     return view('incidents.index', compact('incidents', 'filters', 'stats', 'tab'));
+    // }
+
+    // app/Http/Controllers/IncidentController.php
+
     public function index(Request $request)
     {
         $filters = $request->only([
@@ -80,7 +134,7 @@ class IncidentController extends Controller
         ]);
 
         $user = Auth::user();
-        $tab = $request->input('tab', 'all');
+        $tab = $request->get('tab', 'all');
 
         // Apply role-based filters for non-admin
         if (! $user->isAdmin()) {
@@ -93,7 +147,6 @@ class IncidentController extends Controller
         // Get incidents based on tab
         switch ($tab) {
             case 'escalated':
-                // Show incidents escalated to current user
                 $incidents = Incident::where('escalated_to', $user->id)
                     ->where('status', 'escalated')
                     ->with(['department', 'category', 'reporter', 'assignedTo'])
@@ -102,7 +155,6 @@ class IncidentController extends Controller
                 break;
 
             case 'assigned':
-                // Show incidents assigned to current user
                 $incidents = Incident::where('assigned_to', $user->id)
                     ->whereIn('status', ['open', 'acknowledged', 'in_progress'])
                     ->with(['department', 'category', 'reporter'])
@@ -110,8 +162,38 @@ class IncidentController extends Controller
                     ->paginate(15);
                 break;
 
+            case 'history':
+                // Show ALL incidents where user had any involvement
+                $incidents = Incident::where(function ($query) use ($user) {
+                    $query->where('reported_by', $user->id)
+                        ->orWhere('assigned_to', $user->id)
+                        ->orWhere('escalated_to', $user->id)
+                        ->orWhereHas('escalations', function ($q) use ($user) {
+                            $q->where('escalated_to', $user->id)
+                                ->orWhere('escalated_by', $user->id);
+                        })
+                        ->orWhereHas('assignments', function ($q) use ($user) {
+                            $q->where('assigned_to', $user->id)
+                                ->orWhere('assigned_by', $user->id);
+                        })
+                        ->orWhereHas('comments', function ($q) use ($user) {
+                            $q->where('user_id', $user->id);
+                        });
+                })
+                    ->with(['department', 'category', 'assignedTo', 'reporter', 'escalatedTo'])
+                    ->withCount('comments')
+                    ->latest()
+                    ->paginate(15);
+                break;
+
+            case 'reported':
+                $incidents = Incident::where('reported_by', $user->id)
+                    ->with(['department', 'category', 'assignedTo'])
+                    ->latest()
+                    ->paginate(15);
+                break;
+
             default:
-                // Show all incidents (filtered)
                 $incidents = $this->incidentRepository->getFeedIncidents($filters, 15);
                 break;
         }

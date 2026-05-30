@@ -83,23 +83,39 @@
         </div>
 
         {{-- Header Actions Section --}}
+        {{-- Header Actions Section --}}
 
         @php
         $user = Auth::user();
-        $canTakeAction = $incident->canTakeAction($user);
-        $isEscalatedToMe = $incident->status === 'escalated' && $user->id === $incident->escalated_to;
-        $isAssignedToMe = $incident->assigned_to === $user->id;
         $isAdmin = $user->isAdmin();
+        $isSuperAdmin = $user->isSuperAdmin();
         $isHOD = $user->isHOD() && $user->department_id === $incident->department_id;
+        $isSupervisor = $user->isSupervisor() && $user->department_id === $incident->department_id;
+        $isReporter = $user->id === $incident->reported_by;
+        $isAssignedToMe = $incident->assigned_to === $user->id;
+        $isEscalatedToMe = $incident->status === 'escalated' && $user->id === $incident->escalated_to;
+
+        // Permission hierarchy
+        $canEdit = $isReporter || $isAdmin || $isHOD; // Only reporter, admin, HOD can edit
+        $canAssign = $isAdmin || $isHOD || $isSupervisor; // Admin, HOD, Supervisor can assign
+        $canEscalate = $isAssignedToMe || $isAdmin || $isHOD || $isSupervisor; // Assigned person or higher
+        $canResolve = $isAssignedToMe || $isAdmin || $isHOD; // Only assigned person can resolve
+        $canClose = $isAdmin || $isHOD || ($isAssignedToMe && $incident->status === 'resolved'); // Only if resolved
+        $canReopen = $isReporter || $isAdmin || $isHOD; // Reporter or higher can reopen
+        $canReject = $isAdmin || $isHOD; // Only admin/HOD can reject
+        $canDelete = $isAdmin || $isSuperAdmin; // Only admin/super admin can delete
+
         $hasFullAccess = $isAdmin || $isHOD || $isAssignedToMe || $isEscalatedToMe;
+        $isViewOnly = !$hasFullAccess && !$isEscalatedToMe;
         @endphp
 
         <div class="d-flex flex-wrap gap-2 mt-2 mt-md-0">
 
             {{-- ========================================== --}}
-            {{-- SHARE BUTTON (Always visible) --}}
+            {{-- SHARE BUTTON (Always visible to everyone) --}}
             {{-- ========================================== --}}
-            <button class="btn btn-outline-info btn-sm" onclick="shareIncident()" title="Share" data-bs-placement="top">
+            <button class="btn btn-outline-info btn-sm border-info border-1" onclick="shareIncident()"
+                title="Share this incident">
                 <i class="fas fa-share-alt"></i> <span class="d-none d-md-inline ms-1">Share</span>
             </button>
 
@@ -107,119 +123,178 @@
             {{-- ESCALATION RESPONSE BUTTONS (Only for escalated user) --}}
             {{-- ========================================== --}}
             @if($isEscalatedToMe)
-            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#acceptEscalationModal"
-                title="Accept" data-bs-placement="top">
-                <i class="fas fa-check-circle"></i> <span class="d-none d-md-inline ms-1">Accept</span>
-            </button>
-            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#returnEscalationModal"
-                title="Return" data-bs-placement="top">
-                <i class="fas fa-undo"></i> <span class="d-none d-md-inline ms-1">Return</span>
-            </button>
-            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectEscalationModal"
-                title="Reject" data-bs-placement="top">
-                <i class="fas fa-times-circle"></i> <span class="d-none d-md-inline ms-1">Reject</span>
-            </button>
+            <div class="d-flex gap-1 p-1 bg-warning bg-opacity-10 rounded-2 border border-warning">
+                <span class="badge bg-warning text-dark d-flex align-items-center me-1" style="font-size:0.6rem;">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Action Required
+                </span>
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#acceptEscalationModal"
+                    title="Accept responsibility">
+                    <i class="fas fa-check-circle"></i> Accept
+                </button>
+                <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#returnEscalationModal" title="Return to previous level">
+                    <i class="fas fa-undo"></i> Return
+                </button>
+                <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#rejectEscalationModal" title="Reject escalation">
+                    <i class="fas fa-times-circle"></i> Reject
+                </button>
+            </div>
             @endif
 
             {{-- ========================================== --}}
-            {{-- ACTION BUTTONS (For authorized users) --}}
+            {{-- EDIT - Only Reporter, Admin, HOD --}}
             {{-- ========================================== --}}
-            @if($hasFullAccess && !$isEscalatedToMe)
-
-            {{-- Edit --}}
+            @if($canEdit && !in_array($incident->status, ['resolved', 'closed', 'rejected']))
             @can('edit-incident')
-            <a href="{{ route('incidents.edit', $incident) }}" class="btn btn-outline-secondary btn-sm" title="Edit"
-                data-bs-placement="top">
+            <a href="{{ route('incidents.edit', $incident) }}" class="btn btn-outline-secondary btn-sm"
+                title="{{ $isReporter ? 'Edit your incident' : 'Edit incident' }}">
                 <i class="fas fa-edit"></i> <span class="d-none d-md-inline ms-1">Edit</span>
             </a>
             @endcan
+            @endif
 
-            {{-- Reopen (only if resolved/closed) --}}
-            @if(in_array($incident->status, ['resolved', 'closed']))
+            {{-- ========================================== --}}
+            {{-- REOPEN - Reporter, Admin, HOD (only if resolved/closed) --}}
+            {{-- ========================================== --}}
+            @if($canReopen && in_array($incident->status, ['resolved', 'closed']))
             @can('reopen-incident')
-            <button class="btn btn-outline-primary btn-sm" title="Re-open" data-bs-placement="top"
-                onclick="reopenIncident()">
+            <button class="btn btn-outline-primary btn-sm" onclick="reopenIncident()"
+                title="{{ $isReporter ? 'Reopen your incident' : 'Reopen incident' }}">
                 <i class="fas fa-redo"></i> <span class="d-none d-md-inline ms-1">Reopen</span>
             </button>
             @endcan
             @endif
 
-            {{-- Assign / Reassign --}}
+            {{-- ========================================== --}}
+            {{-- ASSIGN / REASSIGN - Admin, HOD, Supervisor --}}
+            {{-- ========================================== --}}
+            @if($canAssign && !in_array($incident->status, ['resolved', 'closed']))
             @can('assign-incident')
-            @if(!in_array($incident->status, ['resolved', 'closed']))
             <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assignModal"
-                title="{{ $incident->assignedTo ? 'Reassign Incident' : 'Assign Incident' }}" data-bs-placement="top">
-                <i class="fas fa-user-plus" aria-hidden="true"></i>
+                title="{{ $incident->assignedTo ? 'Reassign to another person' : 'Assign to someone' }}">
+                <i class="fas fa-user-plus"></i>
                 <span class="d-none d-md-inline ms-1">{{ $incident->assignedTo ? 'Reassign' : 'Assign' }}</span>
             </button>
-
-            @endif
             @endcan
+            @endif
 
-            {{-- Reject (only if open/acknowledged and not already rejected) --}}
-            @if(in_array($incident->status, ['open', 'acknowledged']))
+            {{-- ========================================== --}}
+            {{-- REJECT - Only Admin or HOD (open/acknowledged only) --}}
+            {{-- ========================================== --}}
+            @if($canReject && in_array($incident->status, ['open', 'acknowledged']))
             @can('close-incident')
-            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal"
-                title="Reject" data-bs-placement="top">
-
+            <button class="btn btn-outline-danger btn-sm border-danger border-1" data-bs-toggle="modal"
+                data-bs-target="#rejectModal" title="Reject this incident">
                 <i class="fas fa-times-circle"></i> <span class="d-none d-md-inline ms-1">Reject</span>
             </button>
             @endcan
             @endif
 
-            {{-- Escalate (not if already escalated or resolved/closed) --}}
+            {{-- ========================================== --}}
+            {{-- ESCALATE - Assigned person, Admin, HOD, Supervisor --}}
+            {{-- ========================================== --}}
+            @if($canEscalate && !in_array($incident->status, ['resolved', 'closed', 'rejected', 'escalated']))
             @can('escalate-incident')
-            @if(!in_array($incident->status, ['resolved', 'closed', 'rejected']))
-            <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#escalateModal"
-                title="Escalate" data-bs-placement="top">
+            <button class="btn btn-outline-warning btn-sm border-warning border-1" data-bs-toggle="modal"
+                data-bs-target="#escalateModal" title="Escalate to higher authority">
                 <i class="fas fa-arrow-up"></i> <span class="d-none d-md-inline ms-1">Escalate</span>
             </button>
-            @endif
             @endcan
+            @endif
 
-            {{-- Resolve (not if already resolved/closed/rejected) --}}
+            {{-- ========================================== --}}
+            {{-- RESOLVE - Only assigned person, Admin, HOD --}}
+            {{-- ========================================== --}}
+            @if($canResolve && !in_array($incident->status, ['resolved', 'closed', 'rejected']))
             @can('resolve-incident')
-            @if(!in_array($incident->status, ['resolved', 'closed', 'rejected']))
-            <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#resolveModal"
-                title="Resolve" data-bs-placement="top">
+            <button class="btn btn-outline-success btn-sm border-success border-1" data-bs-toggle="modal"
+                data-bs-target="#resolveModal"
+                title="{{ $isAssignedToMe ? 'Resolve this incident' : 'Resolve incident as ' . $user->getFirstRoleName() }}">
                 <i class="fas fa-check-circle"></i> <span class="d-none d-md-inline ms-1">Resolve</span>
             </button>
-            @endif
             @endcan
+            @endif
 
-            {{-- Close (not if already closed/rejected) --}}
+            {{-- ========================================== --}}
+            {{-- CLOSE - Admin, HOD, or assigned person (only if resolved) --}}
+            {{-- ========================================== --}}
+            @if($canClose && !in_array($incident->status, ['closed', 'rejected']))
             @can('close-incident')
-            @if(!in_array($incident->status, ['closed', 'rejected']))
-            <button class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#closeModal"
-                title="Close" data-bs-placement="top">
+            <button class="btn btn-outline-dark btn-sm border-dark border-1" data-bs-toggle="modal"
+                data-bs-target="#closeModal"
+                title="{{ $incident->status === 'resolved' ? 'Close this resolved incident' : 'Close incident' }}">
                 <i class="fas fa-lock"></i> <span class="d-none d-md-inline ms-1">Close</span>
             </button>
-            @endif
             @endcan
-
             @endif
 
             {{-- ========================================== --}}
-            {{-- VIEW ONLY BADGE (For users without action permissions) --}}
+            {{-- DELETE - Only Admin/Super Admin (with caution) --}}
             {{-- ========================================== --}}
-            @if(!$hasFullAccess && !$isEscalatedToMe)
-            <span class="badge bg-info d-flex align-items-center gap-1" style="font-size:0.75rem; padding:8px 12px;">
-                <i class="fas fa-eye"></i> View Only
+            @if($canDelete)
+            @can('delete-incident')
+            <button class="btn btn-outline-danger btn-sm border-danger border-1" onclick="confirmDeleteIncident()"
+                title="⚠️ Permanent delete">
+                <i class="fas fa-trash"></i> <span class="d-none d-md-inline ms-1">Delete</span>
+            </button>
+            @endcan
+            @endif
+
+            {{-- ========================================== --}}
+            {{-- VIEW ONLY BADGE --}}
+            {{-- ========================================== --}}
+            @if($isViewOnly)
+            <span class="badge bg-light text-dark border d-flex align-items-center gap-1"
+                style="font-size:0.75rem; padding:6px 12px;">
+                <i class="fas fa-eye text-muted"></i> Read Only
             </span>
-
-            {{-- Still allow reporting user to edit if they reported it --}}
-            @if($incident->reported_by === $user->id && in_array($incident->status, ['open', 'acknowledged']))
-            @can('edit-incident')
-            <a href="{{ route('incidents.edit', $incident) }}" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-edit"></i> <span class="d-none d-md-inline ms-1">Edit</span>
-            </a>
-            @endcan
-            @endif
             @endif
 
         </div>
 
-        {{-- ========================================== --}}
+        {{-- Permission Info Tooltip (shows who can do what) --}}
+        @if($isViewOnly)
+        <div class="mt-1">
+            <small class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                Actions are restricted to:
+                <strong>Assigned User</strong>, <strong>Department HOD</strong>, <strong>Supervisor</strong>, or
+                <strong>Admin</strong>.
+                @if($isReporter)
+                <span class="text-primary">You can edit this incident as the reporter.</span>
+                @endif
+            </small>
+        </div>
+        @endif
+
+
+        {{--
+        ## Permission Matrix Summary
+
+        | Action | Reporter | Assigned User | Supervisor | HOD | Admin |
+        |-------- |----------|---------------|------------|-----|-------|
+        | **Edit | ✅ (own | ❌ | ❌ | ✅ | ✅ |
+        | Assign | ❌ | ❌ | ✅ | ✅ | ✅ |
+        | Escalate | ❌ | ✅ | ✅ | ✅ | ✅ |
+        | Resolve | ❌ | ✅ (assigned) | ❌ | ✅ | ✅ |
+        | **Close* | ❌ | ✅ (if resolved) | ❌ | ✅ | ✅ |
+        | **Reopen | ✅ (own only) | ❌ | ❌ | ✅ | ✅ |
+        | **Reject | ❌ | ❌ | ❌ | ✅ | ✅ |
+        | **Delete | ❌ | ❌ | ❌ | ❌ | ✅ |
+        | **Share* | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+        This ensures:
+        - ✅ **Reporter can only edit** their own incident while it's still open
+        - ✅ **Assigned person can escalate, resolve, and close** (if resolved)
+        - ✅ **Supervisor can assign and escalate** within their department
+        - ✅ **HOD has full control** over their department incidents
+        - ✅ **Admin has complete access** including delete
+        - ✅ **View-only users** see a clear "Read Only" badge with explanation
+        - ✅ **Escalated users** get highlighted action buttons with warning badge
+        - ✅ **Delete** has double confirmation to prevent accidents
+
+        --}} {{-- ========================================== --}}
         {{-- STATUS INDICATOR (Shows who can act) --}}
         {{-- ========================================== --}}
         <div class="mt-2">

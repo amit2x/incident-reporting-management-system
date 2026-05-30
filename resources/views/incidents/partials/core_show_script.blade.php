@@ -223,45 +223,73 @@ const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstra
         return mentionPopup;
     }
 
-    const commentContent = document.getElementById('commentContent');
-    if (commentContent) {
-        commentContent.addEventListener('input', function() {
-            const cursorPos = this.selectionStart;
-            const text = this.value;
+    // Unified Event Delegation for 'input' (Handles @ detection)
+    document.addEventListener('input', function (e) {
+        // Match either the standard static box or the dynamic reply element class
+        if (e.target && (e.target.id === 'commentContent' || e.target.classList.contains('reply-textarea'))) {
+            const textarea = e.target;
+            const cursorPos = textarea.selectionStart;
+            const text = textarea.value;
             const lastAtIndex = text.lastIndexOf('@', cursorPos - 1);
+
             if (lastAtIndex !== -1 && (lastAtIndex === 0 || [' ', '\n'].includes(text[lastAtIndex - 1] || ''))) {
                 const searchTerm = text.substring(lastAtIndex + 1, cursorPos).toLowerCase();
                 mentionStartIndex = lastAtIndex;
-                const filtered = mentionUsers.filter(u => u.name.toLowerCase().includes(searchTerm) || u.username.toLowerCase().includes(searchTerm)).slice(0, 5);
-                if (filtered.length > 0) showMentionPopup(filtered, this);
-                else hideMentionPopup();
+
+                // Filter your dataset
+                const filtered = mentionUsers.filter(u =>
+                    u.name.toLowerCase().includes(searchTerm) ||
+                    u.username.toLowerCase().includes(searchTerm)
+                ).slice(0, 5);
+
+                if (filtered.length > 0) {
+                    showMentionPopup(filtered, textarea);
+                } else {
+                    hideMentionPopup();
+                }
             } else {
                 hideMentionPopup();
             }
-        });
+        }
+    });
 
-        commentContent.addEventListener('keydown', function(e) {
+    //Unified Event Delegation for 'keydown' (Handles keyboard selection)
+    document.addEventListener('keydown', function (e) {
+        if (e.target && (e.target.id === 'commentContent' || e.target.classList.contains('reply-textarea'))) {
             const popup = getOrCreateMentionPopup();
-            if (popup.style.display === 'block') {
-                if (e.key === 'Escape') { hideMentionPopup(); e.preventDefault(); }
-                if (['ArrowDown','ArrowUp','Enter','Tab'].includes(e.key)) {
+
+            if (popup && popup.style.display === 'block') {
+                if (e.key === 'Escape') {
+                    hideMentionPopup();
+                    e.preventDefault();
+                }
+
+                if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
                     e.preventDefault();
                     const items = popup.querySelectorAll('.mention-item');
                     if (items.length === 0) return;
+
                     let idx = Array.from(items).findIndex(i => i.classList.contains('active'));
-                    if (e.key === 'ArrowDown') idx = (idx + 1) % items.length;
-                    else if (e.key === 'ArrowUp') idx = (idx - 1 + items.length) % items.length;
-                    else if (e.key === 'Enter' || e.key === 'Tab') {
-                        if (idx >= 0) items[idx].click();
-                        else items[0].click();
+
+                    if (e.key === 'ArrowDown') {
+                        idx = (idx + 1) % items.length;
+                    } else if (e.key === 'ArrowUp') {
+                        idx = (idx - 1 + items.length) % items.length;
+                    } else if (e.key === 'Enter' || e.key === 'Tab') {
+                        if (idx >= 0) {
+                            items[idx].click();
+                        } else {
+                            items[0].click();
+                        }
                         return;
                     }
+
                     items.forEach(i => i.classList.remove('active'));
                     if (idx >= 0) items[idx].classList.add('active');
                 }
             }
-        });
-    }
+        }
+    });
 
     function showMentionPopup(users, textarea) {
         const popup = getOrCreateMentionPopup();
@@ -396,247 +424,208 @@ const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstra
         return `<div class="comment-thread ${marginClass}" id="comment-${comment.id}"><div class="d-flex gap-2"><img src="${comment.user?.avatar_url || '/images/default-avatar.png'}" class="rounded-circle flex-shrink-0" width="36" height="36"><div class="flex-grow-1 min-width-0"><div class="d-flex gap-2 align-items-center mb-1"><strong style="font-size:0.8125rem;">${comment.user?.name || 'Unknown'}</strong><small class="text-muted">${comment.created_at_diff || ''}</small>${comment.is_internal ? '<span class="badge bg-warning text-dark" style="font-size:0.6rem;">Internal</span>' : ''}</div>${contentHtml}${attachmentsHtml}<div class="d-flex gap-2 mt-1"><button class="btn btn-link btn-sm text-muted p-0 reply-toggle-btn" style="font-size:0.6875rem;" data-comment-id="${comment.id}" data-username="${comment.user?.name || 'User'}"><i class="fas fa-reply me-1"></i>Reply</button></div><div class="replies-container mt-2" id="replies-${comment.id}"></div></div></div></div>`;
     }
 
-    // ==========================================
-    // REPLY FUNCTIONALITY
-    // ==========================================
-    // document.addEventListener('click', function(e) {
-    //     if (e.target.closest('.reply-toggle-btn')) {
-    //         const btn = e.target.closest('.reply-toggle-btn');
-    //         const commentId = btn.dataset.commentId;
-    //         const username = btn.dataset.username;
-    //         const container = document.getElementById('replies-' + commentId);
-    //         if (!container) return;
-    //         const existing = container.querySelector('.reply-form-inline');
-    //         if (existing) { existing.remove(); return; }
-    //         document.querySelectorAll('.reply-form-inline').forEach(f => f.remove());
-    //         const form = document.createElement('div');
-    //         form.className = 'reply-form-inline mt-2';
-    //         form.innerHTML = `<div class="d-flex gap-2"><img src="{{ Auth::user()->avatar_url }}" class="rounded-circle flex-shrink-0" width="28" height="28"><div class="flex-grow-1"><textarea class="form-control form-control-sm reply-textarea" rows="1" placeholder="Reply to ${username}..."></textarea><div class="d-flex justify-content-end gap-1 mt-1"><button type="button" class="btn btn-light btn-sm cancel-reply-btn">Cancel</button><button type="button" class="btn btn-primary btn-sm submit-reply-btn" data-comment-id="${commentId}">Reply</button></div></div></div>`;
-    //         container.appendChild(form);
-    //         form.querySelector('textarea').focus();
-    //     }
-    //     if (e.target.closest('.cancel-reply-btn')) e.target.closest('.reply-form-inline').remove();
-    //     if (e.target.closest('.submit-reply-btn')) {
-    //         const btn = e.target.closest('.submit-reply-btn');
-    //         const commentId = btn.dataset.commentId;
-    //         const textarea = btn.closest('.reply-form-inline').querySelector('textarea');
-    //         const content = textarea?.value.trim();
-    //         if (!content) return;
-    //         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    //         fetch('{{ route("incidents.comments.store", $incident) }}', { method: 'POST', headers: { 'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json' }, body: JSON.stringify({ content, parent_id: commentId }) })
-    //         .then(r => r.json())
-    //         .then(data => {
-    //             if (data.success) {
-    //                 document.getElementById('replies-' + commentId)?.insertAdjacentHTML('beforeend', buildCommentHTML(data.data.comment, true));
-    //                 document.getElementById('commentCount').textContent = data.data.comments_count;
-    //                 btn.closest('.reply-form-inline').remove();
-    //                 if (typeof toastr !== 'undefined') toastr.success('Reply posted!');
-    //             }
-    //         }).catch(err => console.error(err)).finally(() => { btn.disabled = false; btn.innerHTML = 'Reply'; });
-    //     }
-    // });
 
     // ==========================================
-// REPLY FUNCTIONALITY (with file attachment)
-// ==========================================
-document.addEventListener('click', function(e) {
-    // Toggle reply form
-    if (e.target.closest('.reply-toggle-btn')) {
-        const btn = e.target.closest('.reply-toggle-btn');
-        const commentId = btn.dataset.commentId;
-        const username = btn.dataset.username;
-        const container = document.getElementById('replies-' + commentId);
-        if (!container) return;
+    // REPLY FUNCTIONALITY (with file attachment)
+    // ==========================================
+    document.addEventListener('click', function(e) {
+        // Toggle reply form
+        if (e.target.closest('.reply-toggle-btn')) {
+            const btn = e.target.closest('.reply-toggle-btn');
+            const commentId = btn.dataset.commentId;
+            const username = btn.dataset.username;
+            const container = document.getElementById('replies-' + commentId);
+            if (!container) return;
 
-        // Remove any existing reply form (toggle off)
-        const existingForm = container.querySelector('.reply-form-inline');
-        if (existingForm) {
-            existingForm.remove();
-            return;
-        }
+            // Remove any existing reply form (toggle off)
+            const existingForm = container.querySelector('.reply-form-inline');
+            if (existingForm) {
+                existingForm.remove();
+                return;
+            }
 
-        // Remove other reply forms
-        document.querySelectorAll('.reply-form-inline').forEach(f => f.remove());
+            // Remove other reply forms
+            document.querySelectorAll('.reply-form-inline').forEach(f => f.remove());
 
-        // Create reply form with file attachment support
-        const form = document.createElement('div');
-        form.className = 'reply-form-inline mt-2';
-        form.innerHTML = `
-            <div class="d-flex gap-2">
-                <img src="{{ Auth::user()->avatar_url }}" class="rounded-circle flex-shrink-0" width="28" height="28" style="object-fit:cover;">
-                <div class="flex-grow-1">
-                    <textarea class="form-control form-control-sm reply-textarea" rows="1" placeholder="Reply to ${username}..."></textarea>
-                    <div class="reply-file-preview d-flex flex-wrap gap-2 mt-2" id="reply-preview-${commentId}"></div>
-                    <div class="d-flex justify-content-between align-items-center mt-1">
-                        <button type="button" class="btn btn-light btn-sm reply-attach-btn" data-comment-id="${commentId}" title="Attach files">
-                            <i class="fas fa-paperclip"></i>
-                        </button>
-                        <div class="d-flex gap-1">
-                            <button type="button" class="btn btn-light btn-sm cancel-reply-btn">Cancel</button>
-                            <button type="button" class="btn btn-primary btn-sm submit-reply-btn" data-comment-id="${commentId}">Reply</button>
+            // Create reply form with file attachment support
+            const form = document.createElement('div');
+            form.className = 'reply-form-inline mt-2';
+            form.innerHTML = `
+                <div class="d-flex gap-2">
+                    <img src="{{ Auth::user()->avatar_url }}" class="rounded-circle flex-shrink-0" width="28" height="28" style="object-fit:cover;">
+                    <div class="flex-grow-1">
+                        <textarea class="form-control form-control-sm reply-textarea" rows="1" placeholder="Reply to ${username}..." id="replyCommentContent"></textarea>
+                        <div class="reply-file-preview d-flex flex-wrap gap-2 mt-2" id="reply-preview-${commentId}"></div>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <button type="button" class="btn btn-light btn-sm reply-attach-btn" data-comment-id="${commentId}" title="Attach files">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-light btn-sm cancel-reply-btn">Cancel</button>
+                                <button type="button" class="btn btn-primary btn-sm submit-reply-btn" data-comment-id="${commentId}">Reply</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>`;
-        container.appendChild(form);
-        form.querySelector('textarea').focus();
+                </div>`;
+            container.appendChild(form);
+            form.querySelector('textarea').focus();
 
-        // Auto-resize textarea
-        const ta = form.querySelector('textarea');
-        ta.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
+            // Auto-resize textarea
+            const ta = form.querySelector('textarea');
+            ta.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
 
-        // Setup file attachment for this reply
-        setupReplyFileUpload(commentId);
-    }
-
-    // Cancel reply
-    if (e.target.closest('.cancel-reply-btn')) {
-        e.target.closest('.reply-form-inline').remove();
-    }
-
-    // Attach file button in reply
-    if (e.target.closest('.reply-attach-btn')) {
-        const commentId = e.target.closest('.reply-attach-btn').dataset.commentId;
-        triggerReplyFileInput(commentId);
-    }
-
-    // Submit reply
-    if (e.target.closest('.submit-reply-btn')) {
-        const btn = e.target.closest('.submit-reply-btn');
-        const commentId = btn.dataset.commentId;
-        const form = btn.closest('.reply-form-inline');
-        const textarea = form.querySelector('textarea');
-        const content = textarea?.value.trim();
-        const replyFiles = replyFileTransfers[commentId] || new DataTransfer();
-
-        if (!content && replyFiles.files.length === 0) {
-            if (typeof toastr !== 'undefined') toastr.warning('Please enter a reply or attach a file.');
-            return;
+            // Setup file attachment for this reply
+            setupReplyFileUpload(commentId);
         }
 
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        // Cancel reply
+        if (e.target.closest('.cancel-reply-btn')) {
+            e.target.closest('.reply-form-inline').remove();
+        }
 
-        const formData = new FormData();
-        formData.append('content', content);
-        formData.append('parent_id', commentId);
-        Array.from(replyFiles.files).forEach(f => formData.append('files[]', f));
+        // Attach file button in reply
+        if (e.target.closest('.reply-attach-btn')) {
+            const commentId = e.target.closest('.reply-attach-btn').dataset.commentId;
+            triggerReplyFileInput(commentId);
+        }
 
-        fetch('{{ route("incidents.comments.store", $incident) }}', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-            body: formData
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                const container = document.getElementById('replies-' + commentId);
-                if (container) {
-                    container.insertAdjacentHTML('beforeend', buildCommentHTML(data.data.comment, true));
-                }
-                document.getElementById('commentCount').textContent = data.data.comments_count;
-                form.remove();
-                delete replyFileTransfers[commentId];
-                if (typeof toastr !== 'undefined') toastr.success('Reply posted!');
-            } else {
-                if (typeof toastr !== 'undefined') toastr.error(data.message || 'Failed');
-                btn.disabled = false;
-                btn.innerHTML = 'Reply';
+        // Submit reply
+        if (e.target.closest('.submit-reply-btn')) {
+            const btn = e.target.closest('.submit-reply-btn');
+            const commentId = btn.dataset.commentId;
+            const form = btn.closest('.reply-form-inline');
+            const textarea = form.querySelector('textarea');
+            const content = textarea?.value.trim();
+            const replyFiles = replyFileTransfers[commentId] || new DataTransfer();
+
+            if (!content && replyFiles.files.length === 0) {
+                if (typeof toastr !== 'undefined') toastr.warning('Please enter a reply or attach a file.');
+                return;
             }
-        })
-        .catch(err => { console.error(err); btn.disabled = false; btn.innerHTML = 'Reply'; });
-    }
-});
 
-// ==========================================
-// REPLY FILE UPLOAD MANAGEMENT
-// ==========================================
-// Store file transfers per reply
-const replyFileTransfers = {};
-const replyFileInputs = {};
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-/**
- * Create hidden file input for a reply
- */
-function getReplyFileInput(commentId) {
-    if (!replyFileInputs[commentId]) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.multiple = true;
-        input.accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx';
-        input.style.display = 'none';
-        input.dataset.commentId = commentId;
-        document.body.appendChild(input);
+            const formData = new FormData();
+            formData.append('content', content);
+            formData.append('parent_id', commentId);
+            Array.from(replyFiles.files).forEach(f => formData.append('files[]', f));
 
-        input.addEventListener('change', async function() {
-            const cid = this.dataset.commentId;
-            if (!replyFileTransfers[cid]) replyFileTransfers[cid] = new DataTransfer();
+            fetch('{{ route("incidents.comments.store", $incident) }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const container = document.getElementById('replies-' + commentId);
+                    if (container) {
+                        container.insertAdjacentHTML('beforeend', buildCommentHTML(data.data.comment, true));
+                    }
+                    document.getElementById('commentCount').textContent = data.data.comments_count;
+                    form.remove();
+                    delete replyFileTransfers[commentId];
+                    if (typeof toastr !== 'undefined') toastr.success('Reply posted!');
+                } else {
+                    if (typeof toastr !== 'undefined') toastr.error(data.message || 'Failed');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Reply';
+                }
+            })
+            .catch(err => { console.error(err); btn.disabled = false; btn.innerHTML = 'Reply'; });
+        }
+    });
 
-            // Compress images before adding
-            const processedFiles = await ImageCompressor.compressMultiple(this.files);
+    // ==========================================
+    // REPLY FILE UPLOAD MANAGEMENT
+    // ==========================================
+    // Store file transfers per reply
+    const replyFileTransfers = {};
+    const replyFileInputs = {};
 
-            processedFiles.forEach(f => {
-                replyFileTransfers[cid].items.add(f);
-                FilePreviewFactory.createPreview('reply-preview-' + cid, f);
+    /**
+     * Create hidden file input for a reply
+     */
+    function getReplyFileInput(commentId) {
+        if (!replyFileInputs[commentId]) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx';
+            input.style.display = 'none';
+            input.dataset.commentId = commentId;
+            document.body.appendChild(input);
+
+            input.addEventListener('change', async function() {
+                const cid = this.dataset.commentId;
+                if (!replyFileTransfers[cid]) replyFileTransfers[cid] = new DataTransfer();
+
+                // Compress images before adding
+                const processedFiles = await ImageCompressor.compressMultiple(this.files);
+
+                processedFiles.forEach(f => {
+                    replyFileTransfers[cid].items.add(f);
+                    FilePreviewFactory.createPreview('reply-preview-' + cid, f);
+                });
+                this.value = '';
             });
-            this.value = '';
-        });
 
-        replyFileInputs[commentId] = input;
+            replyFileInputs[commentId] = input;
+        }
+        return replyFileInputs[commentId];
     }
-    return replyFileInputs[commentId];
-}
 
-/**
- * Setup file upload for a reply
- */
-function setupReplyFileUpload(commentId) {
-    getReplyFileInput(commentId);
-}
-
-/**
- * Trigger file input for a reply
- */
-function triggerReplyFileInput(commentId) {
-    const input = getReplyFileInput(commentId);
-    input.click();
-}
-
-// Submit reply on Enter (not Shift+Enter)
-document.addEventListener('keydown', function(e) {
-    if (e.target.classList.contains('reply-textarea') && e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        e.target.closest('.reply-form-inline')?.querySelector('.submit-reply-btn')?.click();
+    /**
+     * Setup file upload for a reply
+     */
+    function setupReplyFileUpload(commentId) {
+        getReplyFileInput(commentId);
     }
-});
 
-// Remove reply file transfer when reply form is removed
-const replyFormObserver = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-        mutation.removedNodes.forEach(function(node) {
-            if (node.classList && node.classList.contains('reply-form-inline')) {
-                // Clean up file transfer for removed reply
-                const btn = node.querySelector('.submit-reply-btn');
-                if (btn) {
-                    const commentId = btn.dataset.commentId;
-                    // Keep files for 30 seconds in case of re-open, then clean
-                    setTimeout(() => {
-                        delete replyFileTransfers[commentId];
-                    }, 30000);
+    /**
+     * Trigger file input for a reply
+     */
+    function triggerReplyFileInput(commentId) {
+        const input = getReplyFileInput(commentId);
+        input.click();
+    }
+
+    // Submit reply on Enter (not Shift+Enter)
+    document.addEventListener('keydown', function(e) {
+        if (e.target.classList.contains('reply-textarea') && e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            e.target.closest('.reply-form-inline')?.querySelector('.submit-reply-btn')?.click();
+        }
+    });
+
+    // Remove reply file transfer when reply form is removed
+    const replyFormObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.removedNodes.forEach(function(node) {
+                if (node.classList && node.classList.contains('reply-form-inline')) {
+                    // Clean up file transfer for removed reply
+                    const btn = node.querySelector('.submit-reply-btn');
+                    if (btn) {
+                        const commentId = btn.dataset.commentId;
+                        // Keep files for 30 seconds in case of re-open, then clean
+                        setTimeout(() => {
+                            delete replyFileTransfers[commentId];
+                        }, 30000);
+                    }
                 }
-            }
+            });
         });
     });
-});
 
-// Observe the comments list for removed reply forms
-const commentsList = document.getElementById('commentsList');
-if (commentsList) {
-    replyFormObserver.observe(commentsList, { childList: true, subtree: true });
-}
+    // Observe the comments list for removed reply forms
+    const commentsList = document.getElementById('commentsList');
+    if (commentsList) {
+        replyFormObserver.observe(commentsList, { childList: true, subtree: true });
+    }
 
     document.addEventListener('keydown', function(e) {
         if (e.target.classList.contains('reply-textarea') && e.key === 'Enter' && !e.shiftKey) {
@@ -778,5 +767,23 @@ if (commentsList) {
     ['assignModal','escalateModal'].forEach(id=>{ const m=document.getElementById(id); if(m)m.addEventListener('shown.bs.modal',()=>{ m.querySelectorAll('.select2').forEach(s=>{ if(typeof jQuery!=='undefined'&&jQuery.fn.select2)jQuery(s).select2({dropdownParent:jQuery(m),placeholder:'Search...',allowClear:true,width:'100%'}); }); }); });
 
 });
+
+// Delete incident confirmation
+
+function confirmDeleteIncident() {
+    if (confirm('⚠️ Are you sure you want to PERMANENTLY DELETE this incident?\n\nThis action CANNOT be undone. All comments, attachments, and history will be lost.')) {
+        if (confirm('FINAL WARNING: Delete incident #{{ $incident->incident_id }}?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route("incidents.destroy", $incident) }}';
+            form.innerHTML = `
+                @csrf
+                @method('DELETE')
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+}
 </script>
 @endpush

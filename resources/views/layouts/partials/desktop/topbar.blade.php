@@ -94,18 +94,18 @@
                         </div>
                         <div class="dropdown-divider"></div>
                         <a href="{{ route('dashboard') }}" class="dropdown-item py-2">
-                            <i class="fas fa-gauge-high me-2"></i> Dashboard
+                            <i class="fas fa-gauge-high me-2"></i>Dashboard
                         </a>
                         <a href="{{ route('profile.edit') }}" class="dropdown-item py-2">
-                            <i class="fas fa-user me-2"></i> Profile
+                            <i class="fas fa-user me-2"></i>Profile
                         </a>
                         <a href="{{ route('settings.index') }}" class="dropdown-item py-2">
-                            <i class="fas fa-gear me-2"></i> Settings
+                            <i class="fas fa-gear me-2"></i>Settings
                         </a>
                         <a href="{{ route('contact.form') }}" class="dropdown-item py-2">
-                            <i class="fas fa-headset"></i> Contact
+                            <i class="fas fa-headset"></i>&nbsp Contact
                         </a>
-                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-divider bg-danger"></div>
                         <form action="{{ route('logout') }}" method="POST">
                             @csrf
                             <button type="submit" class="dropdown-item py-2 text-danger">

@@ -116,6 +116,40 @@ $activeTab = request('tab', 'all');
     .view-toggle-btn:hover {
         border-color: #3b82f6;
     }
+
+
+    /* Hide scrollbars on modern desktop environments while maintaining touch actions */
+    .nav-tabs-custom::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-tabs-custom {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .me-1_5 {
+        margin-right: 0.375rem !important;
+    }
+
+    .ms-1_5 {
+        margin-left: 0.375rem !important;
+    }
+
+    /* Add smooth fade indicators for horizontal mobile panning */
+    @media (max-width: 767.98px) {
+        .tabs-container-responsive::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: 32px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+    }
 </style>
 @endpush
 
@@ -160,7 +194,7 @@ $activeTab = request('tab', 'all');
         {{-- ========================================== --}}
         {{-- TABS: All | Escalated to Me | Assigned to Me --}}
         {{-- ========================================== --}}
-        <ul class="nav nav-tabs-custom mb-0 flex-nowrap overflow-x-auto text-nowrap" role="tablist"
+        {{-- <ul class="nav nav-tabs-custom mb-0 flex-nowrap overflow-x-auto text-nowrap" role="tablist"
             style="border-bottom: 1px solid #e5e7eb; -webkit-overflow-scrolling: touch;">
             <li class="nav-item">
                 <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'all' ? 'active' : '' }}"
@@ -204,72 +238,170 @@ $activeTab = request('tab', 'all');
                     @endif
                 </a>
             </li>
-        </ul>
+        </ul> --}}
 
+
+        {{-- Tabs --}}
+        {{-- <ul class="nav nav-tabs-custom mb-0" role="tablist" style="border-bottom: 1px solid #e5e7eb;">
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'all' ? 'active' : '' }}"
+                    href="{{ route('incidents.index', ['tab' => 'all'] + request()->except('tab', 'page')) }}">
+                    <i class="fas fa-list me-1"></i> All Incidents
+                    <span class="badge bg-light text-dark ms-1">{{ $stats['total'] ?? 0 }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'escalated' ? 'active' : '' }}"
+                    href="{{ route('incidents.index', ['tab' => 'escalated'] + request()->except('tab', 'page')) }}">
+                    <i class="fas fa-arrow-up text-warning me-1"></i> Escalated to Me
+                    @php $escalatedCount = \App\Models\Incident::where('escalated_to', $user->id)->where('status',
+                    'escalated')->count(); @endphp
+                    @if($escalatedCount > 0)
+                    <span class="badge bg-warning text-dark ms-1">{{ $escalatedCount }}</span>
+                    @endif
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'assigned' ? 'active' : '' }}"
+                    href="{{ route('incidents.index', ['tab' => 'assigned'] + request()->except('tab', 'page')) }}">
+                    <i class="fas fa-user-check text-primary me-1"></i> Assigned to Me
+                    @php $assignedCount = \App\Models\Incident::where('assigned_to', $user->id)->whereIn('status',
+                    ['open','acknowledged','in_progress'])->count(); @endphp
+                    @if($assignedCount > 0)
+                    <span class="badge bg-primary ms-1">{{ $assignedCount }}</span>
+                    @endif
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'history' ? 'active' : '' }}"
+                    href="{{ route('incidents.index', ['tab' => 'history'] + request()->except('tab', 'page')) }}">
+                    <i class="fas fa-history text-info me-1"></i> My History
+                    @php
+                    $historyCount = \App\Models\Incident::where(function($q) use ($user) {
+                    $q->where('reported_by', $user->id)
+                    ->orWhere('assigned_to', $user->id)
+                    ->orWhere('escalated_to', $user->id)
+                    ->orWhereHas('escalations', fn($e) => $e->where('escalated_to', $user->id))
+                    ->orWhereHas('assignments', fn($a) => $a->where('assigned_to', $user->id))
+                    ->orWhereHas('comments', fn($c) => $c->where('user_id', $user->id));
+                    })->count();
+                    @endphp
+                    <span class="badge bg-info ms-1">{{ $historyCount }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ $activeTab === 'reported' ? 'active' : '' }}"
+                    href="{{ route('incidents.index', ['tab' => 'reported'] + request()->except('tab', 'page')) }}">
+                    <i class="fas fa-pen text-success me-1"></i> Reported by Me
+                    @php $reportedCount = \App\Models\Incident::where('reported_by', $user->id)->count(); @endphp
+                    @if($reportedCount > 0)
+                    <span class="badge bg-success ms-1">{{ $reportedCount }}</span>
+                    @endif
+                </a>
+            </li>
+        </ul> --}}
+
+
+        {{-- Responsive Tabs Component --}}
+        <div class="tabs-container-responsive position-relative w-100" style="border-bottom: 1px solid #e5e7eb;">
+            <ul class="nav nav-tabs-custom flex-nowrap mb-0 border-0" role="tablist"
+                style="overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; white-space: nowrap;">
+
+                {{-- Tab: All Incidents --}}
+                <li class="nav-item flex-shrink-0">
+                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'all' ? 'active' : '' }}"
+                        href="{{ route('incidents.index', ['tab' => 'all'] + request()->except('tab', 'page')) }}"
+                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
+                        <i class="fas fa-list me-1_5"></i>
+                        <span class="tab-text">All Incidents</span>
+                        <span class="badge bg-light text-dark ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{
+                            $stats['total'] ?? 0 }}</span>
+                    </a>
+                </li>
+
+                {{-- Tab: Escalated to Me --}}
+                <li class="nav-item flex-shrink-0">
+                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'escalated' ? 'active' : '' }}"
+                        href="{{ route('incidents.index', ['tab' => 'escalated'] + request()->except('tab', 'page')) }}"
+                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
+                        <i class="fas fa-arrow-up text-warning me-1_5"></i>
+                        <span class="tab-text">Escalated to Me</span>
+                        @php
+                        $escalatedCount = $stats['escalated'] ?? \App\Models\Incident::where('escalated_to',
+                        $user->id)->where('status', 'escalated')->count();
+                        @endphp
+                        @if($escalatedCount > 0)
+                        <span class="badge bg-warning text-dark ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{
+                            $escalatedCount }}</span>
+                        @endif
+                    </a>
+                </li>
+
+                {{-- Tab: Assigned to Me --}}
+                <li class="nav-item flex-shrink-0">
+                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'assigned' ? 'active' : '' }}"
+                        href="{{ route('incidents.index', ['tab' => 'assigned'] + request()->except('tab', 'page')) }}"
+                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
+                        <i class="fas fa-user-check text-primary me-1_5"></i>
+                        <span class="tab-text">Assigned to Me</span>
+                        @php
+                        $assignedCount = $stats['assigned'] ?? \App\Models\Incident::where('assigned_to',
+                        $user->id)->whereIn('status', ['open','acknowledged','in_progress'])->count();
+                        @endphp
+                        @if($assignedCount > 0)
+                        <span class="badge bg-primary ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{ $assignedCount
+                            }}</span>
+                        @endif
+                    </a>
+                </li>
+
+                {{-- Tab: My History --}}
+                <li class="nav-item flex-shrink-0">
+                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'history' ? 'active' : '' }}"
+                        href="{{ route('incidents.index', ['tab' => 'history'] + request()->except('tab', 'page')) }}"
+                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
+                        <i class="fas fa-history text-info me-1_5"></i>
+                        <span class="tab-text">My History</span>
+                        @php
+                        $historyCount = $stats['history'] ?? \App\Models\Incident::where(function($q) use ($user) {
+                        $q->where('reported_by', $user->id)
+                        ->orWhere('assigned_to', $user->id)
+                        ->orWhere('escalated_to', $user->id)
+                        ->orWhereHas('escalations', fn($e) => $e->where('escalated_to', $user->id))
+                        ->orWhereHas('assignments', fn($a) => $a->where('assigned_to', $user->id))
+                        ->orWhereHas('comments', fn($c) => $c->where('user_id', $user->id));
+                        })->count();
+                        @endphp
+                        <span class="badge bg-info ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{ $historyCount
+                            }}</span>
+                    </a>
+                </li>
+
+                {{-- Tab: Reported by Me --}}
+                <li class="nav-item flex-shrink-0">
+                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'reported' ? 'active' : '' }}"
+                        href="{{ route('incidents.index', ['tab' => 'reported'] + request()->except('tab', 'page')) }}"
+                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
+                        <i class="fas fa-pen text-success me-1_5"></i>
+                        <span class="tab-text">Reported by Me</span>
+                        @php
+                        $reportedCount = $stats['reported'] ?? \App\Models\Incident::where('reported_by',
+                        $user->id)->count();
+                        @endphp
+                        @if($reportedCount > 0)
+                        <span class="badge bg-success ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{ $reportedCount
+                            }}</span>
+                        @endif
+                    </a>
+                </li>
+            </ul>
+        </div>
 
 
         {{-- Filters + List Card --}}
         <div class="card shadow-sm" style="border-radius: 0 0 12px 12px;">
             {{-- Filters (hidden for escalated/assigned tabs) --}}
             @if($activeTab === 'all')
-            {{-- <div class="card-header bg-white py-2 border-bottom">
-                <form method="GET" action="{{ route('incidents.index') }}">
-                    <input type="hidden" name="tab" value="all">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-3 col-sm-6">
-                            <input type="text" name="search" class="form-control form-control-sm"
-                                placeholder="Search..." value="{{ request('search') }}">
-                        </div>
-                        <div class="col-md-2 col-sm-4">
-                            <select name="status" class="form-select form-select-sm">
-                                <option value="">All Status</option>
-                                @foreach($statusList as $key => $s)
-                                <option value="{{ $key }}" {{ request('status')==$key ? 'selected' : '' }}>{{
-                                    $s['label'] }}
-                                </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-2 col-sm-4">
-                            <select name="severity" class="form-select form-select-sm">
-                                <option value="">All Severity</option>
-                                <option value="critical" {{ request('severity')=='critical' ? 'selected' : '' }}>
-                                    Critical
-                                </option>
-                                <option value="high" {{ request('severity')=='high' ? 'selected' : '' }}>High</option>
-                                <option value="medium" {{ request('severity')=='medium' ? 'selected' : '' }}>Medium
-                                </option>
-                                <option value="low" {{ request('severity')=='low' ? 'selected' : '' }}>Low</option>
-                            </select>
-                        </div>
-                        @if($isAdmin)
-                        <div class="col-md-2 col-sm-4">
-                            <select name="department_id" class="form-select form-select-sm">
-                                <option value="">All Departments</option>
-                                @foreach(\App\Models\Department::active()->ordered()->get() as $dept)
-                                <option value="{{ $dept->id }}" {{ request('department_id')==$dept->id ? 'selected' : ''
-                                    }}>{{ $dept->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        @endif
-                        <div class="col-md-1 col-sm-4 d-flex gap-1">
-                            <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i></button>
-                            <a href="{{ route('incidents.index') }}" class="btn btn-light btn-sm"><i
-                                    class="fas fa-redo"></i></a>
-                        </div>
-                        <div class="col-md-1 col-sm-4 ms-auto d-flex justify-content-end">
-                            <div class="d-flex gap-1">
-                                <button type="button" class="view-toggle-btn active" onclick="switchView('table')"
-                                    id="tableBtn" title="Table"><i class="fas fa-list"></i></button>
-                                <button type="button" class="view-toggle-btn" onclick="switchView('cards')"
-                                    id="cardsBtn" title="Cards"><i class="fas fa-th-large"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div> --}}
-
             {{-- Filters Card --}}
             <div class="card mb-3">
                 {{-- Mobile Toggle Header: Only visible on small screens --}}
@@ -418,6 +550,10 @@ $activeTab = request('tab', 'all');
                                 <tr>
                                     <th style="width: 100px;">ID</th>
                                     <th>Title</th>
+                                    @if(in_array($activeTab, ['history', 'reported']))
+                                    <th>Your Role</th>
+                                    @endif
+
                                     <th>Category</th>
                                     <th>Department</th>
                                     <th>Severity</th>
@@ -439,6 +575,26 @@ $activeTab = request('tab', 'all');
                                             {{ Str::limit($incident->title, 50) }}
                                         </a>
                                     </td>
+                                    @if(in_array($activeTab, ['history', 'reported']))
+                                    <td>
+                                        @php
+                                        $roles = [];
+                                        if ($incident->reported_by === $user->id) $roles[] = '📝 Reporter';
+                                        if ($incident->assigned_to === $user->id) $roles[] = '👤 Assigned';
+                                        if ($incident->escalated_to === $user->id) $roles[] = '⬆️ Escalated';
+                                        if ($incident->escalations()->where('escalated_by', $user->id)->exists())
+                                        $roles[] = '📤 Escalated Out';
+                                        if ($incident->assignments()->where('assigned_by', $user->id)->exists())
+                                        $roles[] = '📋 Assigned Out';
+                                        if ($incident->comments()->where('user_id', $user->id)->exists()) $roles[] = '💬
+                                        Commented';
+                                        @endphp
+                                        @foreach($roles as $role)
+                                        <span class="badge bg-light text-dark d-block mb-1 small">{{ $role }}</span>
+                                        @endforeach
+                                    </td>
+                                    @endif
+
                                     <td>
                                         <span class="badge"
                                             style="background: {{ $incident->category?->color ?? '#6B7280' }}20; color: {{ $incident->category?->color ?? '#6B7280' }}">
@@ -511,7 +667,7 @@ $activeTab = request('tab', 'all');
                         @endforeach
                     </div>
                 </div>
-                @else
+                {{-- @else
                 <div class="text-center py-5">
                     <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
                     <h6>
@@ -539,6 +695,58 @@ $activeTab = request('tab', 'all');
                     @if($activeTab === 'all')
                     <a href="{{ route('incidents.create') }}" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Report First Incident
+                    </a>
+                    @endif
+                </div>
+                @endif --}}
+
+                @else
+                <div class="text-center py-5">
+                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                    <h6>
+                        @switch($activeTab)
+                        @case('escalated')
+                        No incidents escalated to you
+                        @break
+                        @case('assigned')
+                        No incidents currently assigned to you
+                        @break
+                        @case('history')
+                        No incident history found
+                        @break
+                        @case('reported')
+                        You haven't reported any incidents yet
+                        @break
+                        @default
+                        No incidents found
+                        @endswitch
+                    </h6>
+                    <p class="text-muted small">
+                        @switch($activeTab)
+                        @case('escalated')
+                        You're all caught up! No pending escalations requiring your attention.
+                        @break
+                        @case('assigned')
+                        No incidents are currently assigned to you. Great job!
+                        @break
+                        @case('history')
+                        You haven't been involved in any incidents yet. Once you report, get assigned, or escalate
+                        incidents, they will appear here.
+                        @break
+                        @case('reported')
+                        You haven't reported any incidents yet. Click below to report your first incident.
+                        @break
+                        @default
+                        @if(request()->hasAny(['search','status','severity']))
+                        No incidents match your filters. Try adjusting your search criteria.
+                        @else
+                        No incidents have been reported yet.
+                        @endif
+                        @endswitch
+                    </p>
+                    @if(in_array($activeTab, ['all', 'reported']))
+                    <a href="{{ route('incidents.create') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i> Report Incident
                     </a>
                     @endif
                 </div>

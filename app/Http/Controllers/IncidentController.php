@@ -541,13 +541,6 @@ class IncidentController extends Controller
         return view('incidents.edit', compact('incident', 'departments', 'categories'));
     }
 
-    // app/Http/Controllers/IncidentController.php
-
-    /**
-     * Update the specified incident in storage.
-     */
-    // app/Http/Controllers/IncidentController.php
-
     /**
      * Update the specified incident in storage.
      */
@@ -1119,7 +1112,7 @@ class IncidentController extends Controller
     // }
 
     /**
-     * Escalate incident - OPTIMIZED with duplicate prevention
+     * Escalate incident
      */
     public function escalate(Request $request, Incident $incident)
     {

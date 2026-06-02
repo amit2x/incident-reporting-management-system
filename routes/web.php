@@ -14,6 +14,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
 use App\Models\Department;
@@ -202,6 +203,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::put('/{user}/status', [UserController::class, 'updateStatus'])->name('status');
             Route::put('/{user}/roles', [UserController::class, 'updateRoles'])->name('roles');
             Route::get('/{user}/activity', [UserController::class, 'activity'])->name('activity');
+
+            Route::post('/users/bulk-assign', [RolePermissionController::class, 'bulkAssignRoles'])->name('bulk-assign-role');
+
+        });
+
+        // Role Management
+        Route::controller(RolePermissionController::class)->prefix('roles')->name('roles.')->group(function () {
+            Route::get('/', 'roles')->name('index');
+            Route::get('/create', 'createRole')->name('create');
+            Route::post('/', 'storeRole')->name('store');
+            Route::get('/{role}', 'showRole')->name('show');
+            Route::get('/{role}/edit', 'editRole')->name('edit');
+            Route::put('/{role}', 'updateRole')->name('update');
+            Route::delete('/{role}', 'destroyRole')->name('destroy');
+        });
+
+        // Permission Management Routes
+        Route::controller(RolePermissionController::class)->prefix('permissions')->name('permissions.')->group(function () {
+            Route::get('/', 'permissions')->name('index');
+            Route::get('/create', 'createPermission')->name('create');
+            Route::post('/', 'storePermission')->name('store');
+            Route::get('/{permission}/edit', 'editPermission')->name('edit');
+            Route::put('/{permission}', 'updatePermission')->name('update');
+            Route::delete('/{permission}', 'destroyPermission')->name('destroy');
+            Route::post('/bulk-create', 'bulkCreatePermissions')->name('bulk-create');
         });
 
         // Department Management

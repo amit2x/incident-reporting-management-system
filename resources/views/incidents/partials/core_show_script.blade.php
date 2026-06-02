@@ -291,25 +291,55 @@ const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstra
         }
     });
 
+    // function showMentionPopup(users, textarea) {
+    //     const popup = getOrCreateMentionPopup();
+    //     const rect = textarea.getBoundingClientRect();
+    //     popup.innerHTML = users.map((u, i) => `
+    //         <div class="mention-item d-flex align-items-center gap-2 px-3 py-2 ${i === 0 ? 'active' : ''}"
+    //              style="cursor:pointer;" data-username="${u.username}">
+    //             <img src="${u.avatar_url || '/images/default-avatar.png'}" class="rounded-circle" width="28" height="28">
+    //             <div><div class="fw-medium" style="font-size:0.8125rem;">${u.name}</div><small class="text-muted">@${u.username}</small></div>
+    //         </div>
+    //     `).join('');
+    //     popup.querySelectorAll('.mention-item').forEach(item => {
+    //         item.addEventListener('click', function() {
+    //             const username = this.dataset.username;
+    //             if (mentionStartIndex >= 0 && textarea) {
+    //                 const before = textarea.value.substring(0, mentionStartIndex);
+    //                 const after = textarea.value.substring(textarea.selectionStart);
+    //                 textarea.value = before + '@' + username + ' ' + after;
+    //                 textarea.focus();
+    //                 const newPos = mentionStartIndex + username.length + 2;
+    //                 textarea.setSelectionRange(newPos, newPos);
+    //             }
+    //             hideMentionPopup();
+    //         });
+    //     });
+    //     popup.style.display = 'block';
+    //     popup.style.top = Math.min(rect.bottom + 4, window.innerHeight - 220) + 'px';
+    //     popup.style.left = Math.min(rect.left, window.innerWidth - 240) + 'px';
+    //     popup.style.maxWidth = Math.min(300, window.innerWidth - rect.left - 10) + 'px';
+    // }
+
     function showMentionPopup(users, textarea) {
         const popup = getOrCreateMentionPopup();
         const rect = textarea.getBoundingClientRect();
         popup.innerHTML = users.map((u, i) => `
             <div class="mention-item d-flex align-items-center gap-2 px-3 py-2 ${i === 0 ? 'active' : ''}"
-                 style="cursor:pointer;" data-username="${u.username}">
+                 style="cursor:pointer;" data-name="${u.name}">
                 <img src="${u.avatar_url || '/images/default-avatar.png'}" class="rounded-circle" width="28" height="28">
                 <div><div class="fw-medium" style="font-size:0.8125rem;">${u.name}</div><small class="text-muted">@${u.username}</small></div>
             </div>
         `).join('');
         popup.querySelectorAll('.mention-item').forEach(item => {
             item.addEventListener('click', function() {
-                const username = this.dataset.username;
+                const name = this.dataset.name;
                 if (mentionStartIndex >= 0 && textarea) {
                     const before = textarea.value.substring(0, mentionStartIndex);
                     const after = textarea.value.substring(textarea.selectionStart);
-                    textarea.value = before + '@' + username + ' ' + after;
+                    textarea.value = before + '@' + name + ' ' + after;
                     textarea.focus();
-                    const newPos = mentionStartIndex + username.length + 2;
+                    const newPos = mentionStartIndex + name.length + 2;
                     textarea.setSelectionRange(newPos, newPos);
                 }
                 hideMentionPopup();
@@ -320,6 +350,7 @@ const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstra
         popup.style.left = Math.min(rect.left, window.innerWidth - 240) + 'px';
         popup.style.maxWidth = Math.min(300, window.innerWidth - rect.left - 10) + 'px';
     }
+
 
     function hideMentionPopup() { if (mentionPopup) { mentionPopup.style.display = 'none'; mentionStartIndex = -1; } }
 

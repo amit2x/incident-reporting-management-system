@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Department;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -27,9 +27,9 @@ class UserController extends Controller
         if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('email', 'like', "%{$request->search}%")
-                  ->orWhere('username', 'like', "%{$request->search}%")
-                  ->orWhere('employee_id', 'like', "%{$request->search}%");
+                    ->orWhere('email', 'like', "%{$request->search}%")
+                    ->orWhere('username', 'like', "%{$request->search}%")
+                    ->orWhere('employee_id', 'like', "%{$request->search}%");
             });
         }
 
@@ -64,6 +64,7 @@ class UserController extends Controller
     {
         $departments = Department::active()->ordered()->get();
         $roles = Role::all();
+
         return view('admin.users.form', compact('departments', 'roles'));
     }
 
@@ -131,6 +132,7 @@ class UserController extends Controller
     {
         $departments = Department::active()->ordered()->get();
         $roles = Role::all();
+
         return view('admin.users.form', compact('user', 'departments', 'roles'));
     }
 
@@ -141,11 +143,11 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'username' => 'required|string|max:50|unique:users,username,' . $user->id,
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'username' => 'required|string|max:50|unique:users,username,'.$user->id,
+            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
             'password' => 'nullable|string|min:8|confirmed',
             'phone' => 'nullable|string|max:20',
-            'employee_id' => 'nullable|string|max:50|unique:users,employee_id,' . $user->id,
+            'employee_id' => 'nullable|string|max:50|unique:users,employee_id,'.$user->id,
             'department_id' => 'required|exists:departments,id',
             'designation' => 'nullable|string|max:100',
             'status' => 'required|in:active,inactive,suspended',
@@ -164,7 +166,7 @@ class UserController extends Controller
             'status' => $validated['status'],
         ];
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $data['password'] = Hash::make($validated['password']);
         }
 

@@ -2,42 +2,50 @@
 
 namespace App\Mail\Incident;
 
+use App\Mail\BaseMail;
 use App\Models\Incident;
 use App\Models\User;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 
-class IncidentRejectedMail extends BaseIncidentMail
+class IncidentRejectedMail extends BaseMail
 {
-    protected string $notificationType = 'rejected';
+    protected Incident $incident;
+
+    protected User $actor;
 
     public function __construct(Incident $incident, User $actor)
     {
-        parent::__construct($incident, $actor);
-        
-        $this->extraFields = [
-            'Rejected By' => $actor->name,
-            'Rejection Reason' => $incident->rejection_reason ?? 'N/A',
-        ];
+        $this->incident = $incident;
+        $this->actor = $actor;
+
+        $this->statusColor = '#DC2626';
+        $this->statusLabel = 'Incident Rejected';
+        $this->statusType = 'rejected';
     }
 
-    protected function getSubject(): string
+    public function envelope(): Envelope
     {
-        return 'Incident Rejected – ' . $this->incident->incident_id;
+        return new Envelope(
+            subject: $this->subjectPrefix.' Incident Rejected – '.$this->incident->incident_id,
+        );
     }
 
-    protected function getView(): string
+    public function content(): Content
     {
-        return 'emails.incident.rejected';
-    }
-
-    protected function getGreeting(): string
-    {
-        return 'Hello <span style="color: #0d47a1;">' . 
-               ($this->incident->reporter?->name ?? 'User') . 
-               '</span>,';
-    }
-
-    protected function getBody(): string
-    {
-        return 'The incident you reported has been rejected. Please review the reason and take necessary action.';
+        return new Content(
+            view: 'emails.incident.rejected',
+            with: array_merge($this->getViewData(), [
+                'incident' => $this->incident,
+                'actor' => $this->actor,
+                'greeting' => 'Hello '.($this->incident->reporter?->name ?? 'User').',',
+                'body' => 'The incident you reported has been rejected. Please review the reason and take necessary action.',
+                'actionUrl' => route('incidents.show', $this->incident),
+                'extraFields' => [
+                    'Rejected By' => $this->actor->name,
+                    'Rejection Reason' => $this->incident->rejection_reason ?? 'N/A',
+                ],
+            ])
+        );
     }
 }

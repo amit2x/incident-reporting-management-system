@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Models\Department;
 use App\Models\Escalation;
+use App\Models\EscalationMatrix;
 use App\Models\Incident;
 use App\Models\IncidentCategory;
 use App\Models\IncidentComment;
 use App\Models\IncidentMedia;
 use App\Models\User;
-use App\Models\EscalationMatrix;
 use App\Notifications\NewIncidentNotification;
 use App\Repositories\IncidentRepository;
 use App\Services\IncidentService;
@@ -206,11 +207,10 @@ class IncidentController extends Controller
         if ($request->ajax()) {
             return $this->paginatedResponse($incidents);
         }
-        
-        $canEditIncident =  auth()->user()->hasPermissionTo('edit-incident');
 
+        $canEditIncident = auth()->user()->hasPermissionTo('edit-incident');
 
-        return view('incidents.index', compact('incidents', 'filters', 'stats', 'tab','canEditIncident' ));
+        return view('incidents.index', compact('incidents', 'filters', 'stats', 'tab', 'canEditIncident'));
     }
 
     // ==========================================
@@ -256,13 +256,11 @@ class IncidentController extends Controller
         $categories = IncidentCategory::active()
             ->with('department') // Eager load the department relationship
             ->orderBy('department_id', 'asc')
-            ->orderBy('name', 'asc') 
+            ->orderBy('name', 'asc')
             ->get();
 
         return view('incidents.create', compact('departments', 'categories'));
     }
-    
-    
 
     public function store(Request $request)
     {
@@ -381,200 +379,327 @@ class IncidentController extends Controller
 
     //     return ($hod && $hod->status === 'active') ? $hod : null;
     // }
-    
-    // ==========================================
-// AUTO ASSIGN - Enhanced Logic
-// ==========================================
-private function autoAssignIncident(int $departmentId, string $severity, string $priority, ?int $categoryId = null): ?User
-{
-    $department = Department::find($departmentId);
-    if (! $department) {
-        return null;
-    }
-
-    // Get all active users in the department
-    $departmentUsers = $department->users()->active()->get();
-    if ($departmentUsers->isEmpty()) {
-        return null; // No users in department, keep unassigned
-    }
-
-    // Check if escalation matrix exists for this category
-    $hasEscalationMatrix = false;
-    if ($categoryId) {
-        $hasEscalationMatrix = EscalationMatrix::where('category_id', $categoryId)
-            ->orWhereNull('category_id')
-            ->exists();
-    }
-
-    // If no escalation matrix, default to staff
-    if (! $hasEscalationMatrix) {
-        return $this->assignStaff($department, $departmentUsers);
-    }
-
-    // Get HOD
-    $hod = $department->getHeadOfDepartment();
-    $hodAvailable = $hod && $hod->status === 'active';
-
-    // Get supervisors (users with supervisor role)
-    $supervisors = $departmentUsers->filter(function ($user) {
-        return $user->hasRole('supervisor') && $user->status === 'active';
-    });
-
-    // Get staff (users with staff role, excluding supervisors)
-    $staff = $departmentUsers->filter(function ($user) {
-        return $user->hasRole('staff') && $user->status === 'active';
-    });
 
     // ==========================================
-    // ASSIGNMENT LOGIC BASED ON SEVERITY
+    // AUTO ASSIGN - Enhanced Logic
     // ==========================================
-    
-    // CASE 1: Critical severity with ANY priority
-    if ($severity === 'critical') {
-        if($priority === 'critical'){
-            // First priority: HOD
-            if ($hodAvailable) {
-                return $hod;
+    private function autoAssignIncident(int $departmentId, string $severity, string $priority, ?int $categoryId = null): ?User
+    {
+        $department = Department::find($departmentId);
+        if (! $department) {
+            return null;
+        }
+
+        // Get all active users in the department
+        $departmentUsers = $department->users()->active()->get();
+        if ($departmentUsers->isEmpty()) {
+            return null; // No users in department, keep unassigned
+        }
+
+        // Check if escalation matrix exists for this category
+        $hasEscalationMatrix = false;
+        if ($categoryId) {
+            $hasEscalationMatrix = EscalationMatrix::where('category_id', $categoryId)
+                ->orWhereNull('category_id')
+                ->exists();
+        }
+
+        // If no escalation matrix, default to staff
+        if (! $hasEscalationMatrix) {
+            return $this->assignStaff($department, $departmentUsers);
+        }
+
+        // Get HOD
+        $hod = $department->getHeadOfDepartment();
+        $hodAvailable = $hod && $hod->status === 'active';
+
+        // Get supervisors (users with supervisor role)
+        $supervisors = $departmentUsers->filter(function ($user) {
+            return $user->hasRole('supervisor') && $user->status === 'active';
+        });
+
+        // Get staff (users with staff role, excluding supervisors)
+        $staff = $departmentUsers->filter(function ($user) {
+            return $user->hasRole('staff') && $user->status === 'active';
+        });
+
+        // ==========================================
+        // ASSIGNMENT LOGIC BASED ON SEVERITY
+        // ==========================================
+
+        // CASE 1: Critical severity with ANY priority
+        if ($severity === 'critical') {
+            if ($priority === 'critical') {
+                // First priority: HOD
+                if ($hodAvailable) {
+                    return $hod;
+                }
             }
-        }
-        
-        // Second priority: Supervisor with least workload
-        if ($supervisors->isNotEmpty()) {
-            return $this->getUserWithLeastWorkload($supervisors);
-        }
-        
-        // Third priority: Any staff with least workload
-        if ($staff->isNotEmpty()) {
-            return $this->getUserWithLeastWorkload($staff);
-        }
-        
-        // Fallback: Any active user in department
-        return $this->getUserWithLeastWorkload($departmentUsers);
-    }
 
-    // CASE 2: High severity with ANY priority
-    if ($severity === 'high') {
-        if($priority === 'critical'){
-            // First priority: Supervisor with least workload
+            // Second priority: Supervisor with least workload
             if ($supervisors->isNotEmpty()) {
                 return $this->getUserWithLeastWorkload($supervisors);
             }
+
+            // Third priority: Any staff with least workload
+            if ($staff->isNotEmpty()) {
+                return $this->getUserWithLeastWorkload($staff);
+            }
+
+            // Fallback: Any active user in department
+            return $this->getUserWithLeastWorkload($departmentUsers);
         }
-        
-        // Second priority: Any staff with least workload
-        if ($staff->isNotEmpty()) {
-            return $this->getUserWithLeastWorkload($staff);
+
+        // CASE 2: High severity with ANY priority
+        if ($severity === 'high') {
+            if ($priority === 'critical') {
+                // First priority: Supervisor with least workload
+                if ($supervisors->isNotEmpty()) {
+                    return $this->getUserWithLeastWorkload($supervisors);
+                }
+            }
+
+            // Second priority: Any staff with least workload
+            if ($staff->isNotEmpty()) {
+                return $this->getUserWithLeastWorkload($staff);
+            }
+
+            // Third priority: HOD
+            if ($hodAvailable) {
+                return $hod;
+            }
+
+            // Fallback: Any active user in department
+            return $this->getUserWithLeastWorkload($departmentUsers);
         }
-        
-        // Third priority: HOD
-        if ($hodAvailable) {
-            return $hod;
+
+        // CASE 3: Medium severity
+        if ($severity === 'medium' || $severity === 'low') {
+            // First priority: Staff with least workload
+            if ($staff->isNotEmpty()) {
+                return $this->getUserWithLeastWorkload($staff);
+            }
+
+            // Second priority: Supervisor with least workload
+            if ($supervisors->isNotEmpty()) {
+                return $this->getUserWithLeastWorkload($supervisors);
+            }
+
+            // Third priority: HOD (if no supervisor/staff available)
+            if ($hodAvailable) {
+                return $hod;
+            }
+
+            // Fallback: Any active user in department
+            return $this->getUserWithLeastWorkload($departmentUsers);
         }
-        
-        
-        // Fallback: Any active user in department
-        return $this->getUserWithLeastWorkload($departmentUsers);
+
+        // // CASE 4: Low severity (default to staff)
+        // if ($severity === 'low') {
+        //     // First priority: Staff with least workload
+        //     if ($staff->isNotEmpty()) {
+        //         return $this->getUserWithLeastWorkload($staff);
+        //     }
+
+        //     // Second priority: Supervisor with least workload
+        //     if ($supervisors->isNotEmpty()) {
+        //         return $this->getUserWithLeastWorkload($supervisors);
+        //     }
+
+        //     // Third priority: HOD
+        //     if ($hodAvailable) {
+        //         return $hod;
+        //     }
+
+        //     // Fallback: Any active user in department
+        //     return $this->getUserWithLeastWorkload($departmentUsers);
+        // }
+
+        // Default: Any staff with least workload
+        return $this->assignStaff($department, $departmentUsers);
     }
 
-    // CASE 3: Medium severity
-    if ($severity === 'medium' || $severity === 'low') {
-        // First priority: Staff with least workload
+    /**
+     * Get user with the least number of open incidents
+     */
+    private function getUserWithLeastWorkload($users): ?User
+    {
+        if ($users->isEmpty()) {
+            return null;
+        }
+
+        return $users->sortBy(function ($user) {
+            return $user->assignedIncidents()->open()->count();
+        })->first();
+    }
+
+    /**
+     * Default assignment - staff with least workload
+     */
+    private function assignStaff($department, $departmentUsers): ?User
+    {
+        // Get staff users
+        $staff = $departmentUsers->filter(function ($user) {
+            return $user->hasRole('staff') && $user->status === 'active';
+        });
+
         if ($staff->isNotEmpty()) {
             return $this->getUserWithLeastWorkload($staff);
         }
-        
-        // Second priority: Supervisor with least workload
+
+        // Fallback to supervisors
+        $supervisors = $departmentUsers->filter(function ($user) {
+            return $user->hasRole('supervisor') && $user->status === 'active';
+        });
+
         if ($supervisors->isNotEmpty()) {
             return $this->getUserWithLeastWorkload($supervisors);
         }
-        
-        
-        // Third priority: HOD (if no supervisor/staff available)
-        if ($hodAvailable) {
+
+        // Fallback to HOD
+        $hod = $department->getHeadOfDepartment();
+        if ($hod && $hod->status === 'active') {
             return $hod;
         }
-        
-        // Fallback: Any active user in department
+
+        // Final fallback: any active user
         return $this->getUserWithLeastWorkload($departmentUsers);
     }
-
-    // // CASE 4: Low severity (default to staff)
-    // if ($severity === 'low') {
-    //     // First priority: Staff with least workload
-    //     if ($staff->isNotEmpty()) {
-    //         return $this->getUserWithLeastWorkload($staff);
-    //     }
-        
-    //     // Second priority: Supervisor with least workload
-    //     if ($supervisors->isNotEmpty()) {
-    //         return $this->getUserWithLeastWorkload($supervisors);
-    //     }
-        
-    //     // Third priority: HOD
-    //     if ($hodAvailable) {
-    //         return $hod;
-    //     }
-        
-    //     // Fallback: Any active user in department
-    //     return $this->getUserWithLeastWorkload($departmentUsers);
-    // }
-
-    // Default: Any staff with least workload
-    return $this->assignStaff($department, $departmentUsers);
-}
-
-/**
- * Get user with the least number of open incidents
- */
-private function getUserWithLeastWorkload($users): ?User
-{
-    if ($users->isEmpty()) {
-        return null;
-    }
-
-    return $users->sortBy(function ($user) {
-        return $user->assignedIncidents()->open()->count();
-    })->first();
-}
-
-/**
- * Default assignment - staff with least workload
- */
-private function assignStaff($department, $departmentUsers): ?User
-{
-    // Get staff users
-    $staff = $departmentUsers->filter(function ($user) {
-        return $user->hasRole('staff') && $user->status === 'active';
-    });
-
-    if ($staff->isNotEmpty()) {
-        return $this->getUserWithLeastWorkload($staff);
-    }
-
-    // Fallback to supervisors
-    $supervisors = $departmentUsers->filter(function ($user) {
-        return $user->hasRole('supervisor') && $user->status === 'active';
-    });
-
-    if ($supervisors->isNotEmpty()) {
-        return $this->getUserWithLeastWorkload($supervisors);
-    }
-
-    // Fallback to HOD
-    $hod = $department->getHeadOfDepartment();
-    if ($hod && $hod->status === 'active') {
-        return $hod;
-    }
-
-    // Final fallback: any active user
-    return $this->getUserWithLeastWorkload($departmentUsers);
-}
-    
 
     // ==========================================
     // FILE HANDLING
     // ==========================================
-    private function storeIncidentFile(Incident $incident, $file): void
+    // private function storeIncidentFile(Incident $incident, $file): void
+    // {
+    //     $mediaType = $this->getMediaType($file);
+    //     $path = 'incidents/'.$incident->id.'/'.date('Y/m');
+    //     $fileName = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
+    //     $filePath = $file->storeAs($path, $fileName, 'public');
+
+    //     $thumbnailPath = null;
+    //     if ($mediaType === 'image') {
+    //         try {
+    //             $manager = new ImageManager(new Driver);
+    //             $image = $manager->read($file);
+    //             $image->resize(300, 300, function ($constraint) {
+    //                 $constraint->aspectRatio();
+    //                 $constraint->upsize();
+    //             });
+    //             $thumbPath = $path.'/thumbnails/'.$fileName;
+    //             Storage::disk('public')->put($thumbPath, $image->toJpeg(80));
+    //             $thumbnailPath = $thumbPath;
+    //         } catch (\Exception $e) {
+    //             Log::warning('Thumbnail failed: '.$e->getMessage());
+    //         }
+    //     }
+
+    //     IncidentMedia::create([
+    //         'incident_id' => $incident->id,
+    //         'uploaded_by' => Auth::id(),
+    //         'media_type' => $mediaType,
+    //         'file_path' => $filePath,
+    //         'file_name' => $fileName,
+    //         'original_name' => $file->getClientOriginalName(),
+    //         'mime_type' => $file->getMimeType(),
+    //         'file_size' => $file->getSize(),
+    //         'thumbnail_path' => $thumbnailPath,
+    //         'sort_order' => $incident->media()->count(),
+    //     ]);
+    // }
+
+    // private function getMediaType($file): string
+    // {
+    //     $mime = $file->getMimeType();
+    //     if (str_starts_with($mime, 'image/')) {
+    //         return 'image';
+    //     }
+    //     if (str_starts_with($mime, 'video/')) {
+    //         return 'video';
+    //     }
+    //     if (str_starts_with($mime, 'audio/')) {
+    //         return 'audio';
+    //     }
+
+    //     return 'document';
+    // }
+
+    // ==========================================
+    // FILE HANDLING - UPDATED
+    // ==========================================
+
+    private function storeIncidentFile(Incident $incident, $file, array $requestInfo = []): void
+    {
+        try {
+            $imageHelper = app(ImageHelper::class);
+
+            // Process the image
+            $result = $imageHelper->processImage($file, [
+                'storage_path' => 'incidents/'.$incident->id,
+                'generate_thumbnail' => true,
+            ]);
+
+            if (! $result['success']) {
+                // Fallback to original method if processing fails
+                $this->storeIncidentFileLegacy($incident, $file);
+
+                return;
+            }
+
+            // Get upload metadata
+            $metadata = $imageHelper->getUploadMetadata(
+                $result,
+                Auth::id(),
+                array_merge($requestInfo, [
+                    'source' => 'Web',
+                    'ip' => request()->ip(),
+                    'browser' => request()->userAgent() ? $this->parseBrowser(request()->userAgent()) : null,
+                    'os' => request()->userAgent() ? $this->parseOS(request()->userAgent()) : null,
+                    'device' => request()->userAgent() ? $this->parseDevice(request()->userAgent()) : null,
+                ])
+            );
+
+            // Determine media type
+            $mediaType = $this->getMediaTypeFromMime($file->getMimeType());
+
+            // Create media record
+            $media = IncidentMedia::create([
+                'incident_id' => $incident->id,
+                'uploaded_by' => Auth::id(),
+                'media_type' => $mediaType,
+                'file_path' => $result['stored_path'],
+                'file_name' => $result['stored_filename'],
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => 'image/webp',
+                'file_size' => strlen($result['webp_data']),
+                'thumbnail_path' => $result['thumbnail_path'],
+                'sort_order' => $incident->media()->count(),
+                'metadata' => $metadata, // Store the full metadata as JSON
+            ]);
+
+            Log::info('Image processed and stored', [
+                'incident_id' => $incident->id,
+                'media_id' => $media->id,
+                'original_size' => $metadata['file']['original_size'],
+                'compressed_size' => $metadata['file']['compressed_size'],
+                'compression_ratio' => $metadata['file']['compression_ratio'].'%',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Image processing failed, falling back to legacy method', [
+                'incident_id' => $incident->id,
+                'file' => $file->getClientOriginalName(),
+                'error' => $e->getMessage(),
+            ]);
+
+            // Fallback to original method
+            $this->storeIncidentFileLegacy($incident, $file);
+        }
+    }
+
+    /**
+     * Legacy file storage method (fallback).
+     */
+    private function storeIncidentFileLegacy(Incident $incident, $file): void
     {
         $mediaType = $this->getMediaType($file);
         $path = 'incidents/'.$incident->id.'/'.date('Y/m');
@@ -609,12 +734,15 @@ private function assignStaff($department, $departmentUsers): ?User
             'file_size' => $file->getSize(),
             'thumbnail_path' => $thumbnailPath,
             'sort_order' => $incident->media()->count(),
+            'metadata' => null,
         ]);
     }
 
-    private function getMediaType($file): string
+    /**
+     * Get media type from mime type.
+     */
+    private function getMediaTypeFromMime(string $mime): string
     {
-        $mime = $file->getMimeType();
         if (str_starts_with($mime, 'image/')) {
             return 'image';
         }
@@ -626,6 +754,69 @@ private function assignStaff($department, $departmentUsers): ?User
         }
 
         return 'document';
+    }
+
+    /**
+     * Parse browser from user agent.
+     */
+    private function parseBrowser(string $userAgent): string
+    {
+        if (str_contains($userAgent, 'Chrome')) {
+            return 'Chrome';
+        }
+        if (str_contains($userAgent, 'Firefox')) {
+            return 'Firefox';
+        }
+        if (str_contains($userAgent, 'Safari')) {
+            return 'Safari';
+        }
+        if (str_contains($userAgent, 'Edge')) {
+            return 'Edge';
+        }
+        if (str_contains($userAgent, 'Opera')) {
+            return 'Opera';
+        }
+
+        return 'Unknown';
+    }
+
+    /**
+     * Parse OS from user agent.
+     */
+    private function parseOS(string $userAgent): string
+    {
+        if (str_contains($userAgent, 'Windows')) {
+            return 'Windows';
+        }
+        if (str_contains($userAgent, 'Mac OS')) {
+            return 'macOS';
+        }
+        if (str_contains($userAgent, 'Linux')) {
+            return 'Linux';
+        }
+        if (str_contains($userAgent, 'Android')) {
+            return 'Android';
+        }
+        if (str_contains($userAgent, 'iPhone') || str_contains($userAgent, 'iPad')) {
+            return 'iOS';
+        }
+
+        return 'Unknown';
+    }
+
+    /**
+     * Parse device from user agent.
+     */
+    private function parseDevice(string $userAgent): string
+    {
+        if (str_contains($userAgent, 'Mobile')) {
+            return 'Mobile';
+        }
+        if (str_contains($userAgent, 'Tablet')) {
+            return 'Tablet';
+        }
+
+        return 'Desktop';
     }
 
     // ==========================================

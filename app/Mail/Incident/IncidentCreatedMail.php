@@ -2,40 +2,50 @@
 
 namespace App\Mail\Incident;
 
+use App\Mail\BaseMail;
 use App\Models\Incident;
 use App\Models\User;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 
-class IncidentCreatedMail extends BaseIncidentMail
+class IncidentCreatedMail extends BaseMail
 {
-    protected string $notificationType = 'created';
+    protected Incident $incident;
+
+    protected ?User $actor;
 
     public function __construct(Incident $incident, ?User $actor = null)
     {
-        parent::__construct($incident, $actor ?? $incident->reporter);
-        
-        $this->extraFields = [
-            'Reported By' => $incident->reporter?->name ?? 'N/A',
-            'Status' => ucfirst($incident->status),
-        ];
+        $this->incident = $incident;
+        $this->actor = $actor ?? $incident->reporter;
+
+        $this->statusColor = '#0D47A1';
+        $this->statusLabel = 'New Incident Reported';
+        $this->statusType = 'created';
     }
 
-    protected function getSubject(): string
+    public function envelope(): Envelope
     {
-        return 'New Incident Reported – ' . $this->incident->incident_id;
+        return new Envelope(
+            subject: $this->subjectPrefix.' New Incident Reported – '.$this->incident->incident_id,
+        );
     }
 
-    protected function getView(): string
+    public function content(): Content
     {
-        return 'emails.incident.created';
-    }
-
-    protected function getGreeting(): string
-    {
-        return 'Hello <span style="color: #0d47a1;">Team</span>,';
-    }
-
-    protected function getBody(): string
-    {
-        return 'A new incident has been reported. Please review and take appropriate action.';
+        return new Content(
+            view: 'emails.incident.created',
+            with: array_merge($this->getViewData(), [
+                'incident' => $this->incident,
+                'actor' => $this->actor,
+                'greeting' => 'Hello Team,',
+                'body' => 'A new incident has been reported. Please review and take appropriate action.',
+                'actionUrl' => route('incidents.show', $this->incident),
+                'extraFields' => [
+                    'Reported By' => $this->incident->reporter?->name ?? 'N/A',
+                    'Status' => ucfirst($this->incident->status),
+                ],
+            ])
+        );
     }
 }

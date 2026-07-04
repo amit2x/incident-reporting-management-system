@@ -2,8 +2,10 @@
 
 namespace App\Notifications;
 
+use App\Mail\Incident\IncidentCommentMail;
 use App\Models\Incident;
 use App\Models\IncidentComment;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -14,6 +16,7 @@ class NewCommentNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected Incident $incident;
+
     protected IncidentComment $comment;
 
     /**
@@ -37,19 +40,27 @@ class NewCommentNotification extends Notification implements ShouldQueue
     /**
      * Get the mail representation of the notification.
      */
-    public function toMail(object $notifiable): MailMessage
+    // public function toMail(object $notifiable): MailMessage
+    // {
+    //     $url = route('incidents.show', $this->incident->id) . '#comment-' . $this->comment->id;
+
+    //     return (new MailMessage)
+    //         ->subject("💬 New Comment on Incident #{$this->incident->incident_id}")
+    //         ->greeting("Hello {$notifiable->name},")
+    //         ->line("**{$this->comment->user->name}** commented on incident #{$this->incident->incident_id}:")
+    //         ->line("\"{$this->comment->content}\"")
+    //         ->action('View Comment', $url)
+    //         // ->salutation('Regards,<br>IRMS Notification System');
+    //                     ->salutation("Regards,\nSAMANVAY");
+
+    // }
+
+    public function toMail(object $notifiable)
     {
-        $url = route('incidents.show', $this->incident->id) . '#comment-' . $this->comment->id;
+        $actor = $this->getActor();
 
-        return (new MailMessage)
-            ->subject("💬 New Comment on Incident #{$this->incident->incident_id}")
-            ->greeting("Hello {$notifiable->name},")
-            ->line("**{$this->comment->user->name}** commented on incident #{$this->incident->incident_id}:")
-            ->line("\"{$this->comment->content}\"")
-            ->action('View Comment', $url)
-            // ->salutation('Regards,<br>IRMS Notification System');
-                        ->salutation("Regards,\nSAMANVAY");
-
+        return (new IncidentCommentMail($this->incident, $actor, $this->comment))
+            ->to($notifiable->email);
     }
 
     /**
@@ -62,9 +73,24 @@ class NewCommentNotification extends Notification implements ShouldQueue
             'incident_id' => $this->incident->id,
             'incident_number' => $this->incident->incident_id,
             'comment_id' => $this->comment->id,
+            'comment_by' => $this->getActor()?->name ?? 'System',
+            'comment_preview' => \Str::limit($this->comment->content, 100),
             'commenter_name' => $this->comment->user->name,
-            'message' => "{$this->comment->user->name} commented: " . \Str::limit($this->comment->content, 100),
+            'message' => "{$this->comment->user->name} commented: ".\Str::limit($this->comment->content, 100),
             'url' => route('incidents.show', $this->incident->id),
         ];
+    }
+
+    protected function getActor(): ?User
+    {
+        if (auth()->check()) {
+            return auth()->user();
+        }
+
+        if ($this->comment->user_id) {
+            return User::find($this->comment->user_id);
+        }
+
+        return null;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Mail\Incident\IncidentCreatedMail;
 use App\Models\Incident;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,30 +35,38 @@ class NewIncidentNotification extends Notification implements ShouldQueue
     /**
      * Get the mail representation of the notification.
      */
-    public function toMail(object $notifiable): MailMessage
+    // public function toMail(object $notifiable): MailMessage
+    // {
+    //     $url = route('incidents.show', $this->incident->id);
+
+    //     return (new MailMessage)
+    //         ->subject("🚨 New Incident Reported: #{$this->incident->incident_id}")
+    //         ->greeting("Hello {$notifiable->name},")
+    //         ->line("A new incident has been reported that requires your attention.")
+    //         ->line("**Incident ID:** {$this->incident->incident_id}")
+    //         ->line("**Title:** {$this->incident->title}")
+    //         ->line("**Severity:** " . ucfirst($this->incident->severity))
+    //         ->line("**Priority:** " . ucfirst($this->incident->priority))
+    //         ->line("**Department:** {$this->incident->department->name}")
+    //         ->line("**Category:** {$this->incident->category->name}")
+    //         ->line("**Reported By:** " . ($this->incident->is_anonymous ? 'Anonymous' : $this->incident->reporter->name))
+    //         ->line("**Location:** " . ($this->incident->location ?? 'Not specified'))
+    //         ->when($this->incident->sla_due_at, function ($mail) {
+    //             return $mail->line("**SLA Due:** {$this->incident->sla_due_at->format('d M Y, H:i')}");
+    //         })
+    //         ->action('View Incident', $url)
+    //         ->line('Please take appropriate action at your earliest convenience.')
+    //         // ->salutation('Regards,<br>IRMS Notification System');
+    //                     ->salutation("Regards,\nSAMANVAY");
+
+    // }
+
+    public function toMail(object $notifiable)
     {
-        $url = route('incidents.show', $this->incident->id);
+        $actor = $this->incident->reporter;
 
-        return (new MailMessage)
-            ->subject("🚨 New Incident Reported: #{$this->incident->incident_id}")
-            ->greeting("Hello {$notifiable->name},")
-            ->line("A new incident has been reported that requires your attention.")
-            ->line("**Incident ID:** {$this->incident->incident_id}")
-            ->line("**Title:** {$this->incident->title}")
-            ->line("**Severity:** " . ucfirst($this->incident->severity))
-            ->line("**Priority:** " . ucfirst($this->incident->priority))
-            ->line("**Department:** {$this->incident->department->name}")
-            ->line("**Category:** {$this->incident->category->name}")
-            ->line("**Reported By:** " . ($this->incident->is_anonymous ? 'Anonymous' : $this->incident->reporter->name))
-            ->line("**Location:** " . ($this->incident->location ?? 'Not specified'))
-            ->when($this->incident->sla_due_at, function ($mail) {
-                return $mail->line("**SLA Due:** {$this->incident->sla_due_at->format('d M Y, H:i')}");
-            })
-            ->action('View Incident', $url)
-            ->line('Please take appropriate action at your earliest convenience.')
-            // ->salutation('Regards,<br>IRMS Notification System');
-                        ->salutation("Regards,\nSAMANVAY");
-
+        return (new IncidentCreatedMail($this->incident, $actor))
+            ->to($notifiable->email);
     }
 
     /**

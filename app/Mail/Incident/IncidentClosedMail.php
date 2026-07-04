@@ -2,42 +2,50 @@
 
 namespace App\Mail\Incident;
 
+use App\Mail\BaseMail;
 use App\Models\Incident;
 use App\Models\User;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 
-class IncidentClosedMail extends BaseIncidentMail
+class IncidentClosedMail extends BaseMail
 {
-    protected string $notificationType = 'closed';
+    protected Incident $incident;
+
+    protected User $actor;
 
     public function __construct(Incident $incident, User $actor)
     {
-        parent::__construct($incident, $actor);
-        
-        $this->extraFields = [
-            'Closed By' => $actor->name,
-            'Closed At' => $incident->closed_at?->format('d M Y, H:i') ?? 'N/A',
-        ];
+        $this->incident = $incident;
+        $this->actor = $actor;
+
+        $this->statusColor = '#2E7D32';
+        $this->statusLabel = 'Incident Closed';
+        $this->statusType = 'closed';
     }
 
-    protected function getSubject(): string
+    public function envelope(): Envelope
     {
-        return 'Incident Closed – ' . $this->incident->incident_id;
+        return new Envelope(
+            subject: $this->subjectPrefix.' Incident Closed – '.$this->incident->incident_id,
+        );
     }
 
-    protected function getView(): string
+    public function content(): Content
     {
-        return 'emails.incident.closed';
-    }
-
-    protected function getGreeting(): string
-    {
-        return 'Hello <span style="color: #0d47a1;">' . 
-               ($this->incident->reporter?->name ?? 'User') . 
-               '</span>,';
-    }
-
-    protected function getBody(): string
-    {
-        return 'The incident you reported has been closed. Thank you for your cooperation.';
+        return new Content(
+            view: 'emails.incident.closed',
+            with: array_merge($this->getViewData(), [
+                'incident' => $this->incident,
+                'actor' => $this->actor,
+                'greeting' => 'Hello '.($this->incident->reporter?->name ?? 'User').',',
+                'body' => 'The incident you reported has been closed. Thank you for your cooperation.',
+                'actionUrl' => route('incidents.show', $this->incident),
+                'extraFields' => [
+                    'Closed By' => $this->actor->name,
+                    'Closed At' => $this->incident->closed_at?->format('d M Y, H:i') ?? 'N/A',
+                ],
+            ])
+        );
     }
 }

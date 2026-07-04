@@ -3,15 +3,13 @@
 namespace App\Mail\Layouts;
 
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
 abstract class EmailLayout extends Mailable
 {
     /**
      * The notification type for status banner color.
      */
-    protected string $notificationType;
+    protected string $notificationType = '';
 
     /**
      * Get the status color based on notification type.

@@ -16,8 +16,10 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\Test\EmailTestController;
 use App\Http\Controllers\UserController;
 use App\Models\Department;
+use App\Models\Incident;
 use App\Models\User;
 use App\Services\FCMService;
 use Illuminate\Http\Request;
@@ -130,41 +132,41 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Incident share data
     Route::get('/incidents/{incident}/share', [IncidentController::class, 'shareData'])->name('incidents.share');
-    
-    //View
-Route::get('/incidents/{incident}/media', function(App\Models\Incident $incident) {
-    $media = $incident->media->map(function($item) {
-        return [
-            'id' => $item->id,
-            'type' => $item->media_type,
-            'url' => Storage::url($item->file_path),
-            'thumbnail' => $item->thumbnail_path ? Storage::url($item->thumbnail_path) : null,
-            'name' => $item->original_name,
-            'size' => $item->file_size
-        ];
-    });
-    
-    return response()->json(['success' => true, 'media' => $media]);
-})->name('incidents.media');
 
-Route::get('/incidents/{incident}/comments', function(App\Models\Incident $incident) {
-    $comments = $incident->comments()->with('user')->latest()->limit(50)->get();
-    
-    return response()->json([
-        'success' => true,
-        'comments' => $comments->map(function($comment) {
+    // View
+    Route::get('/incidents/{incident}/media', function (Incident $incident) {
+        $media = $incident->media->map(function ($item) {
             return [
-                'id' => $comment->id,
-                'content' => $comment->content,
-                'user' => [
-                    'name' => $comment->user?->name ?? 'Unknown',
-                    'avatar' => $comment->user?->avatar_url ?? null
-                ],
-                'created_at' => $comment->created_at->toISOString()
+                'id' => $item->id,
+                'type' => $item->media_type,
+                'url' => Storage::url($item->file_path),
+                'thumbnail' => $item->thumbnail_path ? Storage::url($item->thumbnail_path) : null,
+                'name' => $item->original_name,
+                'size' => $item->file_size,
             ];
-        })
-    ]);
-})->name('incidents.comments');
+        });
+
+        return response()->json(['success' => true, 'media' => $media]);
+    })->name('incidents.media');
+
+    Route::get('/incidents/{incident}/comments', function (Incident $incident) {
+        $comments = $incident->comments()->with('user')->latest()->limit(50)->get();
+
+        return response()->json([
+            'success' => true,
+            'comments' => $comments->map(function ($comment) {
+                return [
+                    'id' => $comment->id,
+                    'content' => $comment->content,
+                    'user' => [
+                        'name' => $comment->user?->name ?? 'Unknown',
+                        'avatar' => $comment->user?->avatar_url ?? null,
+                    ],
+                    'created_at' => $comment->created_at->toISOString(),
+                ];
+            }),
+        ]);
+    })->name('incidents.comments');
 
     // ==========================================
     // REPORT ROUTES
@@ -520,4 +522,12 @@ Route::get('/test-fcm-users', function () {
         });
 
     return response()->json($users);
+});
+
+Route::prefix('test')->name('test.')->group(function () {
+    Route::get('/emails', [EmailTestController::class, 'index'])->name('emails');
+    Route::get('/emails/test', [EmailTestController::class, 'test'])->name('emails.test');
+    Route::post('/emails/test', [EmailTestController::class, 'test'])->name('emails.test.post');
+    Route::post('/emails/notification', [EmailTestController::class, 'testNotification'])->name('emails.notification');
+    Route::post('/emails/all', [EmailTestController::class, 'testAll'])->name('emails.all');
 });

@@ -71,7 +71,7 @@ class NotificationService
         // 4. Queue push notifications
         $this->queuePushNotifications($recipients->unique('id'), [
             'title' => '🚨 New Incident Reported',
-            'body' => "{$incident->title}\nSeverity: " . ucfirst($incident->severity) .
+            'body' => "{$incident->title}\nSeverity: ".ucfirst($incident->severity).
                 " | Department: {$incident->department->name}",
             'data' => [
                 'type' => 'new_incident',
@@ -91,7 +91,9 @@ class NotificationService
     public function notifyIncidentAssigned(Incident $incident, int $userId): void
     {
         $user = User::find($userId);
-        if (!$user || $user->id === auth()->id()) return;
+        if (! $user || $user->id === auth()->id()) {
+            return;
+        }
 
         // Database + Email notification
         Notification::send($user, new IncidentAssignedNotification($incident));
@@ -162,6 +164,12 @@ class NotificationService
             Notification::send($incident->reporter, new IncidentResolvedNotification($incident));
         }
 
+        // Notify assigned user
+        if ($incident->assignedTo && $incident->assignedTo->id !== ($incident->reporter->id ?? 0)) {
+            $recipients->push($incident->assignedTo);
+            Notification::send($incident->assignedTo, new IncidentResolvedNotification($incident));
+        }
+
         // Notify HOD
         $hod = $incident->department->getHeadOfDepartment();
         if ($hod && $hod->id !== auth()->id() && $hod->id !== ($incident->reporter->id ?? 0)) {
@@ -220,7 +228,7 @@ class NotificationService
      */
     public function notifyIncidentReopened(Incident $incident): void
     {
-        $title = '🔄 Incident Reopened: #' . $incident->incident_id;
+        $title = '🔄 Incident Reopened: #'.$incident->incident_id;
         $body = "{$incident->title} has been reopened.";
 
         $data = [
@@ -268,7 +276,7 @@ class NotificationService
             Notification::send($incident->reporter, new IncidentRejectedNotification($incident));
 
             $this->queuePushNotification($incident->reporter, [
-                'title' => '❌ Incident Rejected: #' . $incident->incident_id,
+                'title' => '❌ Incident Rejected: #'.$incident->incident_id,
                 'body' => "Your incident has been rejected. Reason: {$incident->rejection_reason}",
                 'data' => [
                     'type' => 'incident_rejected',
@@ -292,7 +300,7 @@ class NotificationService
         $previousCommenters = $incident->allComments()
             ->pluck('user_id')
             ->unique()
-            ->filter(fn($userId) => $userId !== $comment->user_id);
+            ->filter(fn ($userId) => $userId !== $comment->user_id);
 
         foreach ($previousCommenters as $userId) {
             $user = User::find($userId);
@@ -303,17 +311,17 @@ class NotificationService
 
         // Push notifications to assigned user and reporter
         $pushRecipients = collect([$incident->assignedTo, $incident->reporter])
-            ->filter(fn($user) => $user && $user->id !== $comment->user_id)
+            ->filter(fn ($user) => $user && $user->id !== $comment->user_id)
             ->unique('id');
 
         $this->queuePushNotifications($pushRecipients, [
             'title' => '💬 New Comment on Incident',
-            'body' => "{$comment->user->name}: " . \Str::limit($comment->content, 100),
+            'body' => "{$comment->user->name}: ".\Str::limit($comment->content, 100),
             'data' => [
                 'type' => 'new_comment',
                 'incident_id' => (string) $incident->id,
                 'comment_id' => (string) $comment->id,
-                'click_action' => route('incidents.show', $incident->id) . '#comments',
+                'click_action' => route('incidents.show', $incident->id).'#comments',
             ],
         ]);
     }
@@ -350,7 +358,7 @@ class NotificationService
      */
     public function notifySlaBreach(Incident $incident): void
     {
-        $title = '⏰ SLA Breach Warning: #' . $incident->incident_id;
+        $title = '⏰ SLA Breach Warning: #'.$incident->incident_id;
         $body = "{$incident->title} has breached SLA. Breach count: {$incident->sla_breach_count}";
 
         $data = [
@@ -404,7 +412,7 @@ class NotificationService
                 'from_department_id' => $incident->department_id,
                 'to_department_id' => $escalationEntry->escalate_to_department_id,
                 'level' => $nextLevel,
-                'reason' => 'Auto-escalated: SLA breach count reached ' . $incident->sla_breach_count,
+                'reason' => 'Auto-escalated: SLA breach count reached '.$incident->sla_breach_count,
                 'status' => 'pending',
             ]);
 
@@ -425,7 +433,7 @@ class NotificationService
                 'matrix_id' => $escalationEntry->id,
             ]);
         } else {
-            Log::info('No escalation matrix found for level ' . $nextLevel, [
+            Log::info('No escalation matrix found for level '.$nextLevel, [
                 'incident_id' => $incident->incident_id,
                 'department_id' => $incident->department_id,
                 'category_id' => $incident->category_id,
@@ -445,14 +453,16 @@ class NotificationService
         // Check if user has FCM token
         if (empty($user->fcm_token)) {
             Log::debug('Skip push: User has no FCM token', ['user_id' => $user->id]);
+
             return;
         }
 
         // Check user preferences
         $preferences = $user->preferences ?? [];
         $pushEnabled = $preferences['push_notifications'] ?? true;
-        if (!$pushEnabled) {
+        if (! $pushEnabled) {
             Log::debug('Skip push: User disabled push notifications', ['user_id' => $user->id]);
+
             return;
         }
 
@@ -476,7 +486,7 @@ class NotificationService
     {
         $tokens = $users->pluck('fcm_token')->filter()->values()->toArray();
 
-        if (!empty($tokens)) {
+        if (! empty($tokens)) {
             SendBulkPushNotificationJob::dispatch(
                 $tokens,
                 $notificationData['title'] ?? 'IRMSystem Notification',

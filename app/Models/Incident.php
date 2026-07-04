@@ -122,65 +122,65 @@ class Incident extends Model
     //         }
     //     });
     // }
-    
+
     protected static function boot()
-{
-    parent::boot();
+    {
+        parent::boot();
 
-    static::creating(function ($incident) {
-        if (empty($incident->incident_id)) {
-            $incident->incident_id = static::generateIncidentId();
-        }
-
-        if (empty($incident->sla_due_at) && $incident->category_id) {
-            $category = IncidentCategory::find($incident->category_id);
-            if ($category) {
-                $incident->sla_due_at = Carbon::now()->addMinutes($category->sla_minutes);
+        static::creating(function ($incident) {
+            if (empty($incident->incident_id)) {
+                $incident->incident_id = static::generateIncidentId();
             }
-        }
-    });
 
-    // Add this new event to handle duplicate exceptions
-    static::saving(function ($incident) {
-        // If incident_id already exists, regenerate
-        $attempts = 0;
-        while (static::where('incident_id', $incident->incident_id)
-            ->where('id', '!=', $incident->id)
-            ->exists() && $attempts < 5) {
-            
-            $incident->incident_id = static::generateIncidentId();
-            $attempts++;
-            
-            if ($attempts >= 5) {
-                throw new \Exception('Unable to generate unique incident ID after ' . $attempts . ' attempts');
+            if (empty($incident->sla_due_at) && $incident->category_id) {
+                $category = IncidentCategory::find($incident->category_id);
+                if ($category) {
+                    $incident->sla_due_at = Carbon::now()->addMinutes($category->sla_minutes);
+                }
             }
-        }
-    });
+        });
 
-    static::created(function ($incident) {
-        $incident->logActivity('created', null, $incident->toArray());
-        event(new IncidentCreated($incident));
-    });
+        // Add this new event to handle duplicate exceptions
+        static::saving(function ($incident) {
+            // If incident_id already exists, regenerate
+            $attempts = 0;
+            while (static::where('incident_id', $incident->incident_id)
+                ->where('id', '!=', $incident->id)
+                ->exists() && $attempts < 5) {
 
-    static::updated(function ($incident) {
-        if ($incident->isDirty('status')) {
-            $incident->handleStatusChange(
-                $incident->getOriginal('status'),
-                $incident->status
-            );
-        }
-    });
+                $incident->incident_id = static::generateIncidentId();
+                $attempts++;
 
-    static::deleted(function ($incident) {
-        // Clean up media files
-        foreach ($incident->media as $media) {
-            \Storage::disk('public')->delete($media->file_path);
-            if ($media->thumbnail_path) {
-                \Storage::disk('public')->delete($media->thumbnail_path);
+                if ($attempts >= 5) {
+                    throw new \Exception('Unable to generate unique incident ID after '.$attempts.' attempts');
+                }
             }
-        }
-    });
-}
+        });
+
+        static::created(function ($incident) {
+            $incident->logActivity('created', null, $incident->toArray());
+            event(new IncidentCreated($incident));
+        });
+
+        static::updated(function ($incident) {
+            if ($incident->isDirty('status')) {
+                $incident->handleStatusChange(
+                    $incident->getOriginal('status'),
+                    $incident->status
+                );
+            }
+        });
+
+        static::deleted(function ($incident) {
+            // Clean up media files
+            foreach ($incident->media as $media) {
+                \Storage::disk('public')->delete($media->file_path);
+                if ($media->thumbnail_path) {
+                    \Storage::disk('public')->delete($media->thumbnail_path);
+                }
+            }
+        });
+    }
 
     // ==========================================
     // RELATIONSHIPS
@@ -531,115 +531,116 @@ class Incident extends Model
 
     //     return sprintf('%s-%s-%04d', $prefix, $year, $sequence);
     // }
-//     public static function generateIncidentId(): string
-// {
-//     $prefix = 'INC';
-//     $year = date('Y');
-//     $pattern = $prefix . '-' . $year . '-%';
-//     $maxAttempts = 3;
-//     $attempt = 0;
-    
-//     while ($attempt < $maxAttempts) {
-//         $result = DB::transaction(function () use ($prefix, $year, $pattern) {
-//             // Get the maximum sequence number with lock
-//             $lastIncident = static::where('incident_id', 'LIKE', $pattern)
-//                 ->orderBy('id', 'desc')
-//                 ->lockForUpdate()
-//                 ->first();
-            
-//             $sequence = 1;
-//             if ($lastIncident) {
-//                 // Extract sequence number properly
-//                 $expectedPrefix = $prefix . '-' . $year . '-';
-//                 $sequenceStr = substr($lastIncident->incident_id, strlen($expectedPrefix));
-//                 $sequence = intval($sequenceStr) + 1;
-//             }
-            
-//             $newId = sprintf('%s-%s-%04d', $prefix, $year, $sequence);
-            
-//             // Double-check that this ID doesn't already exist (safety)
-//             $exists = static::where('incident_id', $newId)->exists();
-            
-//             return [
-//                 'id' => $newId,
-//                 'exists' => $exists,
-//                 'sequence' => $sequence
-//             ];
-//         });
-        
-//         if (!$result['exists']) {
-//             return $result['id'];
-//         }
-        
-//         $attempt++;
-//         \Log::warning('Duplicate incident_id detected, retrying...', [
-//             'attempt' => $attempt,
-//             'id' => $result['id'],
-//             'sequence' => $result['sequence']
-//         ]);
-        
-//         // Small delay before retry
-//         usleep(50000); // 50ms
-//     }
-    
-//     // Fallback: Use timestamp + microtime as last resort
-//     $fallbackId = sprintf('%s-%s-%s', $prefix, $year, date('YmdHis') . rand(100, 999));
-//     \Log::error('Failed to generate unique incident_id after retries, using fallback', [
-//         'fallback_id' => $fallbackId
-//     ]);
-    
-//     return $fallbackId;
-// }
+    //     public static function generateIncidentId(): string
+    // {
+    //     $prefix = 'INC';
+    //     $year = date('Y');
+    //     $pattern = $prefix . '-' . $year . '-%';
+    //     $maxAttempts = 3;
+    //     $attempt = 0;
 
-public static function generateIncidentId(): string
-{
-    $prefix = 'INC';
-    $year = date('Y');
-    $pattern = $prefix . '-' . $year . '-%';
-    
-    return DB::transaction(function () use ($prefix, $year, $pattern) {
-        // Get all existing sequence numbers for this year
-        $existingSequences = DB::table('incidents')
-            ->where('incident_id', 'LIKE', $pattern)
-            ->lockForUpdate()
-            ->get()
-            ->map(function ($item) use ($prefix, $year) {
-                $patternFull = $prefix . '-' . $year . '-';
-                $numStr = substr($item->incident_id, strlen($patternFull));
-                return (int) $numStr;
-            })
-            ->sort()
-            ->values()
-            ->toArray();
-        
-        // Find the first gap in the sequence
-        $expectedSeq = 1;
-        foreach ($existingSequences as $seq) {
-            if ($seq > $expectedSeq) {
-                // Found a gap
-                break;
+    //     while ($attempt < $maxAttempts) {
+    //         $result = DB::transaction(function () use ($prefix, $year, $pattern) {
+    //             // Get the maximum sequence number with lock
+    //             $lastIncident = static::where('incident_id', 'LIKE', $pattern)
+    //                 ->orderBy('id', 'desc')
+    //                 ->lockForUpdate()
+    //                 ->first();
+
+    //             $sequence = 1;
+    //             if ($lastIncident) {
+    //                 // Extract sequence number properly
+    //                 $expectedPrefix = $prefix . '-' . $year . '-';
+    //                 $sequenceStr = substr($lastIncident->incident_id, strlen($expectedPrefix));
+    //                 $sequence = intval($sequenceStr) + 1;
+    //             }
+
+    //             $newId = sprintf('%s-%s-%04d', $prefix, $year, $sequence);
+
+    //             // Double-check that this ID doesn't already exist (safety)
+    //             $exists = static::where('incident_id', $newId)->exists();
+
+    //             return [
+    //                 'id' => $newId,
+    //                 'exists' => $exists,
+    //                 'sequence' => $sequence
+    //             ];
+    //         });
+
+    //         if (!$result['exists']) {
+    //             return $result['id'];
+    //         }
+
+    //         $attempt++;
+    //         \Log::warning('Duplicate incident_id detected, retrying...', [
+    //             'attempt' => $attempt,
+    //             'id' => $result['id'],
+    //             'sequence' => $result['sequence']
+    //         ]);
+
+    //         // Small delay before retry
+    //         usleep(50000); // 50ms
+    //     }
+
+    //     // Fallback: Use timestamp + microtime as last resort
+    //     $fallbackId = sprintf('%s-%s-%s', $prefix, $year, date('YmdHis') . rand(100, 999));
+    //     \Log::error('Failed to generate unique incident_id after retries, using fallback', [
+    //         'fallback_id' => $fallbackId
+    //     ]);
+
+    //     return $fallbackId;
+    // }
+
+    public static function generateIncidentId(): string
+    {
+        $prefix = 'INC';
+        $year = date('Y');
+        $pattern = $prefix.'-'.$year.'-%';
+
+        return DB::transaction(function () use ($prefix, $year, $pattern) {
+            // Get all existing sequence numbers for this year
+            $existingSequences = DB::table('incidents')
+                ->where('incident_id', 'LIKE', $pattern)
+                ->lockForUpdate()
+                ->get()
+                ->map(function ($item) use ($prefix, $year) {
+                    $patternFull = $prefix.'-'.$year.'-';
+                    $numStr = substr($item->incident_id, strlen($patternFull));
+
+                    return (int) $numStr;
+                })
+                ->sort()
+                ->values()
+                ->toArray();
+
+            // Find the first gap in the sequence
+            $expectedSeq = 1;
+            foreach ($existingSequences as $seq) {
+                if ($seq > $expectedSeq) {
+                    // Found a gap
+                    break;
+                }
+                $expectedSeq = $seq + 1;
             }
-            $expectedSeq = $seq + 1;
-        }
-        
-        $sequence = $expectedSeq;
-        
-        // Safety check - max 99999
-        if ($sequence > 99999) {
-            throw new \Exception('Incident ID sequence exhausted for year ' . $year);
-        }
-        
-        $newId = sprintf('%s-%s-%04d', $prefix, $year, $sequence);
-        
-        // Double-check the ID doesn't exist (shouldn't happen with gap detection)
-        $exists = DB::table('incidents')->where('incident_id', $newId)->exists();
-        if ($exists) {
-            throw new \Exception('Generated ID already exists: ' . $newId);
-        }
-        
-        return $newId;
-    });
-}
+
+            $sequence = $expectedSeq;
+
+            // Safety check - max 99999
+            if ($sequence > 99999) {
+                throw new \Exception('Incident ID sequence exhausted for year '.$year);
+            }
+
+            $newId = sprintf('%s-%s-%04d', $prefix, $year, $sequence);
+
+            // Double-check the ID doesn't exist (shouldn't happen with gap detection)
+            $exists = DB::table('incidents')->where('incident_id', $newId)->exists();
+            if ($exists) {
+                throw new \Exception('Generated ID already exists: '.$newId);
+            }
+
+            return $newId;
+        });
+    }
 
     public function logActivity(string $action, ?array $oldValues, ?array $newValues): void
     {
@@ -863,8 +864,6 @@ public static function generateIncidentId(): string
     //     return false;
     // }
 
-    // app/Models/Incident.php
-
     /**
      * Check if user can take action on this incident
      */
@@ -978,8 +977,7 @@ public static function generateIncidentId(): string
             ->latest()
             ->get();
     }
-    
-    
+
     public function rejectionEscalation()
     {
         return $this->hasOne(Escalation::class)
@@ -987,7 +985,7 @@ public static function generateIncidentId(): string
             ->whereNotNull('responded_by')
             ->latest('responded_at');
     }
-    
+
     public function rejectionResponder()
     {
         return $this->hasOneThrough(

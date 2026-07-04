@@ -47,7 +47,9 @@ class MentionNotification extends Notification implements ShouldQueue
             ->line("**{$this->comment->user->name}** mentioned you in a comment on incident #{$this->incident->incident_id}:")
             ->line("\"{$this->comment->content}\"")
             ->action('View Incident', $url)
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+                        ->salutation("Regards,\nSAMANVAY");
+
     }
 
     /**

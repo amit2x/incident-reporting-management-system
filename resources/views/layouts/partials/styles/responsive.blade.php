@@ -3,6 +3,12 @@
        MOBILE FIRST (< 768px)
        ========================================== */
     @media (max-width: 767.98px) {
+        #backToTop{
+            height: 40px !important;
+            width: 40px !important;
+            bottom: 80px !important;
+            right: 2px !important;
+        }
         .desktop-sidebar,
         .desktop-topbar .hide-on-mobile,
         .hide-on-mobile {

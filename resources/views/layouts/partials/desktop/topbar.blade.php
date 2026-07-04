@@ -3,7 +3,7 @@
         <div class="d-flex align-items-center justify-content-between w-100">
 
             {{-- Left: Mobile Menu Toggle + Brand --}}
-            <div class="d-flex align-items-center gap-3 flex-grow-1">
+            <div class="d-flex align-items-center gap-1 flex-grow-1">
                 <button class="btn btn-light d-none d-md-flex d-lg-none align-items-center justify-content-center"
                     onclick="toggleDesktopSidebar()"
                     style="width: 40px; height: 40px; border-radius: var(--radius-md);">
@@ -16,13 +16,50 @@
                 </button>
 
                 <a href="{{ route('guest.home') }}" class="text-decoration-none d-flex align-items-center gap-2">
-                    <i class="fas fa-shield-halved"
-                        style="font-size: 1.5rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
-                    <span class="fw-bold d-none d-sm-inline"
-                        style="font-size: 1.125rem; font-family: var(--font-heading); color: #1f2937; letter-spacing: -0.5px;">
-                        IRMSystem
-                    </span>
+                    @if(file_exists(public_path('images/master-topbar-logo.webp')) || file_exists(public_path('images/master-topbar-desks.webp')))
+                        
+                        {{-- 1. Mobile & Tablet Logo (Visible below desktop size) --}}
+                        @if(file_exists(public_path('images/master-topbar-logo.webp')))
+                            <img src="{{ asset('images/master-topbar-logo.webp') }}" 
+                                 alt="IRMSystem Logo" 
+                                 class="drawer-logo d-block d-md-none" 
+                                 width="150" 
+                                 height="60" 
+                                 fetchpriority="high"
+                                 style="width: 100%; object-fit: contain;">
+                        @endif
+                
+                        {{-- 2. Desktop Logo (Visible on medium screens and up) --}}
+                        @if(file_exists(public_path('images/master-topbar-desks.webp')))
+                            <img src="{{ asset('images/master-topbar-desks.webp') }}" 
+                                 alt="IRMSystem Logo" 
+                                 class="drawer-logo d-none d-md-block" 
+                                 width="200" 
+                                 height="60" 
+                                 fetchpriority="high"
+                                 style="width: 100%; object-fit: contain;">
+                        @else
+                            {{-- Fallback to mobile logo on desktop if desktop file is missing --}}
+                            <img src="{{ asset('images/master-topbar-logo.webp') }}" 
+                                 alt="IRMSystem Logo" 
+                                 class="drawer-logo d-none d-md-block" 
+                                 width="150" 
+                                 height="60" 
+                                 fetchpriority="high"
+                                 style="width: 100%; object-fit: contain;">
+                        @endif
+                
+                    @else
+                        {{-- 3. Text/Icon Fallback (If both images are missing entirely) --}}
+                        <i class="fas fa-shield-halved"
+                            style="font-size: 1.5rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+                        <span class="fw-bold d-none d-sm-inline"
+                            style="font-size: 1.125rem; font-family: var(--font-heading); color: #1f2937; letter-spacing: -0.5px;">
+                            IRMSystem
+                        </span>
+                    @endif
                 </a>
+
             </div>
 
             {{-- Right: Actions --}}
@@ -129,162 +166,3 @@
         </div>
     </div>
 </header>
-
-@push('scripts')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-
-    const notificationBell = document.getElementById('notificationBell');
-    const notificationDropdown = document.getElementById('notificationDropdownMenu');
-    const notificationContent = document.getElementById('notificationDropdownContent');
-    const notificationBadge = document.getElementById('notificationBadge');
-
-    // ==========================================
-    // TOGGLE NOTIFICATION DROPDOWN
-    // ==========================================
-    window.toggleNotificationDropdown = function(event) {
-        event.stopPropagation();
-
-        if (!notificationDropdown) return;
-
-        const isVisible = notificationDropdown.style.display === 'block';
-
-        if (isVisible) {
-            notificationDropdown.style.display = 'none';
-            document.body.style.overflow = ''; // Restore scrolling
-        } else {
-            notificationDropdown.style.display = 'block';
-            document.body.style.overflow = 'hidden'; // Prevent background scroll on mobile
-            loadNotificationDropdown();
-        }
-    };
-
-    // ==========================================
-    // CLOSE DROPDOWN WHEN CLICKING OUTSIDE
-    // ==========================================
-    document.addEventListener('click', function(event) {
-        if (notificationDropdown && notificationDropdown.style.display === 'block') {
-            if (!notificationBell.contains(event.target) && !notificationDropdown.contains(event.target)) {
-                notificationDropdown.style.display = 'none';
-                document.body.style.overflow = '';
-            }
-        }
-    });
-
-    // ==========================================
-    // CLOSE ON ESCAPE KEY
-    // ==========================================
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && notificationDropdown && notificationDropdown.style.display === 'block') {
-            notificationDropdown.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-    });
-
-    // ==========================================
-    // LOAD UNREAD COUNT
-    // ==========================================
-    function loadUnreadCount() {
-        fetch('/notifications/unread-count', {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return response.json();
-        })
-        .then(data => {
-            if (notificationBadge) {
-                if (data.count > 0) {
-                    notificationBadge.textContent = data.count > 99 ? '99+' : data.count;
-                    notificationBadge.style.display = 'inline-block';
-                } else {
-                    notificationBadge.style.display = 'none';
-                }
-            }
-        })
-        .catch(err => console.log('Count error:', err.message));
-    }
-
-    // ==========================================
-    // LOAD NOTIFICATION DROPDOWN CONTENT
-    // ==========================================
-    function loadNotificationDropdown() {
-        if (!notificationContent) return;
-
-        notificationContent.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>`;
-
-        fetch('/notifications/latest', {
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin'
-        })
-        .then(res => res.json())
-        .then(notifications => {
-            if (!notifications || notifications.length === 0) {
-                notificationContent.innerHTML = `
-                    <div class="text-center py-4 text-muted">
-                        <i class="fas fa-bell-slash fa-2x mb-2 d-block"></i>
-                        <small>No notifications yet</small>
-                    </div>`;
-                return;
-            }
-
-            notificationContent.innerHTML = notifications.map(n => `
-                <a href="${n.url || '#'}" class="text-decoration-none" onclick="closeNotificationDropdown()">
-                    <div class="px-3 py-2 border-bottom ${n.read ? '' : 'bg-light'}" style="cursor:pointer;">
-                        <div class="d-flex align-items-start gap-2">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                 style="width:36px;height:36px;background:${n.color || '#6B7280'}15;color:${n.color || '#6B7280'};">
-                                <i class="fas ${n.icon || 'fa-bell'}" style="font-size:0.75rem;"></i>
-                            </div>
-                            <div class="flex-grow-1 min-width-0">
-                                <div class="small fw-medium">${n.title || 'Notification'}</div>
-                                <div class="text-muted" style="font-size:0.6875rem;">${n.message || ''}</div>
-                                <small class="text-muted" style="font-size:0.625rem;">${n.time || ''}</small>
-                            </div>
-                            ${!n.read ? '<span style="width:8px;height:8px;border-radius:50%;background:#3B82F6;margin-top:6px;flex-shrink:0;"></span>' : ''}
-                        </div>
-                    </div>
-                </a>
-            `).join('');
-        })
-        .catch(err => {
-            notificationContent.innerHTML = `
-                <div class="text-center py-4 text-muted">
-                    <small>Failed to load notifications</small>
-                </div>`;
-        });
-    }
-
-    // ==========================================
-    // CLOSE DROPDOWN HELPER
-    // ==========================================
-    window.closeNotificationDropdown = function() {
-        if (notificationDropdown) {
-            notificationDropdown.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-    };
-
-    // ==========================================
-    // INITIALIZE
-    // ==========================================
-    loadUnreadCount();
-    setInterval(loadUnreadCount, 30000);
-
-});
-</script>
-@endpush

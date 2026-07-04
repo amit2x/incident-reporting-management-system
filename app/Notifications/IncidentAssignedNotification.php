@@ -50,7 +50,8 @@ class IncidentAssignedNotification extends Notification implements ShouldQueue
             ->line("**Location:** " . ($this->incident->location ?? 'Not specified'))
             ->action('View Incident Details', $url)
             ->line('Please acknowledge and take appropriate action.')
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+            ->salutation("Regards,\nSAMANVAY");
     }
 
     /**

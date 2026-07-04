@@ -754,4 +754,15 @@
         padding: 6px 12px;
         border-radius: var(--radius-sm);
     }
+    
+    /*======================================
+        Pre-Load
+    ========================================*/
+    
+    .svg-inline--fa {
+        display: inline-block;
+        overflow: visible;
+        vertical-align: -.125em;
+    }
+    
 </style>

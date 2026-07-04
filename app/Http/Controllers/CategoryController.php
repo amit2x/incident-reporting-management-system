@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\IncidentCategory;
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -35,8 +36,9 @@ class CategoryController extends Controller
      */
     public function create()
     {
+        $departments = Department::active()->ordered()->get();
         $parentCategories = IncidentCategory::active()->root()->get();
-        return view('admin.categories.form', compact('parentCategories'));
+        return view('admin.categories.form', compact('parentCategories', 'departments'));
     }
 
     /**
@@ -51,6 +53,7 @@ class CategoryController extends Controller
             'icon' => 'nullable|string|max:50',
             'color' => 'required|string|max:7',
             'parent_id' => 'nullable|exists:incident_categories,id',
+            'department_id' => 'required|exists:departments,id',
             'default_priority' => 'required|integer|min:1|max:4',
             'sla_minutes' => 'required|integer|min:1',
             'requires_approval' => 'nullable|boolean',
@@ -76,7 +79,7 @@ class CategoryController extends Controller
      */
     public function show(IncidentCategory $category)
     {
-        $category->load(['parent', 'children', 'incidents' => function ($query) {
+        $category->load(['parent', 'department', 'children', 'incidents' => function ($query) {
             $query->latest()->limit(20);
         }]);
         $category->loadCount('incidents');
@@ -94,7 +97,9 @@ class CategoryController extends Controller
             ->root()
             ->get();
 
-        return view('admin.categories.form', compact('category', 'parentCategories'));
+        $departments = Department::active()->ordered()->get();
+        
+        return view('admin.categories.form', compact('category', 'parentCategories', 'departments'));
     }
 
     /**
@@ -109,6 +114,7 @@ class CategoryController extends Controller
             'icon' => 'nullable|string|max:50',
             'color' => 'required|string|max:7',
             'parent_id' => 'nullable|exists:incident_categories,id',
+            'department_id' => 'required|exists:departments,id',
             'default_priority' => 'required|integer|min:1|max:4',
             'sla_minutes' => 'required|integer|min:1',
             'requires_approval' => 'nullable|boolean',

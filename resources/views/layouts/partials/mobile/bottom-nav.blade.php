@@ -14,14 +14,15 @@
                 class="nav-link {{ request()->routeIs('incidents.*') ? 'active' : '' }}">
                 <i class="fas fa-clipboard-list"></i>
                 <span>Incidents</span>
-                @php $openCount = \App\Models\Incident::whereIn('status',
-                ['open','acknowledged','in_progress'])->count(); @endphp
-                @if($openCount > 0)
-                <span class="badge-count">{{ $openCount > 99 ? '99+' : $openCount }}</span>
-                @endif
+        
+                
+                @if(($globalOpenIncidentCount ?? 0) > 0)
+                        <span class="badge-count">{{ $globalOpenIncidentCount > 99 ? '99+' : $globalOpenIncidentCount }}</span>
+                    @endif
             </a>
         </div>
 
+        @can('create-incident')
         {{-- Create (Center - Prominent) --}}
         <div class="nav-item">
             <a href="{{ route('incidents.create') }}" class="nav-link nav-link-create">
@@ -32,6 +33,9 @@
                 <span style="margin-top: 2px;">Report</span>
             </a>
         </div>
+        @endcan
+
+        @can('view-reports')
 
         {{-- Reports --}}
         <div class="nav-item">
@@ -41,9 +45,10 @@
                 <span>Reports</span>
             </a>
         </div>
+        @endcan
 
         {{-- More / Menu --}}
-        <div class="nav-item">
+        <div class="nav-item align-items-left">
             <a href="#" class="nav-link" onclick="openDrawer(); return false;">
                 <i class="fas fa-bars"></i>
                 <span>Menu</span>

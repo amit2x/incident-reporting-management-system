@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Cache;
+
 
 class ProfileController extends Controller
 {
@@ -73,7 +75,7 @@ class ProfileController extends Controller
     public function updateAvatar(Request $request)
     {
         $request->validate([
-            'avatar' => 'required|image|max:2048|mimes:jpg,jpeg,png',
+            'avatar' => 'required|image|max:10240|mimes:jpg,jpeg,png',
         ]);
 
         $user = Auth::user();
@@ -86,6 +88,9 @@ class ProfileController extends Controller
         // Store new avatar
         $path = $request->file('avatar')->store('avatars', 'public');
         $user->update(['avatar' => $path]);
+        
+         // Clear the cached URL
+        Cache::forget('user_avatar_' . $user->id);
 
         return back()->with('success', 'Avatar updated successfully.');
     }

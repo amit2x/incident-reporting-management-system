@@ -1,106 +1,70 @@
 {{-- resources/views/incidents/partials/comment-item.blade.php --}}
-<div class="comment-thread {{ isset($isReply) && $isReply ? 'ms-4 mt-2' : 'mb-3 pb-3 border-bottom' }}" id="comment-{{ $comment->id }}">
+<div class="comment-thread mb-3 pb-3 border-bottom" id="comment-{{ $comment->id }}">
     <div class="d-flex gap-2">
-        <img src="{{ $comment->user?->avatar_url ?? asset('images/default-avatar.png') }}"
-             class="rounded-circle flex-shrink-0" width="36" height="36" style="object-fit: cover;">
+        <img src="{{ $comment->user?->avatar_url ?? '/images/default-avatar.png' }}" 
+             class="rounded-circle flex-shrink-0" width="36" height="36">
         <div class="flex-grow-1 min-width-0">
             <div class="d-flex gap-2 align-items-center mb-1">
-                <strong style="font-size: 0.8125rem;">{{ $comment->user?->name ?? 'Unknown' }}</strong>
+                <strong style="font-size:0.8125rem;">{{ $comment->user?->name ?? 'Unknown' }}</strong>
                 <small class="text-muted">{{ $comment->created_at->diffForHumans() }}</small>
-                @if($comment->is_edited)
-                    <small class="text-muted" title="Edited {{ $comment->edited_at?->diffForHumans() }}">
-                        <i class="fas fa-pencil-alt"></i> edited
-                    </small>
-                @endif
                 @if($comment->is_internal)
                     <span class="badge bg-warning text-dark" style="font-size:0.6rem;">Internal</span>
                 @endif
             </div>
 
-            {{-- Content (editable) --}}
-            <div class="comment-content-wrapper" id="comment-content-{{ $comment->id }}">
-                @if($comment->content)
-                    <div class="comment-text mb-1" style="font-size: 0.8125rem; word-break: break-word;">
+            {{-- Comment Content --}}
+            <div class="comment-text mb-1" id="comment-content-{{ $comment->id }}" style="font-size:0.8125rem;word-break:break-word;">
+                {!! nl2br(e($comment->content)) !!}
+            </div>
+
+            {{-- Comment Attachments --}}
+            @if($comment->attachments && count($comment->attachments) > 0)
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    @foreach($comment->attachments as $attachment)
                         @php
-                            $content = $comment->content;
-                            $content = preg_replace('/@(\w+)/', '<span class="text-primary fw-medium">@$1</span>', $content);
-                            $content = preg_replace('/#(\w+)/', '<span class="text-success fw-medium">#$1</span>', $content);
-                            $content = nl2br(e($content));
-                            $content = str_replace(
-                                ['&lt;span class=&quot;text-primary fw-medium&quot;&gt;', '&lt;span class=&quot;text-success fw-medium&quot;&gt;', '&lt;/span&gt;'],
-                                ['<span class="text-primary fw-medium">', '<span class="text-success fw-medium">', '</span>'],
-                                $content
-                            );
+                            $url = Storage::url($attachment['path']);
+                            $isImage = str_starts_with($attachment['type'] ?? '', 'image/');
+                            $fileName = $attachment['name'] ?? 'File';
+                            $ext = pathinfo($fileName, PATHINFO_EXTENSION);
                         @endphp
-                        {!! $content !!}
-                    </div>
-                @endif
-
-                {{-- Attachments --}}
-                @if($comment->attachments && count($comment->attachments) > 0)
-                    <div class="mt-2">
-                        @php $inlineImages = collect($comment->attachments)->filter(fn($a) => str_starts_with($a['type'] ?? '', 'image/')); @endphp
-                        @if($inlineImages->count() > 0)
-                            <div class="d-flex flex-wrap gap-2 mb-2">
-                                @foreach($inlineImages as $img)
-                                    <a href="{{ Storage::url($img['path']) }}" target="_blank">
-                                        <img src="{{ Storage::url($img['path']) }}"
-                                             style="max-width:200px;max-height:200px;object-fit:cover;border-radius:8px;cursor:pointer;"
-                                             class="img-thumbnail border-0 p-0">
-                                    </a>
-                                @endforeach
-                            </div>
+                        
+                        @if($isImage)
+                            <img src="{{ $url }}" 
+                                 style="max-width:150px;max-height:150px;object-fit:cover;border-radius:8px;cursor:pointer;" 
+                                 class="border comment-attachment-img"
+                                 data-url="{{ $url }}"
+                                 data-name="{{ $fileName }}"
+                                 data-type="image"
+                                 loading="lazy"
+                                 onclick="openCommentMediaInModal('{{ $url }}', '{{ addslashes($fileName) }}', 'image'); return false;">
+                        @else
+                            @php
+                                $icon = 'fa-file';
+                                if (in_array($ext, ['pdf'])) $icon = 'fa-file-pdf';
+                                elseif (in_array($ext, ['doc', 'docx'])) $icon = 'fa-file-word';
+                                elseif (in_array($ext, ['xls', 'xlsx', 'csv'])) $icon = 'fa-file-excel';
+                                elseif (in_array($ext, ['zip', 'rar', '7z'])) $icon = 'fa-file-archive';
+                                elseif (in_array($ext, ['txt', 'log'])) $icon = 'fa-file-alt';
+                            @endphp
+                            <span class="badge bg-light text-dark text-decoration-none d-inline-flex align-items-center gap-1 comment-file-attachment"
+                                 style="font-size:0.7rem;padding:6px 10px;cursor:pointer;"
+                                 data-url="{{ $url }}"
+                                 data-name="{{ $fileName }}"
+                                 data-type="document"
+                                 onclick="openCommentMediaInModal('{{ $url }}', '{{ addslashes($fileName) }}', 'document'); return false;">
+                                <i class="fas {{ $icon }} text-muted"></i>{{ $fileName }}
+                            </span>
                         @endif
-                        @php $files = collect($comment->attachments)->filter(fn($a) => !str_starts_with($a['type'] ?? '', 'image/')); @endphp
-                        @if($files->count() > 0)
-                            <div class="d-flex flex-wrap gap-1">
-                                @foreach($files as $file)
-                                    <a href="{{ Storage::url($file['path']) }}" target="_blank"
-                                       class="badge bg-light text-dark text-decoration-none d-inline-flex align-items-center gap-1"
-                                       style="font-size:0.7rem;padding:6px 10px;">
-                                        <i class="fas fa-file text-muted"></i>
-                                        <span>{{ $file['name'] }}</span>
-                                    </a>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                @endif
-            </div>
-
-            {{-- Edit Form (hidden by default) --}}
-            <div class="comment-edit-wrapper d-none" id="comment-edit-{{ $comment->id }}">
-                <textarea class="form-control form-control-sm edit-textarea" rows="2"
-                          id="edit-textarea-{{ $comment->id }}">{{ $comment->content }}</textarea>
-                <div class="d-flex gap-1 mt-1">
-                    <button class="btn btn-primary btn-sm save-edit-btn" data-comment-id="{{ $comment->id }}">
-                        <i class="fas fa-save me-1"></i>Save
-                    </button>
-                    <button class="btn btn-light btn-sm cancel-edit-btn" data-comment-id="{{ $comment->id }}">
-                        Cancel
-                    </button>
+                    @endforeach
                 </div>
-            </div>
+            @endif
 
-            {{-- Actions --}}
+            {{-- Reply Button --}}
             <div class="d-flex gap-2 mt-1">
-                <button class="btn btn-link btn-sm text-muted p-0 reply-toggle-btn" style="font-size:0.6875rem;"
-                        data-comment-id="{{ $comment->id }}"
-                        data-username="{{ $comment->user?->name ?? 'User' }}">
+                <button class="btn btn-link btn-sm text-muted p-0 reply-toggle-btn" style="font-size:0.6875rem;" 
+                        data-comment-id="{{ $comment->id }}" data-username="{{ $comment->user?->name ?? 'User' }}">
                     <i class="fas fa-reply me-1"></i>Reply
                 </button>
-
-                {{-- Edit/Delete - Only for comment owner or admin --}}
-                @if(Auth::id() === $comment->user_id || Auth::user()->isAdmin())
-                    <button class="btn btn-link btn-sm text-muted p-0 edit-comment-btn" style="font-size:0.6875rem;"
-                            data-comment-id="{{ $comment->id }}">
-                        <i class="fas fa-edit me-1"></i>Edit
-                    </button>
-                    <button class="btn btn-link btn-sm text-muted p-0 delete-comment-btn" style="font-size:0.6875rem;"
-                            data-comment-id="{{ $comment->id }}">
-                        <i class="fas fa-trash me-1"></i>Delete
-                    </button>
-                @endif
             </div>
 
             {{-- Replies Container --}}

@@ -142,5 +142,16 @@ return [
         'notification_retention_days' => 30,
         'activity_log_retention_days' => 90,
     ],
+    
+    /*
+    |--------------------------------------------------------------------------
+    | SAMANVAY Contact Information
+    |--------------------------------------------------------------------------
+    */
+    'samanvay' => [
+        'email' => env('SAMANVAY_EMAIL', 'team@ddg.nscbiairport.com'),
+        'phone' => env('SAMANVAY_PHONE', '+91-763-394-7548'),
+        'website' => env('SAMANVAY_WEBSITE', 'https://ddg.nscbiairport.com'),
+    ],
 
 ];

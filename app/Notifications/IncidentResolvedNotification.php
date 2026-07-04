@@ -47,7 +47,9 @@ class IncidentResolvedNotification extends Notification implements ShouldQueue
             ->line("**Resolution Notes:** " . ($this->incident->resolution_notes ?? 'No notes provided'))
             ->action('View Incident', $url)
             ->line('The incident has been marked as resolved.')
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+                        ->salutation("Regards,\nSAMANVAY");
+
     }
 
     /**

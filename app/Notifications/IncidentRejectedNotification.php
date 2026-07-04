@@ -38,7 +38,9 @@ class IncidentRejectedNotification extends Notification implements ShouldQueue
             ->line("**Reason:** {$this->incident->rejection_reason}")
             ->action('View Incident', $url)
             ->line('Please review the rejection reason and resubmit if necessary.')
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+                        ->salutation("Regards,\nSAMANVAY");
+
     }
 
     public function toArray(object $notifiable): array

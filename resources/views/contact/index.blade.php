@@ -11,7 +11,7 @@
         align-items: center;
         justify-content: center;
         padding: 20px;
-        background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 50%, #f5f3ff 100%);
+        /*background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 50%, #f5f3ff 100%);*/
     }
 
     .contact-card {

@@ -25,6 +25,7 @@
                     <table class="table table-sm mb-0">
                         <tr><td class="text-muted">Slug</td><td class="fw-medium">{{ $category->slug }}</td></tr>
                         <tr><td class="text-muted">Description</td><td>{{ $category->description ?? 'N/A' }}</td></tr>
+                        <tr><td class="text-muted">Preffered Department</td><td>{{ $category->department->name ?? 'N/A' }}</td></tr>
                         <tr><td class="text-muted">Parent</td><td>{{ $category->parent?->name ?? 'None' }}</td></tr>
                         <tr><td class="text-muted">SLA</td><td><span class="badge bg-info">{{ $category->sla_formatted }}</span></td></tr>
                         <tr><td class="text-muted">Default Priority</td><td>

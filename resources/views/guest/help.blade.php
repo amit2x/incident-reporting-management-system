@@ -6,7 +6,7 @@
 @push('styles')
 <style>
     .help-container {
-        max-width: 860px;
+        /*max-width: 860px;*/
         margin: 0 auto;
         padding: 40px 20px;
     }

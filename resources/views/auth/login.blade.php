@@ -4,13 +4,15 @@
 
 @push('styles')
 <style>
+
+
     .login-container {
-        min-height: calc(90vh - var(--topbar-height));
+        /*min-height: calc(90vh - var(--topbar-height));*/
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 20px;
-        background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 50%, #f5f3ff 100%);
+        padding-top: 60px;
+        /*background: linear-gradient(135deg, #f0f5ff 0%, #e8f0fe 50%, #f5f3ff 100%);*/
     }
 
     .login-card {
@@ -25,16 +27,16 @@
 
     .login-header {
         background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
-        padding: 32px 24px;
+        /*padding: 32px 24px;*/
         text-align: center;
         color: white;
     }
 
     .login-logo {
-        width: 64px;
-        height: 64px;
+        /*width: 64px;*/
+        /*height: 64px;*/
         border-radius: 16px;
-        background: white;
+        /*background: white;*/
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -43,8 +45,8 @@
     }
 
     .login-logo img {
-        width: 40px;
-        height: 40px;
+        /*width: 40px;*/
+        /*height: 40px;*/
         object-fit: contain;
     }
 
@@ -330,7 +332,7 @@
         }
 
         .login-header {
-            padding: 24px 20px;
+            /*padding: 24px 20px;*/
         }
 
         .captcha-row {
@@ -351,11 +353,11 @@
         {{-- Header --}}
         <div class="login-header">
             <div class="login-logo">
-                <img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo"
+                <img src="{{ asset('images/master-logo.webp') }}" alt="IRMSystem Logo"
                     onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-shield-halved\' style=\'font-size: 28px; color: #1a56db;\'></i>';">
             </div>
             <h4>Welcome Back</h4>
-            <p>Sign in to your IRMSystem account</p>
+            <p>Sign in to your <strong>SAMANVAY</strong> account</p>
         </div>
 
         {{-- Form --}}
@@ -418,8 +420,10 @@
 
                 {{-- Remember & Forgot --}}
                 <div class="d-flex justify-content-between align-items-center">
+                
                     <div class="remember-check">
-                        <input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }}>
+                        <input type="checkbox" name="remember" id="remember"
+                            {{ old('remember', true) ? 'checked' : '' }}>
                         <label for="remember">Remember me</label>
                     </div>
                     @if (Route::has('password.request'))

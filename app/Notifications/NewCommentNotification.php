@@ -47,7 +47,9 @@ class NewCommentNotification extends Notification implements ShouldQueue
             ->line("**{$this->comment->user->name}** commented on incident #{$this->incident->incident_id}:")
             ->line("\"{$this->comment->content}\"")
             ->action('View Comment', $url)
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+                        ->salutation("Regards,\nSAMANVAY");
+
     }
 
     /**

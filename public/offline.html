@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - SAMANVAY</title>
+    <style>
+        :root {
+            --primary-blue: #0A3C73;
+            --accent-teal: #00B1A9;
+            --text-dark: #333333;
+            --bg-light: #F4F7F9;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        .container {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            max-width: 450px;
+            width: 90%;
+            border-top: 5px solid var(--primary-blue);
+        }
+
+        /* Brand Header Style */
+        .brand-title {
+            color: var(--primary-blue);
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 10px 0 5px 0;
+            letter-spacing: 1px;
+        }
+
+        .brand-subtitle {
+            color: var(--text-dark);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 30px;
+        }
+
+        /* Offline Icon Simulation */
+        .offline-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px auto;
+            border: 4px solid var(--accent-teal);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .offline-icon::before {
+            content: "⚡";
+            font-size: 2.5rem;
+            color: var(--accent-teal);
+        }
+
+        h2 {
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        /* Interactive Retry Button */
+        .retry-btn {
+            background-color: var(--primary-blue);
+            color: #ffffff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 4px 10px rgba(10, 60, 115, 0.2);
+        }
+
+        .retry-btn:hover {
+            background-color: #082d56;
+        }
+
+        .retry-btn:active {
+            transform: scale(0.98);
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 0.75rem;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <div class="brand-title">समन्वय</div>
+        <div class="brand-subtitle">SAMANVAY</div>
+        
+        <div class="offline-icon"></div>
+        
+        <h2>Connection Lost</h2>
+        <p>You are currently offline. SAMANVAY requires an active internet connection to sync live operational data.</p>
+        
+        <!-- Functional retry trigger -->
+        <button class="retry-btn" onclick="window.location.reload()">Retry Connection</button>
+        
+        <div class="footer">NSCBI Airport Kolkata</div>
+    </div>
+
+</body>
+</html>

@@ -1,9 +1,26 @@
 <aside class="desktop-sidebar" id="desktopSidebar">
     {{-- Brand --}}
+    <!--<div class="sidebar-brand">-->
+    <!--    <i class="fas fa-shield-halved"></i>-->
+    <!--    <span>IRMSystem</span>-->
+    <!--</div>-->
+    
+    {{-- Brand --}}
     <div class="sidebar-brand">
-        <i class="fas fa-shield-halved"></i>
-        <span>IRMSystem</span>
+        @if(file_exists(public_path('images/master-logo.webp')))
+            <img src="{{ asset('images/master-logo.webp') }}" 
+                 alt="IRMSystem Logo" 
+                 class="p-0" 
+                 width="150" 
+                 height="50" 
+                 fetchpriority="high"
+                 style="width: 100%; height: auto; object-fit: contain;">
+        @else
+            <i class="fas fa-shield-halved"></i>
+            <span>IRMSystem</span>
+        @endif
     </div>
+
 
     {{-- Navigation --}}
     <nav class="sidebar-nav">
@@ -23,13 +40,14 @@
                     class="nav-link {{ request()->routeIs('incidents.*') && !request()->routeIs('incidents.create') ? 'active' : '' }}">
                     <i class="fas fa-clipboard-list"></i>
                     <span>All Incidents</span>
-                    @php $openCount = \App\Models\Incident::whereIn('status',
-                    ['open','acknowledged','in_progress'])->count(); @endphp
-                    @if($openCount > 0)
-                    <span class="badge bg-danger ms-auto">{{ $openCount }}</span>
+                    
+                    @if(($globalOpenIncidentCount ?? 0) > 0)
+                        <span class="badge bg-danger ms-auto">{{ $globalOpenIncidentCount }}</span>
                     @endif
+
                 </a>
             </div>
+            @can('view-reports')
             <div class="nav-item">
                 <a href="{{ route('incidents.create') }}"
                     class="nav-link {{ request()->routeIs('incidents.create') ? 'active' : '' }}">
@@ -37,6 +55,7 @@
                     <span>Report Incident</span>
                 </a>
             </div>
+            @endcan
         </div>
 
         {{-- Reports Section --}}

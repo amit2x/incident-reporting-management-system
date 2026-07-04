@@ -54,7 +54,9 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
             ->line("**Priority:** " . ucfirst($this->incident->priority))
             ->action('View Incident', $url)
             ->line('This escalation requires your immediate response.')
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+                        ->salutation("Regards,\nSAMANVAY");
+
     }
 
     /**

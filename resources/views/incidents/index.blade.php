@@ -11,9 +11,20 @@ $activeTab = request('tab', 'all');
 
 @push('styles')
 <style>
+    /* Modern Variables */
+    :root {
+        --primary-color: #4361ee;
+        --success-color: #06ffa5;
+        --warning-color: #ff9f1c;
+        --danger-color: #ef233c;
+        --dark-color: #2b2d42;
+        --light-bg: #f8f9fa;
+    }
+
+    /* Quick Stats Cards */
     .quick-stat-card {
-        border: 2px solid #e5e7eb;
-        border-radius: 12px;
+        border: 1px solid #e9ecef;
+        border-radius: 14px;
         padding: 12px 8px;
         text-align: center;
         transition: all 0.2s;
@@ -24,37 +35,230 @@ $activeTab = request('tab', 'all');
     }
 
     .quick-stat-card:hover {
-        border-color: #3b82f6;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-color: var(--primary-color);
     }
 
     .quick-stat-card.active {
-        border-color: #3b82f6;
-        background: #eff6ff;
+        border-color: var(--primary-color);
+        background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
     }
 
     .quick-stat-value {
-        font-size: 1.25rem;
+        font-size: 1.5rem;
         font-weight: 700;
         line-height: 1;
         margin-bottom: 4px;
     }
 
     .quick-stat-label {
-        font-size: 0.65rem;
-        color: #6b7280;
+        font-size: 0.7rem;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Modern Card Design */
+    .incident-card {
+        background: white;
+        border-radius: 16px;
+        margin-bottom: 14px;
+        transition: all 0.25s ease;
+        border: 1px solid #e9ecef;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .incident-card:active {
+        transform: scale(0.99);
+    }
+
+    /* Compact Action Buttons */
+    .action-buttons {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding: 10px 16px;
+        background: #fff;
+        border-top: 1px solid #f0f0f0;
+    }
+
+    .action-icon-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 40px;
+        font-size: 0.85rem;
         font-weight: 500;
+        color: #6c757d;
+        background: transparent;
+        border: none;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .action-icon-btn i {
+        font-size: 1.1rem;
+    }
+
+    .action-icon-btn:hover {
+        background: #f8f9fa;
+        color: var(--primary-color);
+    }
+
+    .action-icon-btn.view-btn:hover {
+        color: var(--primary-color);
+    }
+
+    .action-icon-btn.comment-btn:hover {
+        color: #06ffa5;
+    }
+
+    .action-icon-btn.share-btn:hover {
+        color: #ff9f1c;
+    }
+
+    /* Badge Styles */
+    .priority-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .priority-critical { background: linear-gradient(135deg, #ef233c, #dc2626); color: white; }
+    .priority-high { background: linear-gradient(135deg, #ff9f1c, #f97316); color: white; }
+    .priority-medium { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #78350f; }
+    .priority-low { background: linear-gradient(135deg, #06ffa5, #10b981); color: white; }
+
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .status-open { background: #dbeafe; color: #1e40af; }
+    .status-acknowledged { background: #fed7aa; color: #92400e; }
+    .status-in-progress { background: #e9d5ff; color: #5b21b6; }
+    .status-escalated { background: #fee2e2; color: #dc2626; }
+    .status-resolved { background: #d1fae5; color: #065f46; }
+    .status-closed { background: #e5e7eb; color: #374151; }
+
+    /* Info Badges */
+    .info-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f8f9fa;
+        padding: 5px 12px;
+        border-radius: 30px;
+        font-size: 0.7rem;
+        color: #4b5563;
+        font-weight: 500;
+    }
+
+    .info-chip i {
+        font-size: 0.7rem;
+        color: var(--primary-color);
+    }
+
+    /* Media Grid */
+    .media-grid {
+        display: grid;
+        gap: 6px;
+        padding: 0 16px 12px 16px;
+    }
+
+    .media-item {
+        position: relative;
+        aspect-ratio: 16/9;
+        background: #f8f9fa;
+        border-radius: 12px;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .media-item img,
+    .media-item video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .media-item:hover img,
+    .media-item:hover video {
+        transform: scale(1.05);
+    }
+
+    .media-count {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    /* Modal Fix - Important */
+    .modal.show {
+        background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    .modal.show .modal-content {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+    }
+
+    /* Table View */
+    .table-view-container {
+        overflow-x: auto;
+    }
+
+    .incident-table {
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    .incident-table th {
+        background: #f8f9fa;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #4b5563;
+        padding: 12px;
+        border-bottom: 2px solid #e5e7eb;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .incident-table td {
+        padding: 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f0f0f0;
     }
 
     .incident-row {
         cursor: pointer;
-        transition: background 0.15s;
+        transition: background 0.2s;
     }
 
     .incident-row:hover {
-        background: #f8fafc;
+        background: #f8f9fa;
     }
-
+    
     .nav-tabs-custom .nav-link {
         border: none;
         color: #6b7280;
@@ -93,491 +297,238 @@ $activeTab = request('tab', 'all');
         padding: 2px 8px;
     }
 
-    .view-toggle-btn {
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid #e5e7eb;
-        background: white;
-        cursor: pointer;
-        transition: all 0.2s;
-        color: #6b7280;
+    /* Responsive */
+    @media (max-width: 768px) {
+        .quick-stat-value {
+            font-size: 1.1rem;
+        }
+        
+        .action-icon-btn span {
+            display: inline;
+        }
+        
+        .action-icon-btn {
+            padding: 6px 8px;
+        }
     }
 
-    .view-toggle-btn.active {
-        background: #eff6ff;
-        border-color: #3b82f6;
-        color: #3b82f6;
+    @media (min-width: 769px) {
+        #cardsView { display: none; }
+        #tableView { display: block; }
     }
 
-    .view-toggle-btn:hover {
-        border-color: #3b82f6;
+    @media (max-width: 768px) {
+        #cardsView { display: block; }
+        #tableView { display: none; }
     }
-
-
-    /* Hide scrollbars on modern desktop environments while maintaining touch actions */
-    .nav-tabs-custom::-webkit-scrollbar {
-        display: none;
+    
+    {{-- Add Webkit scrollbar cleaner block to your CSS file --}}
+    .nav-tabs::-webkit-scrollbar {
+        display: none !important;
     }
-
-    .nav-tabs-custom {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-    }
-
     .me-1_5 {
         margin-right: 0.375rem !important;
     }
-
     .ms-1_5 {
         margin-left: 0.375rem !important;
-    }
-
-    /* Add smooth fade indicators for horizontal mobile panning */
-    @media (max-width: 767.98px) {
-        .tabs-container-responsive::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            height: 100%;
-            width: 32px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 100%);
-            pointer-events: none;
-            z-index: 2;
-        }
     }
 </style>
 @endpush
 
 @section('content')
-{{-- <div class="container-fluid px-3 py-3"> --}}
-    <div class="py-3">
+<div class="py-3">
+    {{-- Header --}}
+    <div class="d-flex justify-content-between align-items-center mb-3 px-2">
+        <div>
+            <h4 class="fw-bold mb-0" style="color: var(--dark-color);">Incidents</h4>
+            <p class="text-muted small mb-0">Track and manage all incidents</p>
+        </div>
+        <a href="{{ route('incidents.create') }}" class="btn btn-primary rounded-pill px-4">
+            <i class="fas fa-plus me-2"></i>New Incident
+        </a>
+    </div>
 
-        {{-- Header --}}
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-            <div>
-                <h4 class="fw-bold mb-1">Incidents</h4>
-                <p class="text-muted small mb-0">View and manage all reported incidents</p>
-            </div>
-            <a href="{{ route('incidents.create') }}" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> Report Incident
+    {{-- Quick Stats --}}
+    <div class="row g-2 mb-3 px-2">
+        @php
+        $statusList = [
+            'open' => ['label' => 'Open', 'color' => '#3B82F6', 'icon' => 'fa-circle-info'],
+            'acknowledged' => ['label' => 'Acknowledged', 'color' => '#F59E0B', 'icon' => 'fa-eye'],
+            'in_progress' => ['label' => 'In Progress', 'color' => '#8B5CF6', 'icon' => 'fa-spinner'],
+            'escalated' => ['label' => 'Escalated', 'color' => '#EF4444', 'icon' => 'fa-arrow-up'],
+            'resolved' => ['label' => 'Resolved', 'color' => '#10B981', 'icon' => 'fa-check-circle'],
+            'closed' => ['label' => 'Closed', 'color' => '#6B7280', 'icon' => 'fa-times-circle']
+        ];
+        @endphp
+        @foreach($statusList as $key => $status)
+        <div class="col-4 col-md-2">
+            <a href="{{ route('incidents.index', ['status' => $key]) }}"
+                class="quick-stat-card {{ request('status') == $key ? 'active' : '' }}">
+                <div class="quick-stat-value" style="color: {{ $status['color'] }}">{{ $stats[$key] ?? 0 }}</div>
+                <div class="quick-stat-label">
+                    <i class="fas {{ $status['icon'] }} me-1" style="font-size: 0.6rem;"></i>
+                    {{ $status['label'] }}
+                </div>
             </a>
         </div>
+        @endforeach
+    </div>
 
-        {{-- Quick Stats --}}
-        <div class="row g-2 mb-3">
-            @php
-            $statusList = [
-            'open' => ['label' => 'Open', 'color' => '#3B82F6'],
-            'acknowledged' => ['label' => 'Acknowledged', 'color' => '#F59E0B'],
-            'in_progress' => ['label' => 'In Progress', 'color' => '#8B5CF6'],
-            'escalated' => ['label' => 'Escalated', 'color' => '#EF4444'],
-            'resolved' => ['label' => 'Resolved', 'color' => '#10B981'],
-            'closed' => ['label' => 'Closed', 'color' => '#6B7280']
-            ];
-            @endphp
-            @foreach($statusList as $key => $status)
-            <div class="col-4 col-md-2">
-                <a href="{{ route('incidents.index', ['status' => $key]) }}"
-                    class="quick-stat-card {{ request('status') == $key ? 'active' : '' }}">
-                    <div class="quick-stat-value" style="color: {{ $status['color'] }}">{{ $stats[$key] ?? 0 }}</div>
-                    <div class="quick-stat-label">{{ $status['label'] }}</div>
-                </a>
+   
+    
+    {{-- Tabs --}}
+    <div class="px-2 overflow-hidden">
+    <ul class="nav nav-tabs border-0 gap-2 flex-nowrap overflow-x-auto overflow-y-hidden" style="scrollbar-width: none; -ms-overflow-style: none;">
+        <li class="nav-item d-flex d-md-inline-flex">
+            <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'all' ? 'active bg-primary text-white' : 'bg-light text-dark' }}" 
+               href="{{ route('incidents.index', ['tab' => 'all']) }}">
+                <i class="fas fa-list me-1_5"></i> <span>All</span>
+                <span class="badge rounded-pill {{ $activeTab === 'all' ? 'bg-white text-primary' : 'bg-secondary text-white' }} ms-1_5 lh-1 px-2 py-1 small fw-bold">{{ $stats['total'] ?? 0 }}</span>
+            </a>
+        </li>
+        <li class="nav-item d-flex d-md-inline-flex">
+            <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'escalated' ? 'active bg-danger text-white' : 'bg-light text-dark' }}" 
+               href="{{ route('incidents.index', ['tab' => 'escalated']) }}">
+                <i class="fas fa-arrow-up me-1_5 text-warning text-center"></i> <span>Escalated</span>
+                @if(($escalatedCount = $stats['escalated'] ?? 0) > 0)
+                <span class="badge rounded-pill bg-white text-danger ms-1_5 lh-1 px-2 py-1 small fw-bold">{{ $escalatedCount }}</span>
+                @endif
+            </a>
+        </li>
+        <li class="nav-item d-flex d-md-inline-flex">
+            <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'assigned' ? 'active bg-success text-white' : 'bg-light text-dark' }}" 
+               href="{{ route('incidents.index', ['tab' => 'assigned']) }}">
+                <i class="fas fa-user-check me-1_5 text-primary"></i> <span>Assigned</span>
+                @if(($assignedCount = $stats['assigned'] ?? 0) > 0)
+                <span class="badge rounded-pill bg-white text-success ms-1_5 lh-1 px-2 py-1 small fw-bold">{{ $assignedCount }}</span>
+                @endif
+            </a>
+        </li>
+        <li class="nav-item d-flex d-md-inline-flex">
+            <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'history' ? 'active bg-info text-white' : 'bg-light text-dark' }}" 
+               href="{{ route('incidents.index', ['tab' => 'history']) }}">
+                <i class="fas fa-history me-1_5"></i> <span>History</span>
+            </a>
+        </li>
+        <li class="nav-item d-flex d-md-inline-flex">
+            <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'reported' ? 'active bg-warning text-dark' : 'bg-light text-dark' }}" 
+               href="{{ route('incidents.index', ['tab' => 'reported']) }}">
+                <i class="fas fa-pen me-1_5"></i> <span>My Reports</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+
+
+    {{-- Filters --}}
+    
+    {{-- Filters - Collapsible on Mobile --}}
+    @if($activeTab === 'all')
+    <div class="card shadow-sm mt-3 border-0 rounded-3">
+        <div class="card-body py-3">
+            {{-- Filter Toggle Button for Mobile --}}
+            <div class="d-md-none">
+                <button class="btn btn-outline-primary w-100 rounded-pill d-flex justify-content-between align-items-center" 
+                        type="button" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#filterCollapse" 
+                        aria-expanded="false" 
+                        aria-controls="filterCollapse">
+                    <span><i class="fas fa-filter me-2"></i>Filter Incidents</span>
+                    <i class="fas fa-chevron-down toggle-icon"></i>
+                </button>
             </div>
-            @endforeach
-        </div>
-
-        {{-- ========================================== --}}
-        {{-- TABS: All | Escalated to Me | Assigned to Me --}}
-        {{-- ========================================== --}}
-        {{-- <ul class="nav nav-tabs-custom mb-0 flex-nowrap overflow-x-auto text-nowrap" role="tablist"
-            style="border-bottom: 1px solid #e5e7eb; -webkit-overflow-scrolling: touch;">
-            <li class="nav-item">
-                <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'all' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'all'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-list me-1"></i> All
-                    <span class="badge rounded-pill bg-light text-dark ms-1 align-self-start"
-                        style="font-size: 0.75em; transform: translateY(-3px);">
-                        {{ $stats['total'] ?? 0 }}
-                    </span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'escalated' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'escalated'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-arrow-up text-warning me-1"></i> Escalated
-                    @php
-                    $escalatedCount = \App\Models\Incident::where('escalated_to', $user->id)->where('status',
-                    'escalated')->count();
-                    @endphp
-                    @if($escalatedCount > 0)
-                    <span class="badge rounded-pill bg-warning text-dark ms-1 align-self-start"
-                        style="font-size: 0.75em; transform: translateY(-3px);">
-                        {{ $escalatedCount }}
-                    </span>
-                    @endif
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'assigned' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'assigned'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-user-check text-primary me-1"></i> Assigned
-                    @php
-                    $assignedCount = \App\Models\Incident::where('assigned_to', $user->id)->whereIn('status',
-                    ['open','acknowledged','in_progress'])->count();
-                    @endphp
-                    @if($assignedCount > 0)
-                    <span class="badge rounded-pill bg-primary ms-1 align-self-start"
-                        style="font-size: 0.75em; transform: translateY(-3px);">
-                        {{ $assignedCount }}
-                    </span>
-                    @endif
-                </a>
-            </li>
-        </ul> --}}
-
-
-        {{-- Tabs --}}
-        {{-- <ul class="nav nav-tabs-custom mb-0" role="tablist" style="border-bottom: 1px solid #e5e7eb;">
-            <li class="nav-item">
-                <a class="nav-link {{ $activeTab === 'all' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'all'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-list me-1"></i> All Incidents
-                    <span class="badge bg-light text-dark ms-1">{{ $stats['total'] ?? 0 }}</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ $activeTab === 'escalated' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'escalated'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-arrow-up text-warning me-1"></i> Escalated to Me
-                    @php $escalatedCount = \App\Models\Incident::where('escalated_to', $user->id)->where('status',
-                    'escalated')->count(); @endphp
-                    @if($escalatedCount > 0)
-                    <span class="badge bg-warning text-dark ms-1">{{ $escalatedCount }}</span>
-                    @endif
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ $activeTab === 'assigned' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'assigned'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-user-check text-primary me-1"></i> Assigned to Me
-                    @php $assignedCount = \App\Models\Incident::where('assigned_to', $user->id)->whereIn('status',
-                    ['open','acknowledged','in_progress'])->count(); @endphp
-                    @if($assignedCount > 0)
-                    <span class="badge bg-primary ms-1">{{ $assignedCount }}</span>
-                    @endif
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ $activeTab === 'history' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'history'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-history text-info me-1"></i> My History
-                    @php
-                    $historyCount = \App\Models\Incident::where(function($q) use ($user) {
-                    $q->where('reported_by', $user->id)
-                    ->orWhere('assigned_to', $user->id)
-                    ->orWhere('escalated_to', $user->id)
-                    ->orWhereHas('escalations', fn($e) => $e->where('escalated_to', $user->id))
-                    ->orWhereHas('assignments', fn($a) => $a->where('assigned_to', $user->id))
-                    ->orWhereHas('comments', fn($c) => $c->where('user_id', $user->id));
-                    })->count();
-                    @endphp
-                    <span class="badge bg-info ms-1">{{ $historyCount }}</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ $activeTab === 'reported' ? 'active' : '' }}"
-                    href="{{ route('incidents.index', ['tab' => 'reported'] + request()->except('tab', 'page')) }}">
-                    <i class="fas fa-pen text-success me-1"></i> Reported by Me
-                    @php $reportedCount = \App\Models\Incident::where('reported_by', $user->id)->count(); @endphp
-                    @if($reportedCount > 0)
-                    <span class="badge bg-success ms-1">{{ $reportedCount }}</span>
-                    @endif
-                </a>
-            </li>
-        </ul> --}}
-
-
-        {{-- Responsive Tabs Component --}}
-        <div class="tabs-container-responsive position-relative w-100" style="border-bottom: 1px solid #e5e7eb;">
-            <ul class="nav nav-tabs-custom flex-nowrap mb-0 border-0" role="tablist"
-                style="overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; white-space: nowrap;">
-
-                {{-- Tab: All Incidents --}}
-                <li class="nav-item flex-shrink-0">
-                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'all' ? 'active' : '' }}"
-                        href="{{ route('incidents.index', ['tab' => 'all'] + request()->except('tab', 'page')) }}"
-                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
-                        <i class="fas fa-list me-1_5"></i>
-                        <span class="tab-text">All Incidents</span>
-                        <span class="badge bg-light text-dark ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{
-                            $stats['total'] ?? 0 }}</span>
-                    </a>
-                </li>
-
-                {{-- Tab: Escalated to Me --}}
-                <li class="nav-item flex-shrink-0">
-                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'escalated' ? 'active' : '' }}"
-                        href="{{ route('incidents.index', ['tab' => 'escalated'] + request()->except('tab', 'page')) }}"
-                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
-                        <i class="fas fa-arrow-up text-warning me-1_5"></i>
-                        <span class="tab-text">Escalated to Me</span>
-                        @php
-                        $escalatedCount = $stats['escalated'] ?? \App\Models\Incident::where('escalated_to',
-                        $user->id)->where('status', 'escalated')->count();
-                        @endphp
-                        @if($escalatedCount > 0)
-                        <span class="badge bg-warning text-dark ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{
-                            $escalatedCount }}</span>
+            
+            {{-- Filter Form - Collapsible on mobile, always visible on desktop --}}
+            <div class="collapse d-md-block" id="filterCollapse">
+                <form id="filterForm" method="GET" class="mt-3 mt-md-0">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-3">
+                            <input type="text" name="search" class="form-control form-control-sm rounded-pill"
+                                placeholder="🔍 Search incidents..." value="{{ request('search') }}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <select name="status" class="form-select form-select-sm rounded-pill">
+                                <option value="">All Status</option>
+                                <option value="open" {{ request('status')=='open' ? 'selected' : '' }}>Open</option>
+                                <option value="acknowledged" {{ request('status')=='acknowledged' ? 'selected' : '' }}>Acknowledged</option>
+                                <option value="in_progress" {{ request('status')=='in_progress' ? 'selected' : '' }}>In Progress</option>
+                                <option value="escalated" {{ request('status')=='escalated' ? 'selected' : '' }}>Escalated</option>
+                                <option value="resolved" {{ request('status')=='resolved' ? 'selected' : '' }}>Resolved</option>
+                                <option value="closed" {{ request('status')=='closed' ? 'selected' : '' }}>Closed</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <select name="severity" class="form-select form-select-sm rounded-pill">
+                                <option value="">All Severity</option>
+                                <option value="critical" {{ request('severity')=='critical' ? 'selected' : '' }}>Critical</option>
+                                <option value="high" {{ request('severity')=='high' ? 'selected' : '' }}>High</option>
+                                <option value="medium" {{ request('severity')=='medium' ? 'selected' : '' }}>Medium</option>
+                                <option value="low" {{ request('severity')=='low' ? 'selected' : '' }}>Low</option>
+                            </select>
+                        </div>
+                        @if($isAdmin)
+                        <div class="col-12 col-md-3">
+                            <select name="department_id" class="form-select form-select-sm rounded-pill">
+                                <option value="">All Departments</option>
+                                @foreach(\App\Models\Department::active()->ordered()->get() as $dept)
+                                <option value="{{ $dept->id }}" {{ request('department_id')==$dept->id ? 'selected' : '' }}>
+                                    {{ $dept->name }}
+                                </option>
+                                @endforeach
+                            </select>
+                        </div>
                         @endif
-                    </a>
-                </li>
-
-                {{-- Tab: Assigned to Me --}}
-                <li class="nav-item flex-shrink-0">
-                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'assigned' ? 'active' : '' }}"
-                        href="{{ route('incidents.index', ['tab' => 'assigned'] + request()->except('tab', 'page')) }}"
-                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
-                        <i class="fas fa-user-check text-primary me-1_5"></i>
-                        <span class="tab-text">Assigned to Me</span>
-                        @php
-                        $assignedCount = $stats['assigned'] ?? \App\Models\Incident::where('assigned_to',
-                        $user->id)->whereIn('status', ['open','acknowledged','in_progress'])->count();
-                        @endphp
-                        @if($assignedCount > 0)
-                        <span class="badge bg-primary ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{ $assignedCount
-                            }}</span>
-                        @endif
-                    </a>
-                </li>
-
-                {{-- Tab: My History --}}
-                <li class="nav-item flex-shrink-0">
-                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'history' ? 'active' : '' }}"
-                        href="{{ route('incidents.index', ['tab' => 'history'] + request()->except('tab', 'page')) }}"
-                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
-                        <i class="fas fa-history text-info me-1_5"></i>
-                        <span class="tab-text">My History</span>
-                        @php
-                        $historyCount = $stats['history'] ?? \App\Models\Incident::where(function($q) use ($user) {
-                        $q->where('reported_by', $user->id)
-                        ->orWhere('assigned_to', $user->id)
-                        ->orWhere('escalated_to', $user->id)
-                        ->orWhereHas('escalations', fn($e) => $e->where('escalated_to', $user->id))
-                        ->orWhereHas('assignments', fn($a) => $a->where('assigned_to', $user->id))
-                        ->orWhereHas('comments', fn($c) => $c->where('user_id', $user->id));
-                        })->count();
-                        @endphp
-                        <span class="badge bg-info ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{ $historyCount
-                            }}</span>
-                    </a>
-                </li>
-
-                {{-- Tab: Reported by Me --}}
-                <li class="nav-item flex-shrink-0">
-                    <a class="nav-link d-inline-flex align-items-center {{ $activeTab === 'reported' ? 'active' : '' }}"
-                        href="{{ route('incidents.index', ['tab' => 'reported'] + request()->except('tab', 'page')) }}"
-                        style="padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;">
-                        <i class="fas fa-pen text-success me-1_5"></i>
-                        <span class="tab-text">Reported by Me</span>
-                        @php
-                        $reportedCount = $stats['reported'] ?? \App\Models\Incident::where('reported_by',
-                        $user->id)->count();
-                        @endphp
-                        @if($reportedCount > 0)
-                        <span class="badge bg-success ms-1_5 rounded-pill" style="font-size: 0.75rem;">{{ $reportedCount
-                            }}</span>
-                        @endif
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-
-        {{-- Filters + List Card --}}
-        <div class="card shadow-sm" style="border-radius: 0 0 12px 12px;">
-            {{-- Filters (hidden for escalated/assigned tabs) --}}
-            @if($activeTab === 'all')
-            {{-- Filters Card --}}
-            <div class="card mb-3">
-                {{-- Mobile Toggle Header: Only visible on small screens --}}
-                <div class="card-header d-md-none bg-transparent border-0 py-2">
-                    <button
-                        class="btn btn-outline-secondary btn-sm w-100 d-flex align-items-center justify-content-between"
-                        type="button" data-bs-toggle="collapse" data-bs-target="#mobileFilterCollapse"
-                        aria-expanded="false" aria-controls="mobileFilterCollapse">
-                        <span><i class="fas fa-filter me-2"></i>Filter Incidents</span>
-                        <i class="fas fa-chevron-down toggle-icon"></i>
-                    </button>
-                    <div class="col-md-1 col-sm-4 ms-auto d-flex justify-content-end">
-                        <div class="d-flex gap-1">
-                            <button type="button" class="view-toggle-btn active" onclick="switchView('table')"
-                                id="tableBtn" title="Table"><i class="fas fa-list"></i></button>
-                            <button type="button" class="view-toggle-btn" onclick="switchView('cards')" id="cardsBtn"
-                                title="Cards"><i class="fas fa-th-large"></i></button>
+                        <div class="col-auto ms-auto">
+                            <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">
+                                <i class="fas fa-filter me-1"></i> Filter
+                            </button>
+                            <a href="{{ route('incidents.index') }}" class="btn btn-light btn-sm rounded-pill px-3">
+                                <i class="fas fa-redo"></i>
+                            </a>
                         </div>
                     </div>
-                </div>
-
-                {{-- Collapsible Container: Hidden on mobile by default, always visible on desktop via d-md-block --}}
-                <div class="collapse d-md-block" id="mobileFilterCollapse">
-                    <div class="card-body py-2 pt-0 pt-md-2">
-                        <form id="filterForm" method="GET" action="{{ route('incidents.index') }}">
-                            <div class="row g-2 align-items-end">
-                                {{-- Search --}}
-                                <div class="col-12 col-md-3">
-                                    <label class="form-label mb-1" style="font-size: 0.6875rem;">Search</label>
-                                    <input type="text" name="search" class="form-control form-control-sm"
-                                        placeholder="Search incidents..." value="{{ request('search') }}">
-                                </div>
-
-                                {{-- Status & Severity (Paired 50/50 on mobile) --}}
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label mb-1" style="font-size: 0.6875rem;">Status</label>
-                                    <select name="status" class="form-select form-select-sm">
-                                        <option value="">All Status</option>
-                                        <option value="open" {{ request('status')=='open' ? 'selected' : '' }}>Open
-                                        </option>
-                                        <option value="acknowledged" {{ request('status')=='acknowledged' ? 'selected'
-                                            : '' }}>
-                                            Acknowledged</option>
-                                        <option value="in_progress" {{ request('status')=='in_progress' ? 'selected'
-                                            : '' }}>In
-                                            Progress</option>
-                                        <option value="escalated" {{ request('status')=='escalated' ? 'selected' : ''
-                                            }}>
-                                            Escalated</option>
-                                        <option value="resolved" {{ request('status')=='resolved' ? 'selected' : '' }}>
-                                            Resolved
-                                        </option>
-                                        <option value="closed" {{ request('status')=='closed' ? 'selected' : '' }}>
-                                            Closed
-                                        </option>
-                                    </select>
-                                </div>
-
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label mb-1" style="font-size: 0.6875rem;">Severity</label>
-                                    <select name="severity" class="form-select form-select-sm">
-                                        <option value="">All Severity</option>
-                                        <option value="critical" {{ request('severity')=='critical' ? 'selected' : ''
-                                            }}>
-                                            Critical</option>
-                                        <option value="high" {{ request('severity')=='high' ? 'selected' : '' }}>High
-                                        </option>
-                                        <option value="medium" {{ request('severity')=='medium' ? 'selected' : '' }}>
-                                            Medium
-                                        </option>
-                                        <option value="low" {{ request('severity')=='low' ? 'selected' : '' }}>Low
-                                        </option>
-                                    </select>
-                                </div>
-
-                                {{-- Department Filter (Admin Only) --}}
-                                @if(Auth::user()->isAdmin())
-                                <div class="col-12 col-md-2">
-                                    <label class="form-label mb-1" style="font-size: 0.6875rem;">Department</label>
-                                    <select name="department_id" class="form-select form-select-sm">
-                                        <option value="">All Departments</option>
-                                        @foreach(\App\Models\Department::active()->ordered()->get() as $dept)
-                                        <option value="{{ $dept->id }}" {{ request('department_id')==$dept->id ?
-                                            'selected'
-                                            : ''
-                                            }}>
-                                            {{ $dept->name }}
-                                        </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                @endif
-
-                                {{-- Date From & Date To (Paired 50/50 on mobile) --}}
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label mb-1" style="font-size: 0.6875rem;">Date From</label>
-                                    <input type="date" name="date_from" class="form-control form-control-sm"
-                                        value="{{ request('date_from') }}">
-                                </div>
-
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label mb-1" style="font-size: 0.6875rem;">Date To</label>
-                                    <input type="date" name="date_to" class="form-control form-control-sm"
-                                        value="{{ request('date_to') }}">
-                                </div>
-
-                                {{-- Action Buttons --}}
-                                <div class="col-12 col-md-auto ms-md-auto d-flex gap-1 pt-2 pt-md-0">
-                                    <button type="submit" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 px-3"
-                                        title="Filter" data-bs-placement="top">
-                                        <i class="fas fa-filter me-1"></i>
-                                    </button>
-                                    <a href="{{ route('incidents.index') }}"
-                                        class="btn btn-light btn-sm flex-fill flex-md-grow-0" title="Redo"
-                                        data-bs-placement="top">
-                                        <i class="fas fa-redo"></i>
-                                    </a>
-
-                                    <div class="col-md-1 col-sm-4 ms-auto d-flex justify-content-end">
-                                        <div class="d-flex gap-1">
-                                            <button type="button" class="view-toggle-btn active"
-                                                onclick="switchView('table')" id="tableBtn" title="Table View"
-                                                data-bs-placement="top"><i class="fas fa-list"></i></button>
-                                            <button type="button" class="view-toggle-btn" onclick="switchView('cards')"
-                                                id="cardsBtn" title="Cards view" data-bs-placement="top"><i
-                                                    class="fas fa-th-large"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                </form>
             </div>
-            @endif
+        </div>
+    </div>
+    @endif
 
-            {{-- Content --}}
-            <div class="card-body p-0">
-                @if(isset($incidents) && count($incidents) > 0)
-                {{-- Table View --}}
-                <div id="tableView" class="table-responsive">
-                    <div class="table-responsive d-none d-md-block" id="listView">
-                        <table class="table table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 100px;">ID</th>
-                                    <th>Title</th>
-                                    @if(in_array($activeTab, ['history', 'reported']))
-                                    <th>Your Role</th>
-                                    @endif
+    {{-- Results --}}
+    <div class="card shadow-sm mt-3 border-0 rounded-3 overflow-hidden">
+        <div class="card-body p-0">
+            @if(isset($incidents) && count($incidents) > 0)
+            
+            {{-- Desktop Table View --}}
+            <div id="tableView">
+                <table class="incident-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            @if(in_array($activeTab, ['history', 'reported']))
+                            <th>Your Role</th>
+                            @endif
 
-                                    <th>Category</th>
-                                    <th>Department</th>
-                                    <th>Severity</th>
-                                    <th>Status</th>
-                                    <th>Assigned To</th>
-                                    <th>Reported</th>
-                                    <th style="width: 60px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($incidents as $incident)
-                                <tr>
-                                    <td>
-                                        <span class="badge bg-light text-dark">{{ $incident->incident_id }}</span>
-                                    </td>
-                                    <td>
-                                        <a href="{{ route('incidents.show', $incident) }}"
-                                            class="text-decoration-none fw-medium">
-                                            {{ Str::limit($incident->title, 50) }}
-                                        </a>
-                                    </td>
-                                    @if(in_array($activeTab, ['history', 'reported']))
-                                    <td>
-                                        @php
+                            <th>Category</th>
+                            <th>Department</th>
+                            <th>Severity</th>
+                            <th>Status</th>
+                            <th>Assigned To</th>
+                            <th>Created</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($incidents as $incident)
+                        <tr class="incident-row" data-href="{{ route('incidents.show', $incident->id) }}">
+                            <td><code class="small">{{ $incident->incident_id }}</code></td>
+                            <td class="fw-medium">{{ Str::limit($incident->title, 50) }}</td>
+                            @if(in_array($activeTab, ['history', 'reported']))
+                            <td>
+                                    @php
                                         $roles = [];
                                         if ($incident->reported_by === $user->id) $roles[] = '📝 Reporter';
                                         if ($incident->assigned_to === $user->id) $roles[] = '👤 Assigned';
@@ -588,191 +539,615 @@ $activeTab = request('tab', 'all');
                                         $roles[] = '📋 Assigned Out';
                                         if ($incident->comments()->where('user_id', $user->id)->exists()) $roles[] = '💬
                                         Commented';
-                                        @endphp
-                                        @foreach($roles as $role)
+                                    @endphp
+                                    @foreach($roles as $role)
                                         <span class="badge bg-light text-dark d-block mb-1 small">{{ $role }}</span>
-                                        @endforeach
-                                    </td>
-                                    @endif
+                                    @endforeach
+                            </td>
+                            @endif
 
-                                    <td>
-                                        <span class="badge"
-                                            style="background: {{ $incident->category?->color ?? '#6B7280' }}20; color: {{ $incident->category?->color ?? '#6B7280' }}">
-                                            {{ $incident->category?->name ?? 'N/A' }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge"
-                                            style="background: {{ $incident->department?->color ?? '#6B7280' }}20; color: {{ $incident->department?->color ?? '#6B7280' }}">
+                            <td><span class="badge info-chip py-1" 
+                                style="background: {{ $incident->category?->color ?? '#6B7280' }}20; color: {{ $incident->category?->color ?? '#6B7280'}}">
+                                {{ $incident->category?->name ?? 'N/A' }}</span>
+                            </td>
+                            <td>
+                                <span class="badge" style="background: {{ $incident->department?->color ?? '#6B7280' }}20; color: {{ $incident->department?->color ?? '#6B7280' }}">
                                             {{ $incident->department?->code ?? 'N/A' }}
                                         </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge priority-{{ $incident->severity }}">
-                                            {{ ucfirst($incident->severity) }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge status-{{ str_replace('_', '-', $incident->status) }}">
-                                            {{ str_replace('_', ' ', ucfirst($incident->status)) }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        @if($incident->assignedTo)
-                                        <div class="d-flex align-items-center gap-2">
-                                            <img src="{{ $incident->assignedTo->avatar_url }}" alt="Assignee"
-                                                class="rounded-circle" width="24" height="24">
-                                            <small>{{ $incident->assignedTo->name }}</small>
-                                        </div>
-                                        @else
-                                        <small class="text-muted">Unassigned</small>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">{{ $incident->created_at->diffForHumans() }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="dropdown">
-                                            <button class="btn btn-light btn-sm" data-bs-toggle="dropdown">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <div class="dropdown-menu dropdown-menu-end">
-                                                <a href="{{ route('incidents.show', $incident) }}"
-                                                    class="dropdown-item">
-                                                    <i class="fas fa-eye me-2"></i>View
-                                                </a>
-                                                @can('edit-incident')
-                                                <a href="{{ route('incidents.edit', $incident) }}"
-                                                    class="dropdown-item">
-                                                    <i class="fas fa-edit me-2"></i>Edit
-                                                </a>
-                                                @endcan
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                            </td>
+                            <td><span class="priority-badge priority-{{ $incident->priority }}">{{ ucfirst($incident->severity) }}</span></td>
+                            <td><span class="status-badge status-{{ $incident->status }}">{{ ucfirst($incident->status) }}</span></td>
+                            <!--<td><small>{{ $incident->assignedTo?->name ?? 'Unassigned' }}</small></td>-->
+                            <td>
+                                 @if($incident->assignedTo)
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img src="{{ $incident->assignedTo->avatar_url }}" alt="Assignee" class="rounded-circle" width="24" height="24">
+                                        <small>{{ $incident->assignedTo->name }}</small>
+                                    </div>
+                                @else
+                                    <small class="text-muted">Unassigned</small>
+                                @endif
+                            </td>
+                            <td><small class="text-muted">{{ $incident->created_at->diffForHumans() }}</small></td>
+                            <td>
+                                <a href="{{ route('incidents.show', $incident->id) }}" class="btn btn-sm btn-light rounded-circle">
+                                    <i class="fas fa-arrow-right"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
 
-                {{-- Cards View --}}
-                <div id="cardsView" class="d-none p-2">
-                    <div class="row g-2">
-                        @foreach($incidents as $incident)
-                        <div class="col-md-6 col-lg-4">
-                            @include('incidents.partials.incident-card', ['incident' => $incident])
+            {{-- Mobile Cards View --}}
+            <div id="cardsView">
+                @php
+                    // Use the variable passed from controller
+                    // Or use hasPermissionTo() directly
+                    $canEdit = auth()->user()->hasPermissionTo('edit-incident');
+                @endphp
+
+                @foreach($incidents as $incident)
+                <div class="incident-card" onclick="goToIncident({{ $incident->id }})">
+                    {{-- Header --}}
+                    <div class="d-flex justify-content-between align-items-start p-3 pb-2">
+                        <div class="d-flex gap-2">
+                            <div class="user-avatar">
+                                <img src="{{ $incident->reporter?->avatar_url ?? asset('images/default-avatar.png') }}" 
+                                     class="rounded-circle" width="42" height="42" style="object-fit: cover;">
+                            </div>
+                            <div>
+                                <div class="fw-semibold" style="font-size: 0.9rem;">{{ $incident->reporter?->name ?? 'Anonymous' }}</div>
+                                <div class="text-muted" style="font-size: 0.65rem;">
+                                    {{ $incident->department?->name ?? 'No Dept' }} • {{ $incident->created_at->diffForHumans() }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm rounded-circle" data-bs-toggle="dropdown" onclick="event.stopPropagation()">
+                                <i class="fas fa-ellipsis-v text-muted"></i>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                <a href="{{ route('incidents.show', $incident->id) }}" class="dropdown-item">
+                                    <i class="fas fa-eye me-2"></i>View Details
+                                </a>
+                                @if($canEdit)
+                                    <a href="{{ route('incidents.edit', $incident->id) }}" class="dropdown-item">
+                                        <i class="fas fa-edit me-2"></i>Edit
+                                    </a>
+                                @endif
+                                <button class="dropdown-item" onclick="shareIncident({{ $incident->id }}, '{{ addslashes($incident->title) }}', event)">
+                                    <i class="fas fa-share-alt me-2"></i>Share
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Location --}}
+                    @if($incident->location)
+                    <div class="px-3 pb-1">
+                        <i class="fas fa-map-marker-alt text-muted" style="font-size: 0.65rem;"></i>
+                        <span class="text-muted" style="font-size: 0.7rem;">{{ $incident->location }}</span>
+                    </div>
+                    @endif
+
+                    {{-- Badges --}}
+                    <div class="px-3 pb-2 d-flex gap-2 flex-wrap align-items-center">
+                        <code class="small bg-light px-2 py-1 rounded" style="font-size: 0.65rem;">{{ $incident->incident_id }}</code>
+                        <span class="priority-badge priority-{{ $incident->priority }}">{{ ucfirst($incident->priority) }}</span>
+                        <span class="status-badge status-{{ $incident->status }}">{{ ucfirst($incident->status) }}</span>
+                        @if($incident->sla_due_at && $incident->sla_due_at < now())
+                        <span class="badge bg-danger px-2 py-1" style="font-size: 0.65rem;">
+                            <i class="fas fa-clock"></i> Overdue
+                        </span>
+                        @endif
+                    </div>
+
+                    {{-- Title & Description --}}
+                    <div class="px-3 pb-2">
+                        <h6 class="fw-bold mb-1" style="font-size: 0.95rem;">{{ $incident->title }}</h6>
+                        <p class="text-muted mb-0" style="font-size: 0.75rem; line-height: 1.4;">
+                            {{ Str::limit($incident->description, 80) }}
+                        </p>
+                    </div>
+
+                    {{-- Info Chips --}}
+                    <div class="px-3 pb-2 d-flex gap-2 flex-wrap">
+                        <span class="info-chip">
+                            <i class="fas fa-folder-open"></i> {{ $incident->category?->name ?? 'Uncategorized' }}
+                        </span>
+                        <span class="info-chip">
+                            <i class="fas fa-building"></i> {{ $incident->department?->code ?? 'N/A' }}
+                        </span>
+                    </div>
+
+                    {{-- Media Grid --}}
+                    @if($incident->media && $incident->media->count() > 0)
+                    <div class="media-grid" style="grid-template-columns: repeat({{ min($incident->media->count(), 3) }}, 1fr);">
+                        @foreach($incident->media->take(3) as $index => $media)
+                        <div class="media-item" onclick="event.stopPropagation(); openMediaModal({{ $incident->id }}, {{ $index }})">
+                            @if($media->media_type === 'image')
+                                <img src="{{ Storage::url($media->file_path) }}" loading="lazy">
+                            @elseif($media->media_type === 'video')
+                                <video src="{{ Storage::url($media->file_path) }}" preload="metadata"></video>
+                                <div class="position-absolute top-50 start-50 translate-middle">
+                                    <i class="fas fa-play-circle text-white" style="font-size: 2rem; text-shadow: 0 0 5px black;"></i>
+                                </div>
+                            @else
+                                <div class="d-flex align-items-center justify-content-center h-100 bg-light">
+                                    <i class="fas fa-file-alt fa-2x text-muted"></i>
+                                </div>
+                            @endif
+                            @if($index === 2 && $incident->media->count() > 3)
+                            <div class="media-count">+{{ $incident->media->count() - 3 }}</div>
+                            @endif
                         </div>
                         @endforeach
                     </div>
-                </div>
-                {{-- @else
-                <div class="text-center py-5">
-                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                    <h6>
-                        @if($activeTab === 'escalated')
-                        No incidents escalated to you
-                        @elseif($activeTab === 'assigned')
-                        No incidents assigned to you
-                        @else
-                        No incidents found
-                        @endif
-                    </h6>
-                    <p class="text-muted small">
-                        @if($activeTab === 'escalated')
-                        You're all caught up! No pending escalations.
-                        @elseif($activeTab === 'assigned')
-                        No incidents currently assigned to you.
-                        @else
-                        @if(request()->hasAny(['search','status','severity']))
-                        No incidents match your filters.
-                        @else
-                        No incidents have been reported yet.
-                        @endif
-                        @endif
-                    </p>
-                    @if($activeTab === 'all')
-                    <a href="{{ route('incidents.create') }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i> Report First Incident
-                    </a>
                     @endif
-                </div>
-                @endif --}}
 
-                @else
-                <div class="text-center py-5">
-                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                    <h6>
-                        @switch($activeTab)
-                        @case('escalated')
-                        No incidents escalated to you
-                        @break
-                        @case('assigned')
-                        No incidents currently assigned to you
-                        @break
-                        @case('history')
-                        No incident history found
-                        @break
-                        @case('reported')
-                        You haven't reported any incidents yet
-                        @break
-                        @default
-                        No incidents found
-                        @endswitch
-                    </h6>
-                    <p class="text-muted small">
-                        @switch($activeTab)
-                        @case('escalated')
-                        You're all caught up! No pending escalations requiring your attention.
-                        @break
-                        @case('assigned')
-                        No incidents are currently assigned to you. Great job!
-                        @break
-                        @case('history')
-                        You haven't been involved in any incidents yet. Once you report, get assigned, or escalate
-                        incidents, they will appear here.
-                        @break
-                        @case('reported')
-                        You haven't reported any incidents yet. Click below to report your first incident.
-                        @break
-                        @default
-                        @if(request()->hasAny(['search','status','severity']))
-                        No incidents match your filters. Try adjusting your search criteria.
-                        @else
-                        No incidents have been reported yet.
-                        @endif
-                        @endswitch
-                    </p>
-                    @if(in_array($activeTab, ['all', 'reported']))
-                    <a href="{{ route('incidents.create') }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i> Report Incident
-                    </a>
-                    @endif
+                    {{-- Compact Action Buttons --}}
+                    <div class="action-buttons">
+                        <button class="action-icon-btn view-btn" onclick="event.stopPropagation(); goToIncident({{ $incident->id }})">
+                            <i class="fas fa-eye"></i>
+                            <span>View</span>
+                        </button>
+                        <button class="action-icon-btn comment-btn" onclick="event.stopPropagation(); openCommentsModal({{ $incident->id }})">
+                            <i class="fas fa-comment"></i>
+                            <span>Comment</span>
+                            @if($incident->comments_count > 0)
+                            <span class="badge bg-secondary rounded-pill ms-1" style="font-size: 0.6rem;">{{ $incident->comments_count }}</span>
+                            @endif
+                        </button>
+                        <button class="action-icon-btn share-btn" onclick="event.stopPropagation(); shareIncident({{ $incident->id }}, '{{ addslashes($incident->title) }}', event)">
+                            <i class="fas fa-share-alt"></i>
+                            <span>Share</span>
+                        </button>
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="px-3 py-2 bg-light d-flex justify-content-between align-items-center" style="border-top: 1px solid #f0f0f0;">
+                        <div class="d-flex gap-3">
+                            <span class="text-muted" style="font-size: 0.65rem;">
+                                <i class="far fa-calendar-alt me-1"></i>{{ $incident->created_at->format('d M Y') }}
+                            </span>
+                            <span class="text-muted" style="font-size: 0.65rem;">
+                                <i class="fas fa-user-check me-1"></i>{{ $incident->assignedTo?->name ?? 'Unassigned' }}
+                            </span>
+                        </div>
+                        <i class="fas fa-chevron-right text-primary" style="font-size: 0.8rem;"></i>
+                    </div>
                 </div>
-                @endif
+                @endforeach
             </div>
 
-            @if(isset($incidents) && $incidents->hasPages())
-            <div class="card-footer bg-white">
+            {{-- Pagination --}}
+            @if($incidents->hasPages())
+            <div class="card-footer bg-white border-0 py-3">
                 {{ $incidents->appends(request()->query())->links('pagination::bootstrap-5') }}
+            </div>
+            @endif
+
+            @else
+            {{-- Empty State --}}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h6 class="fw-semibold">No incidents found</h6>
+                <p class="text-muted small">
+                    @if(request()->hasAny(['search','status','severity']))
+                    No incidents match your filters.
+                    @else
+                    Start by reporting your first incident.
+                    @endif
+                </p>
+                @if($activeTab === 'all')
+                <a href="{{ route('incidents.create') }}" class="btn btn-primary rounded-pill px-4">
+                    <i class="fas fa-plus me-2"></i>Report Incident
+                </a>
+                @endif
             </div>
             @endif
         </div>
     </div>
-    @endsection
+    </div>
 
-    @push('scripts')
-    <script>
-        function switchView(view) {
-        document.getElementById('tableView').classList.toggle('d-none', view !== 'table');
-        document.getElementById('cardsView').classList.toggle('d-none', view !== 'cards');
-        document.getElementById('tableBtn').classList.toggle('active', view === 'table');
-        document.getElementById('cardsBtn').classList.toggle('active', view === 'cards');
-        localStorage.setItem('incidentView', view);
+
+{{-- Media Modal - Fixed Focus Issue --}}
+<div class="modal fade" id="mediaModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="true" aria-hidden="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0">
+                <div class="position-relative bg-black rounded-3 overflow-hidden" style="min-height: 500px;">
+                    <img id="modalMedia" src="" alt="" class="w-100" style="display: none; max-height: 80vh; object-fit: contain;">
+                    <video id="modalVideo" controls style="display: none; width: 100%; max-height: 80vh;">
+                        <source id="videoSource" src="">
+                    </video>
+                    <div id="modalDocument" class="text-center text-white p-5" style="display: none;">
+                        <i class="fas fa-file fa-4x mb-3"></i>
+                        <p>Document preview not available</p>
+                        <a id="downloadLink" href="#" class="btn btn-primary rounded-pill px-4" download>Download File</a>
+                    </div>
+                    
+                    {{-- Navigation Buttons --}}
+                    <button id="prevMediaBtn" class="btn btn-dark rounded-circle position-absolute start-3 top-50 translate-middle-y" style="width: 40px; height: 40px; z-index: 10;">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button id="nextMediaBtn" class="btn btn-dark rounded-circle position-absolute end-3 top-50 translate-middle-y" style="width: 40px; height: 40px; z-index: 10;">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    
+                    <div id="mediaCounter" class="position-absolute bottom-3 start-50 translate-middle-x bg-dark bg-opacity-75 text-white px-3 py-1 rounded-pill" style="font-size: 0.8rem; bottom: 10px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 justify-content-center pt-3">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal" id="closeMediaModalBtn">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--{{-- Media Modal - Fixed with proper focus management --}}-->
+<!--<div class="modal fade" id="mediaModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="true">-->
+<!--    <div class="modal-dialog modal-dialog-centered modal-lg">-->
+<!--        <div class="modal-content bg-transparent border-0">-->
+<!--            <div class="modal-body p-0">-->
+<!--                <div class="position-relative bg-white rounded-3 overflow-hidden" style="min-height: 500px;">-->
+<!--                    <img id="modalMedia" src="" alt="" class="w-100" style="display: none; max-height: 80vh; object-fit: contain;">-->
+<!--                    <video id="modalVideo" controls style="display: none; width: 100%; max-height: 80vh;">-->
+<!--                        <source id="videoSource" src="">-->
+<!--                    </video>-->
+<!--                    <div id="modalDocument" class="text-center text-white p-5" style="display: none;">-->
+<!--                        <i class="fas fa-file fa-4x mb-3"></i>-->
+<!--                        <p>Document preview not available</p>-->
+<!--                        <a id="downloadLink" href="#" class="btn btn-primary rounded-pill px-4" download>Download File</a>-->
+<!--                    </div>-->
+                    
+<!--                    {{-- Navigation Buttons --}}-->
+<!--                    <button id="prevMediaBtn" class="btn btn-dark rounded-circle position-absolute start-3 top-50 translate-middle-y" style="width: 40px; height: 40px; z-index: 10;">-->
+<!--                        <i class="fas fa-chevron-left"></i>-->
+<!--                    </button>-->
+<!--                    <button id="nextMediaBtn" class="btn btn-dark rounded-circle position-absolute end-3 top-50 translate-middle-y" style="width: 40px; height: 40px; z-index: 10;">-->
+<!--                        <i class="fas fa-chevron-right"></i>-->
+<!--                    </button>-->
+                    
+<!--                    <div id="mediaCounter" class="position-absolute bottom-3 start-50 translate-middle-x bg-dark bg-opacity-75 text-white px-3 py-1 rounded-pill" style="font-size: 0.8rem; bottom: 10px;"></div>-->
+<!--                </div>-->
+<!--            </div>-->
+<!--            <div class="modal-footer border-0 justify-content-center pt-3">-->
+<!--                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    </div>-->
+<!--</div>-->
+
+{{-- Comments Modal --}}
+<div class="modal fade" id="commentsModal" tabindex="-1" role="dialog" aria-labelledby="commentsModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content bg-white border-0 rounded-3 shadow">
+            <!-- Forced background utility onto header directly -->
+            <div class="modal-header bg-white border-0 pb-0">
+                <h5 class="modal-title fw-semibold text-dark" id="commentsModalTitle">
+                    <i class="fas fa-comments text-primary me-2" aria-hidden="true"></i>Comments
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close comments"></button>
+            </div>
+            <!-- Ensured background matching on body wrapper -->
+            <div class="modal-body bg-white" id="commentsModalBody" role="region" aria-live="polite" aria-busy="true">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                    <p class="mt-2 text-muted">Loading comments...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+@endsection
+
+@push('scripts')
+<script>
+let currentMediaList = [];
+let currentMediaIndex = 0;
+let mediaModal = null;
+let modalElement = null;
+
+async function openMediaModal(incidentId, index = 0) {
+    currentMediaIndex = index;
+    
+    try {
+        const response = await fetch(`/incidents/${incidentId}/media`);
+        const data = await response.json();
+        
+        if (data.success && data.media.length > 0) {
+            currentMediaList = data.media;
+            displayCurrentMedia();
+            
+            modalElement = document.getElementById('mediaModal');
+            
+            // Remove aria-hidden before showing
+            modalElement.removeAttribute('aria-hidden');
+            modalElement.style.display = 'block';
+            
+            document.body.classList.add('modal-open');
+            
+            let backdrop = document.querySelector('.modal-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop fade show';
+                document.body.appendChild(backdrop);
+            }
+            
+            setTimeout(() => {
+                modalElement.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                const closeBtn = document.getElementById('closeMediaModalBtn');
+                if (closeBtn) closeBtn.focus();
+            }, 100);
+            
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    closeMediaModal();
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+            modalElement._escapeHandler = handleEscape;
+            
+        } else {
+            showToast('No media found');
+        }
+    } catch (error) {
+        console.error('Error loading media:', error);
+        showToast('Error loading media');
     }
-    document.addEventListener('DOMContentLoaded', function() {
-        switchView(localStorage.getItem('incidentView') || 'table');
+}
+
+function closeMediaModal() {
+    if (!modalElement) return;
+    
+    // CORRECTION 1: Explicitly drop active button focus immediately to prevent WAI-ARIA error
+    if (document.activeElement && modalElement.contains(document.activeElement)) {
+        document.activeElement.blur();
+    }
+    
+    modalElement.classList.remove('show');
+    
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) {
+        backdrop.classList.remove('show');
+        setTimeout(() => {
+            if (backdrop && backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+    
+    document.body.classList.remove('modal-open');
+    
+    setTimeout(() => {
+        if (modalElement) {
+            modalElement.setAttribute('aria-hidden', 'true');
+            modalElement.style.display = 'none';
+            
+            if (modalElement._escapeHandler) {
+                document.removeEventListener('keydown', modalElement._escapeHandler);
+                delete modalElement._escapeHandler;
+            }
+            
+            const mediaItem = document.querySelector('.media-item'); 
+            if (mediaItem) {
+                mediaItem.focus();
+            }
+        }
+    }, 150);
+}
+
+function displayCurrentMedia() {
+    const media = currentMediaList[currentMediaIndex];
+    const imgElement = document.getElementById('modalMedia');
+    const videoElement = document.getElementById('modalVideo');
+    const docElement = document.getElementById('modalDocument');
+    const counter = document.getElementById('mediaCounter');
+    
+    imgElement.style.display = 'none';
+    videoElement.style.display = 'none';
+    docElement.style.display = 'none';
+    
+    if (counter) {
+        counter.textContent = `${currentMediaIndex + 1} of ${currentMediaList.length}`;
+    }
+    
+    if (media.type === 'image') {
+        imgElement.src = media.url;
+        imgElement.style.display = 'block';
+    } else if (media.type === 'video') {
+        const videoSource = document.getElementById('videoSource');
+        if (videoSource) {
+            videoSource.src = media.url;
+            videoElement.load();
+        }
+        videoElement.style.display = 'block';
+    } else {
+        const downloadLink = document.getElementById('downloadLink');
+        if (downloadLink) {
+            downloadLink.href = media.url;
+        }
+        docElement.style.display = 'block';
+    }
+    
+    const prevBtn = document.getElementById('prevMediaBtn');
+    const nextBtn = document.getElementById('nextMediaBtn');
+    
+    if (prevBtn) {
+        prevBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigateMedia(-1);
+        };
+    }
+    
+    if (nextBtn) {
+        nextBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigateMedia(1);
+        };
+    }
+}
+
+function navigateMedia(direction) {
+    const newIndex = currentMediaIndex + direction;
+    if (newIndex >= 0 && newIndex < currentMediaList.length) {
+        currentMediaIndex = newIndex;
+        displayCurrentMedia();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const closeBtn = document.getElementById('closeMediaModalBtn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            closeMediaModal();
+        });
+    }
+    
+    document.addEventListener('click', function(e) {
+        // CORRECTION 2: Check target parent container context exactly so comments click won't trip media close routines
+        if (modalElement && modalElement.classList.contains('show') && modalElement.contains(e.target)) {
+            const modalDialog = modalElement.querySelector('.modal-dialog');
+            if (modalDialog && !modalDialog.contains(e.target)) {
+                closeMediaModal();
+            }
+        }
     });
-    </script>
-    @endpush
+    
+    // the comments modal starts its closing hide animation sequence.
+    const commentsModalEl = document.getElementById('commentsModal');
+    if (commentsModalEl) {
+        commentsModalEl.addEventListener('hide.bs.modal', function() {
+            if (document.activeElement && commentsModalEl.contains(document.activeElement)) {
+                document.activeElement.blur();
+            }
+        });
+    }
+});
+
+async function openCommentsModal(incidentId, event) {
+    if (event) event.stopPropagation();
+    
+    const modalTarget = document.getElementById('commentsModal');
+    const modal = new bootstrap.Modal(modalTarget);
+    const modalBody = document.getElementById('commentsModalBody');
+    
+    modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading comments...</p></div>';
+    modal.show();
+    
+    try {
+        const response = await fetch(`/incidents/${incidentId}/comments`);
+        const data = await response.json();
+        
+        if (data.success && data.comments.length > 0) {
+            let html = '<div class="list-group list-group-flush">';
+            data.comments.forEach(comment => {
+                html += `
+                    <div class="list-group-item border-0 py-3 bg-white">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <strong class="small text-dark">${escapeHtml(comment.user.name)}</strong>
+                            <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                        </div>
+                        <p class="mb-0 small text-muted">${escapeHtml(comment.content)}</p>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            modalBody.innerHTML = html;
+        } else {
+            modalBody.innerHTML = '<div class="text-center py-4 text-muted"><i class="fas fa-comment-slash fa-2x mb-2"></i><p>No comments yet</p></div>';
+        }
+    } catch (error) {
+        modalBody.innerHTML = '<div class="text-center py-4 text-danger">Error loading comments</div>';
+    }
+}
+
+function closeCommentsModal() {
+    const commentsModalEl = document.getElementById('commentsModal');
+    if (!commentsModalEl) return;
+    
+    // CORRECTION: Aggressively drop focus immediately from the close button 
+    // before the hiding animation runs.
+    if (document.activeElement && commentsModalEl.contains(document.activeElement)) {
+        document.activeElement.blur();
+    }
+    
+    const instance = bootstrap.Modal.getInstance(commentsModalEl);
+    if (instance) {
+        instance.hide();
+    }
+}
+
+
+// Simple placeholder helper in case you don't have it defined globally
+function escapeHtml(string) {
+    return String(string).replace(/[&<>"']/g, function (s) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s];
+    });
+}
+
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-3 p-2 bg-dark text-white rounded-pill px-3';
+    toast.style.zIndex = '9999';
+    toast.style.fontSize = '0.8rem';
+    toast.innerHTML = `<i class="fas fa-check-circle me-1"></i> ${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+}
+
+function goToIncident(id) {
+    window.location.href = `/incidents/${id}`;
+}
+
+function shareIncident(id, title, event) {
+    if (event) event.stopPropagation();
+    const url = `${window.location.origin}/incidents/${id}`;
+    
+    if (navigator.share) {
+        navigator.share({ title: `Incident: ${title}`, url: url });
+    } else {
+        navigator.clipboard.writeText(url);
+        showToast('Link copied to clipboard!');
+    }
+}
+
+// Initialize table row clicks
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.incident-row').forEach(row => {
+        row.addEventListener('click', function() {
+            if (this.dataset.href) window.location.href = this.dataset.href;
+        });
+    });
+});
+    
+
+document.addEventListener('DOMContentLoaded', function() {
+    const filterToggle = document.querySelector('[data-bs-target="#filterCollapse"]');
+    if (filterToggle) {
+        filterToggle.addEventListener('click', function() {
+            const icon = this.querySelector('.toggle-icon');
+            if (icon) {
+                icon.style.transform = this.getAttribute('aria-expanded') === 'true' ? 'rotate(0deg)' : 'rotate(180deg)';
+            }
+        });
+    }
+});
+
+
+</script>
+@endpush

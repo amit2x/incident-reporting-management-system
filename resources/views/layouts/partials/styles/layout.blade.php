@@ -85,7 +85,8 @@
     }
 
     .desktop-sidebar .sidebar-brand {
-        padding: 20px 24px;
+        /*padding: 20px 24px;*/
+        padding: -10px;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -305,18 +306,18 @@
     }
 
     .mobile-drawer .drawer-header {
-        padding: 10px;
+        /*padding: 10px;*/
         /* background: var(--primary); */
-        color: white;
-        display: flex;
-        align-items: center;
+        /*color: white;*/
+        /*display: flex;*/
+        /*align-items: center;*/
         /* gap: 12px; */
         border-bottom: 1px solid #3b82f6;
     }
 
     .drawer-logo {
-        max-height: 100px;
-        width: auto;
+        max-height: 125px !important;
+        width: 100% !important;
         object-fit: contain;
     }
 

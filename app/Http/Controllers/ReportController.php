@@ -28,6 +28,85 @@ class ReportController extends Controller
     }
 
     /**
+     * Get user's department filter - automatically applied for non-admin users
+     */
+    private function getDepartmentFilter(): ?int
+    {
+        $user = Auth::user();
+        
+        // Admin and Super Admin can see all departments
+        if ($user->isAdmin() || $user->isSuperAdmin()) {
+            return null;
+        }
+        
+        // Other users can only see their own department
+        return $user->department_id;
+    }
+
+    /**
+     * Check if user has full access (Admin or Super Admin)
+     */
+    private function hasFullAccess(): bool
+    {
+        $user = Auth::user();
+        return $user->isAdmin() || $user->isSuperAdmin();
+    }
+
+    /**
+     * Apply automatic department filter to queries based on user role
+     */
+    private function applyDepartmentFilter($query, ?int $departmentId = null)
+    {
+        $autoFilter = $this->getDepartmentFilter();
+        
+        // If user has full access, use explicit department filter if provided
+        if ($this->hasFullAccess()) {
+            if ($departmentId) {
+                return $query->where('department_id', $departmentId);
+            }
+            return $query;
+        }
+        
+        // Non-admin users: always filter by their department
+        // Override any explicit department filter with their own
+        return $query->where('department_id', $autoFilter);
+    }
+
+    /**
+     * Apply department filter to a collection (for pre-fetched data)
+     */
+    private function filterCollectionByDepartment($collection)
+    {
+        $autoFilter = $this->getDepartmentFilter();
+        
+        // Admin/Super Admin can see all
+        if ($this->hasFullAccess() || !$autoFilter) {
+            return $collection;
+        }
+        
+        // Filter by department_id
+        return $collection->filter(function ($item) use ($autoFilter) {
+            // For Department models
+            if (isset($item['id']) && $item instanceof Department) {
+                return $item->id == $autoFilter;
+            }
+            // For arrays with department_id
+            if (isset($item['department_id'])) {
+                return $item['department_id'] == $autoFilter;
+            }
+            // For objects with department_id
+            if (isset($item->department_id)) {
+                return $item->department_id == $autoFilter;
+            }
+            // For incidents directly
+            if (isset($item->id) && $item instanceof Incident) {
+                return $item->department_id == $autoFilter;
+            }
+            return true;
+        });
+    }
+
+    /**
      * Reports index page
      */
     public function index()
@@ -49,22 +128,33 @@ class ReportController extends Controller
         $departmentId = $request->get('department_id');
         $categoryId = $request->get('category_id');
 
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
+
         // Calculate date range
         $dateRange = $this->getDateRange($period, $request);
 
-        // Get all data
+        // Get all data with filters
         $kpiData = $this->getKpiMetrics($dateRange, $departmentId, $categoryId);
         $trendData = $this->getTrendData($dateRange, $departmentId, $categoryId);
         $severityDistribution = $this->getSeverityDistribution($dateRange, $departmentId, $categoryId);
         $statusDistribution = $this->getStatusDistribution($dateRange, $departmentId, $categoryId);
-        $departmentPerformance = $this->getDepartmentPerformance($dateRange);
+        $departmentPerformance = $this->getDepartmentPerformance($dateRange, $departmentId);
         $categoryBreakdown = $this->getCategoryBreakdown($dateRange, $departmentId);
-        $slaCompliance = $this->getSlaComplianceByDepartment($dateRange);
+        $slaCompliance = $this->getSlaComplianceByDepartment($dateRange, $departmentId);
         $hourlyDistribution = $this->getHourlyDistribution($dateRange, $departmentId);
         $resolutionTimeTrend = $this->getResolutionTimeTrend($dateRange, $departmentId);
 
-        // Get filter dropdowns
-        $departments = Department::active()->ordered()->get();
+        // Get filter dropdowns - restrict for non-admin users
+        if ($this->hasFullAccess()) {
+            $departments = Department::active()->ordered()->get();
+        } else {
+            // Non-admin users only see their department
+            $departments = Department::where('id', $this->getDepartmentFilter())->active()->ordered()->get();
+        }
         $categories = IncidentCategory::active()->get();
 
         // AJAX response for dynamic updates
@@ -113,13 +203,20 @@ class ReportController extends Controller
         $period = $request->get('period', 'last30days');
         $departmentId = $request->get('department_id');
         $categoryId = $request->get('category_id');
+
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
+
         $dateRange = $this->getDateRange($period, $request);
 
         $reportData = [
             'kpi' => $this->getKpiMetrics($dateRange, $departmentId, $categoryId),
-            'department_performance' => $this->getDepartmentPerformance($dateRange),
+            'department_performance' => $this->getDepartmentPerformance($dateRange, $departmentId),
             'category_breakdown' => $this->getCategoryBreakdown($dateRange, $departmentId),
-            'sla_compliance' => $this->getSlaComplianceByDepartment($dateRange),
+            'sla_compliance' => $this->getSlaComplianceByDepartment($dateRange, $departmentId),
             'severity_distribution' => $this->getSeverityDistribution($dateRange, $departmentId, $categoryId),
             'status_distribution' => $this->getStatusDistribution($dateRange, $departmentId, $categoryId),
             'period' => $period,
@@ -127,6 +224,8 @@ class ReportController extends Controller
             'date_to' => $dateRange['end']->format('d M Y'),
             'generated_at' => now()->format('d M Y, H:i'),
             'generated_by' => Auth::user()->name,
+            'department_name' => $departmentId ? Department::find($departmentId)?->name : 'All Departments',
+            'is_restricted' => !$this->hasFullAccess(),
         ];
 
         $filename = 'KPI_Report_'.now()->format('Y-m-d_His');
@@ -165,76 +264,19 @@ class ReportController extends Controller
     }
 
     /**
-     * Build base query with filters
+     * Build base query with filters - AUTOMATIC DEPARTMENT FILTER
      */
     private function buildQuery(array $dateRange, ?int $departmentId = null, ?int $categoryId = null)
     {
-        return Incident::whereBetween('created_at', [$dateRange['start'], $dateRange['end']])
-            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+        $query = Incident::whereBetween('created_at', [$dateRange['start'], $dateRange['end']])
             ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId));
+
+        // Apply automatic department filter
+        return $this->applyDepartmentFilter($query, $departmentId);
     }
 
     /**
      * Get KPI metrics
-     */
-    // private function getKpiMetrics(array $dateRange, ?int $departmentId = null, ?int $categoryId = null): array
-    // {
-    //     $query = $this->buildQuery($dateRange, $departmentId, $categoryId);
-    //     $total = (clone $query)->count();
-
-    //     if ($total === 0) {
-    //         return [
-    //             'total_incidents' => 0,
-    //             'open_incidents' => 0,
-    //             'in_progress_incidents' => 0,
-    //             'resolved_incidents' => 0,
-    //             'closed_incidents' => 0,
-    //             'escalated_incidents' => 0,
-    //             'rejected_incidents' => 0,
-    //             'sla_breaches' => 0,
-    //             'avg_response_time' => 0,
-    //             'avg_resolution_time' => 0,
-    //             'sla_compliance' => 100,
-    //             'resolution_rate' => 0,
-    //             'escalation_rate' => 0,
-    //         ];
-    //     }
-
-    //     $open = (clone $query)->whereIn('status', ['open', 'acknowledged'])->count();
-    //     $inProgress = (clone $query)->where('status', 'in_progress')->count();
-    //     $resolved = (clone $query)->where('status', 'resolved')->count();
-    //     $closed = (clone $query)->where('status', 'closed')->count();
-    //     $escalated = (clone $query)->where('status', 'escalated')->count();
-    //     $rejected = (clone $query)->where('status', 'rejected')->count();
-    //     $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
-
-    //     $avgResponseTime = (clone $query)->whereNotNull('acknowledged_at')
-    //         ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, acknowledged_at)) as avg_time')
-    //         ->value('avg_time') ?? 0;
-
-    //     $avgResolutionTime = (clone $query)->whereNotNull('resolved_at')
-    //         ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) as avg_time')
-    //         ->value('avg_time') ?? 0;
-
-    //     return [
-    //         'total_incidents' => $total,
-    //         'open_incidents' => $open,
-    //         'in_progress_incidents' => $inProgress,
-    //         'resolved_incidents' => $resolved,
-    //         'closed_incidents' => $closed,
-    //         'escalated_incidents' => $escalated,
-    //         'rejected_incidents' => $rejected,
-    //         'sla_breaches' => $breached,
-    //         'avg_response_time' => round($avgResponseTime, 1),
-    //         'avg_resolution_time' => round($avgResolutionTime, 1),
-    //         'sla_compliance' => round((($total - $breached) / $total) * 100, 1),
-    //         'resolution_rate' => round((($resolved + $closed) / $total) * 100, 1),
-    //         'escalation_rate' => round(($escalated / $total) * 100, 1),
-    //     ];
-    // }
-
-    /**
-     * Get KPI metrics - FIXED
      */
     private function getKpiMetrics(array $dateRange, ?int $departmentId = null, ?int $categoryId = null): array
     {
@@ -271,6 +313,12 @@ class ReportController extends Controller
             ->whereNotNull('resolved_at')
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) as avg_time')
             ->value('avg_time') ?? 0;
+
+        // Apply auto department filter for DB queries
+        $autoFilter = $this->getDepartmentFilter();
+        if ($autoFilter && !$this->hasFullAccess()) {
+            // The when clauses above already handle this, but ensure consistency
+        }
 
         return [
             'total_incidents' => $total,
@@ -355,11 +403,20 @@ class ReportController extends Controller
     }
 
     /**
-     * Get department performance
+     * Get department performance - FIXED with auto filter
      */
-    private function getDepartmentPerformance(array $dateRange): array
+    private function getDepartmentPerformance(array $dateRange, ?int $departmentId = null): array
     {
-        return Department::active()->get()->map(function ($dept) use ($dateRange) {
+        // If user is not admin, only show their department
+        $autoFilter = $this->getDepartmentFilter();
+        $departments = Department::active()->get();
+        
+        // If non-admin, filter departments
+        if ($autoFilter && !$this->hasFullAccess()) {
+            $departments = $departments->where('id', $autoFilter);
+        }
+
+        return $departments->map(function ($dept) use ($dateRange) {
             $query = Incident::where('department_id', $dept->id)
                 ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
 
@@ -389,10 +446,14 @@ class ReportController extends Controller
      */
     private function getCategoryBreakdown(array $dateRange, ?int $departmentId = null): array
     {
-        return IncidentCategory::active()->get()->map(function ($cat) use ($dateRange, $departmentId) {
+        $categories = IncidentCategory::active()->get();
+        
+        return $categories->map(function ($cat) use ($dateRange, $departmentId) {
             $query = Incident::where('category_id', $cat->id)
-                ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']])
-                ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
+                ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+            
+            // Apply department filter
+            $query = $this->applyDepartmentFilter($query, $departmentId);
 
             $total = (clone $query)->count();
             $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
@@ -412,9 +473,17 @@ class ReportController extends Controller
     /**
      * Get SLA compliance by department
      */
-    private function getSlaComplianceByDepartment(array $dateRange): array
+    private function getSlaComplianceByDepartment(array $dateRange, ?int $departmentId = null): array
     {
-        return Department::active()->get()->mapWithKeys(function ($dept) use ($dateRange) {
+        $departments = Department::active()->get();
+        
+        // If non-admin, only show their department
+        $autoFilter = $this->getDepartmentFilter();
+        if ($autoFilter && !$this->hasFullAccess()) {
+            $departments = $departments->where('id', $autoFilter);
+        }
+
+        return $departments->mapWithKeys(function ($dept) use ($dateRange) {
             $query = Incident::where('department_id', $dept->id)
                 ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
 
@@ -493,6 +562,9 @@ class ReportController extends Controller
             fputcsv($file, ['Period', $data['date_from'].' to '.$data['date_to']]);
             fputcsv($file, ['Generated', $data['generated_at']]);
             fputcsv($file, ['Generated By', $data['generated_by']]);
+            if (isset($data['is_restricted']) && $data['is_restricted']) {
+                fputcsv($file, ['Note', 'This report is restricted to your department only']);
+            }
             fputcsv($file, ['']);
 
             // KPI Metrics
@@ -523,9 +595,24 @@ class ReportController extends Controller
     {
         $this->authorize('view-reports');
 
+        // AUTO FILTER: If user is not admin and trying to view another department, redirect
+        $requestedDeptId = $request->get('department_id');
+        $autoFilter = $this->getDepartmentFilter();
+        
+        if ($autoFilter && !$this->hasFullAccess()) {
+            // Force the department filter to user's department
+            if ($requestedDeptId && $requestedDeptId != $autoFilter) {
+                return redirect()->route('reports.department', ['department_id' => $autoFilter])
+                    ->with('warning', 'You can only view your own department data.');
+            }
+            $departmentId = $autoFilter;
+        } else {
+            $departmentId = $requestedDeptId;
+        }
+
         // If department_id is provided, show detail view
-        if ($request->has('department_id')) {
-            return $this->departmentDetail($request);
+        if ($departmentId) {
+            return $this->departmentDetail($request, $departmentId);
         }
 
         // Get date range
@@ -537,7 +624,12 @@ class ReportController extends Controller
             ->withCount(['users', 'incidents'])
             ->get();
 
-        // Get performance stats for each department - FIXED: Include name, code, color
+        // If non-admin, only show their department
+        if ($autoFilter && !$this->hasFullAccess()) {
+            $departments = $departments->where('id', $autoFilter);
+        }
+
+        // Get performance stats for each department
         $departmentStats = [];
         foreach ($departments as $dept) {
             $query = Incident::where('department_id', $dept->id)
@@ -549,10 +641,10 @@ class ReportController extends Controller
 
             $departmentStats[] = [
                 'id' => $dept->id,
-                'name' => $dept->name,        // ADDED
-                'code' => $dept->code,        // ADDED
-                'color' => $dept->color,      // ADDED
-                'icon' => $dept->icon,        // ADDED
+                'name' => $dept->name,
+                'code' => $dept->code,
+                'color' => $dept->color,
+                'icon' => $dept->icon,
                 'total' => $total,
                 'active' => (clone $query)->whereIn('status', ['open', 'acknowledged', 'in_progress', 'escalated'])->count(),
                 'resolved' => $resolved,
@@ -572,14 +664,11 @@ class ReportController extends Controller
         return view('reports.department', compact('departments', 'departmentStats'));
     }
 
-    // app/Http/Controllers/ReportController.php
-
     /**
      * Department Detail View - With Filters
      */
-    private function departmentDetail(Request $request)
+    private function departmentDetail(Request $request, int $deptId)
     {
-        $deptId = $request->get('department_id');
         $department = Department::withCount(['users', 'incidents'])->findOrFail($deptId);
 
         // Get filter parameters
@@ -618,7 +707,7 @@ class ReportController extends Controller
         // Users
         $deptUsers = User::where('department_id', $deptId)->active()->get();
 
-        // Categories (from incidents in this department based on filters)
+        // Categories
         $deptCategories = IncidentCategory::whereHas('incidents', function ($q) use ($deptId, $dateRange, $statusFilter, $categoryFilter, $severityFilter) {
             $q->where('department_id', $deptId)
                 ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
@@ -699,59 +788,8 @@ class ReportController extends Controller
     /**
      * Get KPI metrics from a pre-built query
      */
-    // private function getKpiMetricsForQuery($query): array
-    // {
-    //     $total = (clone $query)->count();
-
-    //     if ($total === 0) {
-    //         return [
-    //             'total_incidents' => 0,
-    //             'open_incidents' => 0,
-    //             'resolved_incidents' => 0,
-    //             'closed_incidents' => 0,
-    //             'escalated_incidents' => 0,
-    //             'sla_breaches' => 0,
-    //             'avg_response_time' => 0,
-    //             'avg_resolution_time' => 0,
-    //             'sla_compliance' => 100,
-    //             'resolution_rate' => 0,
-    //         ];
-    //     }
-
-    //     $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
-
-    //     return [
-    //         'total_incidents' => $total,
-    //         'open_incidents' => (clone $query)->whereIn('status', ['open', 'acknowledged'])->count(),
-    //         'resolved_incidents' => (clone $query)->where('status', 'resolved')->count(),
-    //         'closed_incidents' => (clone $query)->where('status', 'closed')->count(),
-    //         'escalated_incidents' => (clone $query)->where('status', 'escalated')->count(),
-    //         'sla_breaches' => $breached,
-    //         'avg_response_time' => round((clone $query)->whereNotNull('acknowledged_at')
-    //             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, acknowledged_at)) as avg_time')
-    //             ->value('avg_time') ?? 0, 1),
-    //         'avg_resolution_time' => round((clone $query)->whereNotNull('resolved_at')
-    //             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) as avg_time')
-    //             ->value('avg_time') ?? 0, 1),
-    //         'sla_compliance' => round((($total - $breached) / $total) * 100, 1),
-    //         'resolution_rate' => round(((clone $query)->whereIn('status', ['resolved', 'closed'])->count() / $total) * 100, 1),
-    //     ];
-    // }
-
-    // app/Http/Controllers/ReportController.php
-
-    /**
-     * Get KPI metrics from a pre-built query
-     */
-    /**
-     * Get KPI metrics from a pre-built query - FIXED
-     */
     private function getKpiMetricsForQuery($query): array
     {
-        // Extract the where conditions from the query
-        $bindings = $query->getBindings();
-        $wheres = $query->getQuery()->wheres;
-
         $total = (clone $query)->count();
 
         if ($total === 0) {
@@ -765,7 +803,6 @@ class ReportController extends Controller
 
         $breached = (clone $query)->where('sla_breach_count', '>', 0)->count();
 
-        // Use raw DB query for aggregate - avoids ordering issues
         $avgResponseTime = DB::table('incidents')
             ->whereNull('deleted_at')
             ->whereNotNull('acknowledged_at')
@@ -800,6 +837,16 @@ class ReportController extends Controller
         $this->authorize('export-reports');
 
         $deptId = $request->get('department_id');
+        
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoFilter = $this->getDepartmentFilter();
+        if ($autoFilter && !$this->hasFullAccess()) {
+            if ($deptId && $deptId != $autoFilter) {
+                abort(403, 'You are not authorized to export data from other departments.');
+            }
+            $deptId = $autoFilter;
+        }
+
         $period = $request->get('period', 'last30days');
         $dateRange = $this->getDateRange($period, $request);
         $statusFilter = $request->get('status');
@@ -844,15 +891,23 @@ class ReportController extends Controller
                 ],
                 'generated_at' => now()->format('d M Y, H:i'),
                 'generated_by' => Auth::user()->name,
+                'is_restricted' => !$this->hasFullAccess(),
             ];
             $filename = "Department_Report_{$department->code}_".now()->format('Y-m-d_His');
         } else {
+            // If no department ID, get all departments (or only user's if restricted)
+            $departments = Department::active()->get();
+            if ($autoFilter && !$this->hasFullAccess()) {
+                $departments = $departments->where('id', $autoFilter);
+            }
+
             $data = [
-                'departments' => Department::active()->get(),
+                'departments' => $departments,
                 'stats' => $this->getDepartmentPerformance($dateRange),
                 'period' => $period,
                 'generated_at' => now()->format('d M Y, H:i'),
                 'generated_by' => Auth::user()->name,
+                'is_restricted' => !$this->hasFullAccess(),
             ];
             $filename = 'All_Departments_Report_'.now()->format('Y-m-d_His');
         }
@@ -865,8 +920,6 @@ class ReportController extends Controller
             default => abort(400),
         };
     }
-
-    // app/Http/Controllers/ReportController.php
 
     /**
      * SLA Compliance Report
@@ -881,6 +934,12 @@ class ReportController extends Controller
         $departmentId = $request->get('department_id');
         $categoryId = $request->get('category_id');
         $statusFilter = $request->get('status');
+
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
 
         // Build base query
         $baseQuery = Incident::whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
@@ -902,6 +961,12 @@ class ReportController extends Controller
         // SLA by Department
         $slaData = [];
         $departments = Department::active()->ordered()->get();
+        
+        // If non-admin, only show their department
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departments = $departments->where('id', $autoDepartmentId);
+        }
+
         foreach ($departments as $dept) {
             $deptQuery = Incident::where('department_id', $dept->id)
                 ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
@@ -1001,7 +1066,11 @@ class ReportController extends Controller
         }
 
         // Get filter dropdowns
-        $allDepartments = Department::active()->ordered()->get();
+        if ($this->hasFullAccess()) {
+            $allDepartments = Department::active()->ordered()->get();
+        } else {
+            $allDepartments = Department::where('id', $this->getDepartmentFilter())->active()->ordered()->get();
+        }
         $allCategories = IncidentCategory::active()->get();
 
         // AJAX response
@@ -1041,6 +1110,12 @@ class ReportController extends Controller
         $departmentId = $request->get('department_id');
         $categoryId = $request->get('category_id');
 
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
+
         // Build base query
         $baseQuery = Incident::whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
         if ($departmentId) {
@@ -1058,6 +1133,11 @@ class ReportController extends Controller
         // SLA by Department
         $slaByDepartment = [];
         $departments = Department::active()->ordered()->get();
+        
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departments = $departments->where('id', $autoDepartmentId);
+        }
+
         foreach ($departments as $dept) {
             $deptQuery = Incident::where('department_id', $dept->id)
                 ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
@@ -1090,6 +1170,7 @@ class ReportController extends Controller
             'date_to' => $dateRange['end']->format('d M Y'),
             'generated_at' => now()->format('d M Y, H:i'),
             'generated_by' => Auth::user()->name,
+            'is_restricted' => !$this->hasFullAccess(),
         ];
 
         $filename = 'SLA_Report_'.now()->format('Y-m-d_His');
@@ -1103,8 +1184,6 @@ class ReportController extends Controller
         };
     }
 
-    // app/Http/Controllers/ReportController.php
-
     /**
      * Category Analysis Report
      */
@@ -1116,6 +1195,12 @@ class ReportController extends Controller
         $dateRange = $this->getDateRange($period, $request);
         $departmentId = $request->get('department_id');
         $severityFilter = $request->get('severity');
+
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
 
         // Build query
         $baseQuery = Incident::whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
@@ -1177,7 +1262,11 @@ class ReportController extends Controller
         }
 
         // Filters
-        $departments = Department::active()->ordered()->get();
+        if ($this->hasFullAccess()) {
+            $departments = Department::active()->ordered()->get();
+        } else {
+            $departments = Department::where('id', $this->getDepartmentFilter())->active()->ordered()->get();
+        }
         $categories = IncidentCategory::active()->get();
 
         return view('reports.category', compact(
@@ -1196,6 +1285,12 @@ class ReportController extends Controller
         $period = $request->get('period', 'last30days');
         $dateRange = $this->getDateRange($period, $request);
         $departmentId = $request->get('department_id');
+
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
 
         $categoryStats = IncidentCategory::active()->get()->map(function ($cat) use ($dateRange, $departmentId) {
             $query = Incident::where('category_id', $cat->id)
@@ -1218,7 +1313,13 @@ class ReportController extends Controller
 
         return match ($format) {
             'excel' => Excel::download(new CategoryReportExport($categoryStats->toArray()), $filename.'.xlsx'),
-            'pdf' => Pdf::loadView('reports.exports.category-pdf', ['categories' => $categoryStats, 'period' => $period, 'generated_at' => now()->format('d M Y, H:i'), 'generated_by' => Auth::user()->name])
+            'pdf' => Pdf::loadView('reports.exports.category-pdf', [
+                'categories' => $categoryStats, 
+                'period' => $period, 
+                'generated_at' => now()->format('d M Y, H:i'), 
+                'generated_by' => Auth::user()->name,
+                'is_restricted' => !$this->hasFullAccess(),
+            ])
                 ->setPaper('a4', 'landscape')
                 ->download($filename.'.pdf'),
             default => abort(400),
@@ -1227,49 +1328,6 @@ class ReportController extends Controller
 
     /**
      * User Performance Report
-     */
-    // public function userPerformanceReport(Request $request)
-    // {
-    //     $this->authorize('view-reports');
-
-    //     $period = $request->get('period', 'last30days');
-    //     $dateRange = $this->getDateRange($period, $request);
-    //     $departmentId = $request->get('department_id');
-    //     $roleFilter = $request->get('role');
-
-    //     $query = User::active()
-    //         ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
-    //         ->when($roleFilter, fn ($q) => $q->whereHas('roles', fn ($r) => $r->where('name', $roleFilter)));
-
-    //     $userStats = $query->get()->map(function ($user) use ($dateRange) {
-    //         $incidentQuery = Incident::whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
-
-    //         return [
-    //             'id' => $user->id,
-    //             'name' => $user->name,
-    //             'avatar_url' => $user->avatar_url,
-    //             'department' => $user->department?->name,
-    //             'role' => $user->getFirstRoleName(),
-    //             'reported' => (clone $incidentQuery)->where('reported_by', $user->id)->count(),
-    //             'assigned' => (clone $incidentQuery)->where('assigned_to', $user->id)->count(),
-    //             'resolved' => (clone $incidentQuery)->where('assigned_to', $user->id)->whereIn('status', ['resolved', 'closed'])->count(),
-    //             'avg_response' => round((clone $incidentQuery)->where('assigned_to', $user->id)->whereNotNull('acknowledged_at')
-    //                 ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, acknowledged_at)) as avg_time')
-    //                 ->value('avg_time') ?? 0, 1),
-    //             'avg_resolution' => round((clone $incidentQuery)->where('assigned_to', $user->id)->whereNotNull('resolved_at')
-    //                 ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) as avg_time')
-    //                 ->value('avg_time') ?? 0, 1),
-    //         ];
-    //     })->filter(fn ($u) => $u['reported'] > 0 || $u['assigned'] > 0)->sortByDesc('resolved');
-
-    //     $departments = Department::active()->ordered()->get();
-    //     $roles = Role::all();
-
-    //     return view('reports.user-performance', compact('userStats', 'departments', 'roles', 'period', 'departmentId', 'roleFilter'));
-    // }
-
-    /**
-     * User Performance Report - FIXED aggregate queries
      */
     public function userPerformanceReport(Request $request)
     {
@@ -1280,9 +1338,20 @@ class ReportController extends Controller
         $departmentId = $request->get('department_id');
         $roleFilter = $request->get('role');
 
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
+
         $query = User::active()
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->when($roleFilter, fn ($q) => $q->whereHas('roles', fn ($r) => $r->where('name', $roleFilter)));
+
+        // If non-admin, only show users in their department
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $query->where('department_id', $autoDepartmentId);
+        }
 
         $userStats = $query->get()->map(function ($user) use ($dateRange) {
             $reported = Incident::where('reported_by', $user->id)
@@ -1295,7 +1364,6 @@ class ReportController extends Controller
                 ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']])
                 ->whereIn('status', ['resolved', 'closed'])->count();
 
-            // Use DB facade for aggregate
             $avgResponse = DB::table('incidents')
                 ->whereNull('deleted_at')
                 ->where('assigned_to', $user->id)
@@ -1326,7 +1394,11 @@ class ReportController extends Controller
             ];
         })->filter(fn ($u) => $u['reported'] > 0 || $u['assigned'] > 0)->sortByDesc('resolved');
 
-        $departments = Department::active()->ordered()->get();
+        if ($this->hasFullAccess()) {
+            $departments = Department::active()->ordered()->get();
+        } else {
+            $departments = Department::where('id', $this->getDepartmentFilter())->active()->ordered()->get();
+        }
         $roles = Role::all();
 
         return view('reports.user-performance', compact('userStats', 'departments', 'roles', 'period', 'departmentId', 'roleFilter'));
@@ -1342,6 +1414,12 @@ class ReportController extends Controller
         $period = $request->get('period', 'last30days');
         $dateRange = $this->getDateRange($period, $request);
         $departmentId = $request->get('department_id');
+
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
 
         // Escalation stats
         $escalatedIncidents = Incident::where('status', 'escalated')
@@ -1369,7 +1447,11 @@ class ReportController extends Controller
             ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']])->count();
         $manualEscalated = $totalEscalated - $autoEscalated;
 
-        $departments = Department::active()->ordered()->get();
+        if ($this->hasFullAccess()) {
+            $departments = Department::active()->ordered()->get();
+        } else {
+            $departments = Department::where('id', $this->getDepartmentFilter())->active()->ordered()->get();
+        }
 
         return view('reports.escalation', compact(
             'escalatedIncidents', 'totalEscalated', 'escalationByDept',
@@ -1391,6 +1473,12 @@ class ReportController extends Controller
         $categoryId = $request->get('category_id');
         $statusFilter = $request->get('status');
         $severityFilter = $request->get('severity');
+
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
 
         $dateRange = [
             'start' => Carbon::parse($dateFrom)->startOfDay(),
@@ -1418,7 +1506,11 @@ class ReportController extends Controller
 
         $kpiData = $this->getKpiMetricsForQuery(clone $baseQuery);
 
-        $departments = Department::active()->ordered()->get();
+        if ($this->hasFullAccess()) {
+            $departments = Department::active()->ordered()->get();
+        } else {
+            $departments = Department::where('id', $this->getDepartmentFilter())->active()->ordered()->get();
+        }
         $categories = IncidentCategory::active()->get();
 
         return view('reports.custom', compact(
@@ -1426,7 +1518,6 @@ class ReportController extends Controller
             'departments', 'categories', 'departmentId', 'categoryId', 'statusFilter', 'severityFilter'
         ));
     }
-    // app/Http/Controllers/ReportController.php
 
     /**
      * Export Custom Date Report
@@ -1441,6 +1532,12 @@ class ReportController extends Controller
         $categoryId = $request->get('category_id');
         $statusFilter = $request->get('status');
         $severityFilter = $request->get('severity');
+
+        // AUTO FILTER: Apply department restriction for non-admin users
+        $autoDepartmentId = $this->getDepartmentFilter();
+        if ($autoDepartmentId && !$this->hasFullAccess()) {
+            $departmentId = $autoDepartmentId;
+        }
 
         $dateRange = [
             'start' => Carbon::parse($dateFrom)->startOfDay(),
@@ -1470,6 +1567,8 @@ class ReportController extends Controller
             'total' => $incidents->count(),
             'generated_at' => now()->format('d M Y, H:i'),
             'generated_by' => Auth::user()->name,
+            'is_restricted' => !$this->hasFullAccess(),
+            'department_name' => $departmentId ? Department::find($departmentId)?->name : 'All Departments',
         ];
 
         $filename = 'Custom_Report_'.now()->format('Y-m-d_His');

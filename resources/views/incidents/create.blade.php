@@ -4,12 +4,13 @@
 @section('title', 'Report New Incident - IRMS')
 
 @push('styles')
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.css">
 <style>
     .form-section {
         background: #ffffff;
         border: 1px solid #e5e7eb;
         border-radius: 16px;
-        padding: 24px;
+        padding: 10px;
         margin-bottom: 20px;
         transition: all 0.2s ease;
     }
@@ -115,16 +116,94 @@
         gap: 10px;
         margin-top: 16px;
     }
+    
+    /* Preview overlay for edit button */
+.preview-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #e5e7eb;
+    background: #f9fafb;
+    transition: all 0.2s;
+}
 
-    .preview-item {
-        position: relative;
-        aspect-ratio: 1;
-        border-radius: 10px;
-        overflow: hidden;
-        border: 2px solid #e5e7eb;
-        background: #f9fafb;
-        transition: all 0.2s;
-    }
+.preview-item:hover .preview-overlay {
+    opacity: 1;
+}
+
+.preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    gap: 8px;
+}
+
+.preview-overlay .btn-edit-image {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    color: #0d6efd;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preview-overlay .btn-edit-image:hover {
+    transform: scale(1.1);
+    background: white;
+    box-shadow: 0 0 20px rgba(13, 110, 253, 0.3);
+}
+
+.preview-item .btn-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    z-index: 2;
+    padding: 0;
+    line-height: 1;
+    transition: all 0.2s;
+}
+
+.preview-item .btn-remove:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+    /*.preview-item {*/
+    /*    position: relative;*/
+    /*    aspect-ratio: 1;*/
+    /*    border-radius: 10px;*/
+    /*    overflow: hidden;*/
+    /*    border: 2px solid #e5e7eb;*/
+    /*    background: #f9fafb;*/
+    /*    transition: all 0.2s;*/
+    /*}*/
 
     .preview-item:hover {
         border-color: #3b82f6;
@@ -326,6 +405,141 @@
             grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
         }
     }
+    
+    /*for better User Experience*/
+    /* Form Validation Styles */
+    .form-control:required {
+        border-color: #dc3545;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .form-control:required:focus {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+    
+    .form-control:required:valid {
+        border-color: #28a745;
+    }
+    
+    .form-control:required:valid:focus {
+        border-color: #28a745;
+        box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+    }
+    
+    /* Select validation */
+    .form-select:required {
+        border-color: #dc3545;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .form-select:required:focus {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+    
+    .form-select:required:valid {
+        border-color: #28a745;
+    }
+    
+    .form-select:required:valid:focus {
+        border-color: #28a745;
+        box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+    }
+    
+    /* Textarea validation */
+    textarea:required {
+        border-color: #dc3545;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    textarea:required:focus {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.15);
+    }
+    
+    textarea:required:valid {
+        border-color: #28a745;
+    }
+    
+    textarea:required:valid:focus {
+        border-color: #28a745;
+        box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+    }
+    
+    /* Success icon for filled fields */
+    .form-control:required:valid,
+    .form-select:required:valid,
+    textarea:required:valid {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2328a745' class='bi bi-check-circle-fill' viewBox='0 0 16 16'%3E%3Cpath d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 16px;
+        padding-right: 40px;
+    }
+    
+    /* Red icon for empty required fields */
+    .form-control:required:invalid:not(:placeholder-shown),
+    .form-select:required:invalid:not(:focus) {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23dc3545' class='bi bi-exclamation-circle-fill' viewBox='0 0 16 16'%3E%3Cpath d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 16px;
+        padding-right: 40px;
+    }
+    
+    /* Floating label effect for validation status */
+    .form-group-valid {
+        position: relative;
+    }
+    
+    .form-group-valid .validation-status {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.8rem;
+    }
+    
+    /* Optional: Add a subtle animation when field becomes valid */
+    @keyframes validPulse {
+        0% { border-color: #28a745; }
+        50% { border-color: #34ce57; box-shadow: 0 0 0 5px rgba(40, 167, 69, 0.2); }
+        100% { border-color: #28a745; }
+    }
+    
+    .form-control:required:valid:not(:focus) {
+        animation: validPulse 0.5s ease;
+    }
+    
+    /* Invalid shake animation */
+    @keyframes invalidShake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
+    
+    .form-control:required:invalid:focus,
+    .form-select:required:invalid:focus {
+        animation: invalidShake 0.5s ease;
+    }
+    
+    /* Custom validation messages */
+    .validation-feedback {
+        font-size: 0.75rem;
+        margin-top: 4px;
+        display: none;
+    }
+    
+    .validation-feedback.error {
+        color: #dc3545;
+        display: block;
+    }
+    
+    .validation-feedback.success {
+        color: #28a745;
+        display: block;
+    }
 </style>
 @endpush
 
@@ -358,53 +572,115 @@
                             <small class="text-muted">Provide the core details of the incident</small>
                         </div>
                     </div>
+
                     <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
+                            <select name="category_id" id="categorySelect" class="form-select @error('category_id') is-invalid @enderror" required>
+                                <option value="">Select Category</option>
+                                @foreach($categories as $cat)
+                                    <option value="{{ $cat->id }}" 
+                                            data-department="{{ $cat->department_id ?? '' }}"
+                                            data-description="{{ $cat->description ?? '' }}"
+                                            {{ old('category_id') == $cat->id ? 'selected' : '' }}>
+                                        {{ $cat->name }}
+                                        @if($cat->department)
+                                            ({{ $cat->department->code }})
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <small class="text-muted" id="categoryHelper">Select a category to auto-fill department and title</small>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
+                            <select name="department_id" id="departmentSelect"
+                                class="form-select @error('department_id') is-invalid @enderror" required>
+                                <option value="">Select Department</option>
+                                @foreach($departments as $dept)
+                                    <option value="{{ $dept->id }}" 
+                                        {{ old('department_id', auth()->user()->department_id) == $dept->id ? 'selected' : '' }}>
+                                        {{ $dept->name }} ({{ $dept->code }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('department_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <small class="text-muted" id="departmentHelper">Auto-selected based on category, but you can change</small>
+                        </div>
+                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Incident Title <span
-                                    class="text-danger">*</span></label>
-                            <input type="text" name="title"
+                            <label class="form-label fw-semibold">Incident Title <span class="text-danger">*</span></label>
+                            <input type="text" name="title" id="incidentTitle"
                                 class="form-control form-control-lg @error('title') is-invalid @enderror"
                                 value="{{ old('title') }}"
                                 placeholder="e.g., Water leakage spotted in Terminal 1 lobby area" required>
                             @error('title')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <small class="text-muted" id="titleHelper">You can edit this title</small>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
-                            <select name="category_id" class="form-select @error('category_id') is-invalid @enderror"
-                                required>
-                                <option value="">Select Category</option>
-                                @foreach($categories as $cat)
-                                <option value="{{ $cat->id }}" {{ old('category_id')==$cat->id ? 'selected' : '' }}>{{
-                                    $cat->name }}</option>
-                                @endforeach
-                            </select>
-                            @error('category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
-                            <select name="department_id"
-                                class="form-select @error('department_id') is-invalid @enderror" required>
-                                <option value="">Select Department</option>
-                                @foreach($departments as $dept)
-                                <option value="{{ $dept->id }}" {{ old('department_id', auth()->user()->department_id)
-                                    == $dept->id ? 'selected' : '' }}>
-                                    {{ $dept->name }} ({{ $dept->code }})
-                                </option>
-                                @endforeach
-                            </select>
-                            @error('department_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
+                        
+                        
+                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Location</label>
+                            <label class="form-label fw-semibold">Location <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white"><i
-                                        class="fas fa-map-marker-alt text-muted"></i></span>
-                                <input type="text" name="location"
+                                <span class="input-group-text bg-white"><i class="fas fa-map-marker-alt text-muted"></i></span>
+                                <input type="text" name="location" id="incidentLocation"
                                     class="form-control @error('location') is-invalid @enderror"
-                                    value="{{ old('location') }}" placeholder="e.g., Terminal 1, Gate A">
+                                    value="{{ old('location') }}" placeholder="e.g., Terminal 1, Gate A" required>
                             </div>
                             @error('location')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
+                    </div>
+                </div> <!-- End of Basic Information Section -->
+
+
+
+                {{-- Section 3: Description & Tags --}}
+                <div class="form-section">
+                    <div class="section-heading">
+                        <div class="section-icon bg-info bg-opacity-10 text-info">
+                            <i class="fas fa-align-left"></i>
+                        </div>
+                        <div>
+                            <div class="section-title">Description & Tags</div>
+                            <small class="text-muted">Provide detailed information and categorize the incident</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Detailed Description <span class="text-danger">*</span></label>
+                        <textarea name="description" class="form-control @error('description') is-invalid @enderror"
+                            rows="5" placeholder="Please describe the incident in detail..."
+                            required>{{ old('description') }}</textarea>
+                        <small class="text-muted float-end mt-1"><span id="charCount">0</span>/5000</small>
+                        @error('description')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                    </div>
+
+                    {{-- Predefined Tags --}}
+                    <div>
+                        <label class="form-label fw-semibold">Quick Tags</label>
+                        <div class="tag-selector" id="tagSelector">
+                            <span class="tag-chip" data-tag="urgent"><span class="tag-emoji">🔴</span> Urgent</span>
+                            <span class="tag-chip" data-tag="safety"><span class="tag-emoji">🦺</span> Safety</span>
+                            <span class="tag-chip" data-tag="maintenance"><span class="tag-emoji">🔧</span> Maintenance</span>
+                            <span class="tag-chip" data-tag="security"><span class="tag-emoji">🔒</span> Security</span>
+                            <span class="tag-chip" data-tag="electrical"><span class="tag-emoji">⚡</span> Electrical</span>
+                            <span class="tag-chip" data-tag="water-leak"><span class="tag-emoji">💧</span> Water Leak</span>
+                            <span class="tag-chip" data-tag="cleaning"><span class="tag-emoji">🧹</span> Cleaning</span>
+                            <span class="tag-chip" data-tag="it-issue"><span class="tag-emoji">💻</span> IT Issue</span>
+                            <span class="tag-chip" data-tag="fire"><span class="tag-emoji">🔥</span> Fire Hazard</span>
+                            <span class="tag-chip" data-tag="structural"><span class="tag-emoji">🏗️</span> Structural</span>
+                            <span class="tag-chip" data-tag="vehicle"><span class="tag-emoji">🚗</span> Vehicle</span>
+                            <span class="tag-chip" data-tag="noise"><span class="tag-emoji">🔊</span> Noise</span>
+                        </div>
+                        <div class="selected-tags-display" id="selectedTagsDisplay"></div>
+                        <div class="tags-input-wrapper">
+                            <input type="text" id="customTagInput" class="form-control form-control-sm"
+                                placeholder="Type custom tag and press Enter or comma...">
+                        </div>
+                        <input type="hidden" name="tags" id="tagsHidden" value="{{ old('tags') }}">
+                        <small class="text-muted">Click predefined tags or type your own. Press Enter or comma to add.</small>
                     </div>
                 </div>
 
@@ -421,90 +697,28 @@
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Severity Level <span
-                                    class="text-danger">*</span></label>
-                            <select name="severity" class="form-select @error('severity') is-invalid @enderror"
-                                required>
-                                <option value="low" {{ old('severity')=='low' ? 'selected' : '' }}>🟢 Low - Minor issue
-                                </option>
-                                <option value="medium" {{ old('severity', 'medium' )=='medium' ? 'selected' : '' }}>🟡
-                                    Medium - Attention required</option>
-                                <option value="high" {{ old('severity')=='high' ? 'selected' : '' }}>🟠 High - Urgent
-                                    action needed</option>
-                                <option value="critical" {{ old('severity')=='critical' ? 'selected' : '' }}>🔴 Critical
-                                    - Immediate action</option>
+                            <label class="form-label fw-semibold">Severity Level <span class="text-danger">*</span></label>
+                            <select name="severity" class="form-select @error('severity') is-invalid @enderror" required>
+                                <option value="low" {{ old('severity')=='low' ? 'selected' : '' }}>🟢 Low - Minor issue</option>
+                                <option value="medium" {{ old('severity', 'medium' )=='medium' ? 'selected' : '' }}>🟡 Medium - Attention required</option>
+                                <option value="high" {{ old('severity')=='high' ? 'selected' : '' }}>🟠 High - Urgent action needed</option>
+                                <option value="critical" {{ old('severity')=='critical' ? 'selected' : '' }}>🔴 Critical - Immediate action</option>
                             </select>
                             @error('severity')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Priority <span class="text-danger">*</span></label>
-                            <select name="priority" class="form-select @error('priority') is-invalid @enderror"
-                                required>
+                            <select name="priority" class="form-select @error('priority') is-invalid @enderror" required>
                                 <option value="low" {{ old('priority')=='low' ? 'selected' : '' }}>Low</option>
-                                <option value="medium" {{ old('priority', 'medium' )=='medium' ? 'selected' : '' }}>
-                                    Medium</option>
+                                <option value="medium" {{ old('priority', 'medium' )=='medium' ? 'selected' : '' }}>Medium</option>
                                 <option value="high" {{ old('priority')=='high' ? 'selected' : '' }}>High</option>
-                                <option value="critical" {{ old('priority')=='critical' ? 'selected' : '' }}>Critical
-                                </option>
+                                <option value="critical" {{ old('priority')=='critical' ? 'selected' : '' }}>Critical</option>
                             </select>
                             @error('priority')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
                 </div>
-
-                {{-- Section 3: Description & Tags --}}
-                <div class="form-section">
-                    <div class="section-heading">
-                        <div class="section-icon bg-info bg-opacity-10 text-info">
-                            <i class="fas fa-align-left"></i>
-                        </div>
-                        <div>
-                            <div class="section-title">Description & Tags</div>
-                            <small class="text-muted">Provide detailed information and categorize the incident</small>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Detailed Description <span
-                                class="text-danger">*</span></label>
-                        <textarea name="description" class="form-control @error('description') is-invalid @enderror"
-                            rows="5" placeholder="Please describe the incident in detail..."
-                            required>{{ old('description') }}</textarea>
-                        <small class="text-muted float-end mt-1"><span id="charCount">0</span>/5000</small>
-                        @error('description')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                    </div>
-
-                    {{-- Predefined Tags --}}
-                    <div>
-                        <label class="form-label fw-semibold">Quick Tags</label>
-                        <div class="tag-selector" id="tagSelector">
-                            <span class="tag-chip" data-tag="urgent"><span class="tag-emoji">🔴</span> Urgent</span>
-                            <span class="tag-chip" data-tag="safety"><span class="tag-emoji">🦺</span> Safety</span>
-                            <span class="tag-chip" data-tag="maintenance"><span class="tag-emoji">🔧</span>
-                                Maintenance</span>
-                            <span class="tag-chip" data-tag="security"><span class="tag-emoji">🔒</span> Security</span>
-                            <span class="tag-chip" data-tag="electrical"><span class="tag-emoji">⚡</span>
-                                Electrical</span>
-                            <span class="tag-chip" data-tag="water-leak"><span class="tag-emoji">💧</span> Water
-                                Leak</span>
-                            <span class="tag-chip" data-tag="cleaning"><span class="tag-emoji">🧹</span> Cleaning</span>
-                            <span class="tag-chip" data-tag="it-issue"><span class="tag-emoji">💻</span> IT Issue</span>
-                            <span class="tag-chip" data-tag="fire"><span class="tag-emoji">🔥</span> Fire Hazard</span>
-                            <span class="tag-chip" data-tag="structural"><span class="tag-emoji">🏗️</span>
-                                Structural</span>
-                            <span class="tag-chip" data-tag="vehicle"><span class="tag-emoji">🚗</span> Vehicle</span>
-                            <span class="tag-chip" data-tag="noise"><span class="tag-emoji">🔊</span> Noise</span>
-                        </div>
-                        <div class="selected-tags-display" id="selectedTagsDisplay"></div>
-                        <div class="tags-input-wrapper">
-                            <input type="text" id="customTagInput" class="form-control form-control-sm"
-                                placeholder="Type custom tag and press Enter or comma...">
-                        </div>
-                        <input type="hidden" name="tags" id="tagsHidden" value="{{ old('tags') }}">
-                        <small class="text-muted">Click predefined tags or type your own. Press Enter or comma to
-                            add.</small>
-                    </div>
-                </div>
-
+                
                 {{-- Section 4: Attachments --}}
                 <div class="form-section">
                     <div class="section-heading">
@@ -513,8 +727,7 @@
                         </div>
                         <div>
                             <div class="section-title">Attachments</div>
-                            <small class="text-muted">Upload photos, videos, or documents (Max 20MB each - images
-                                auto-compressed)</small>
+                            <small class="text-muted">Upload photos, videos, or documents (Max 20MB each - images auto-compressed)</small>
                         </div>
                     </div>
 
@@ -539,7 +752,7 @@
                     <div class="preview-grid" id="previewContainer"></div>
                 </div>
 
-                {{-- Section 5: Options -- no need --}}
+                {{-- Section 5: Options --}}
                 <div class="form-section d-none">
                     <div class="section-heading">
                         <div class="section-icon bg-secondary bg-opacity-10 text-secondary">
@@ -569,7 +782,7 @@
                     <a href="{{ route('incidents.index') }}" class="btn btn-light btn-lg px-4 order-2 order-sm-1">
                         <i class="fas fa-times me-2"></i>Cancel
                     </a>
-                    <button type="submit" class="btn btn-primary btn-lg px-5 id=" submitBtn" order-1 order-sm-2">
+                    <button type="submit" class="btn btn-primary btn-lg px-5 order-1 order-sm-2" id="submitBtn">
                         <i class="fas fa-paper-plane me-2"></i>Submit Incident
                     </button>
                 </div>
@@ -592,7 +805,11 @@
         </div>
     </div>
 </div>
+{{-- Image Editor Modal --}}
+@include('components.image-editor-modal')
+
 @endsection
 
 {{-- Core Scripts --}}
 @include('incidents.partials.core_create_script')
+@include('incidents.partials.image_editor_script')

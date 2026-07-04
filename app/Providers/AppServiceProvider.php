@@ -70,5 +70,27 @@ class AppServiceProvider extends ServiceProvider
         \Blade::if('hod', function () {
             return auth()->check() && auth()->user()->isHOD();
         });
+        
+        
+        //'open','acknowledged','in_progress','escalated','resolved','closed','rejected'
+         // Dynamic Badge Counter for Navigation/Layouts
+        view()->composer('*', function ($view) {
+            if (auth()->check()) {
+                $user = auth()->user();
+                
+                // Base query for un-resolved and un-closed incidents
+                $query = Incident::whereNotIn('status', ['resolved', 'closed']);
+        
+                // Filter by department ONLY IF the user is NOT a super-admin and NOT a director
+                if (!$user->hasRole(['super-admin', 'director'])) {
+                    $query->where('department_id', $user->department_id);
+                }
+        
+                $openCount = $query->count();
+                
+                $view->with('globalOpenIncidentCount', $openCount);
+            }
+        });
+
     }
 }

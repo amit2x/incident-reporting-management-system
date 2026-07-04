@@ -135,6 +135,47 @@
         min-height: 100vh;
         min-height: -webkit-fill-available;
     }
+    
+    /* Set background on body */
+    /*body {*/
+    /*    background: url('/images/background.webp') no-repeat center center fixed;*/
+    /*    background-size: cover;*/
+    /*    position: relative;*/
+    /*    min-height: 100vh;*/
+    /*}*/
+
+    /* Add overlay with very low opacity */
+    /*body::before {*/
+    /*    content: '';*/
+    /*    position: fixed;*/
+    /*    inset: 0;*/
+        /*background: rgba(255, 255, 255, 0.15); /* Very low opacity white overlay 
+        /* OR use dark overlay with low opacity */
+        /* background: rgba(0, 0, 0, 0.1); */
+    /*    z-index: 0;*/
+    /*    pointer-events: none;*/
+    /*}*/
+    
+    /* Even more subtle background */
+body {
+    background: url('/images/background.webp') no-repeat center center fixed;
+    background-size: cover;
+    position: relative;
+    min-height: 100vh;
+}
+
+/* Very light overlay with blur */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.15);
+    /*backdrop-filter: blur(2px);*/
+    z-index: 0;
+    pointer-events: none;
+}
+
+
 
     h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-heading);

@@ -46,7 +46,9 @@ class IncidentClosedNotification extends Notification implements ShouldQueue
             ->line("**Title:** {$this->incident->title}")
             ->action('View Incident', $url)
             ->line('This incident is now closed.')
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+                        ->salutation("Regards,\nSAMANVAY");
+
     }
 
     /**

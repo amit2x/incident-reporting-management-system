@@ -70,18 +70,30 @@
         <div class="col-lg-4">
             <div class="card shadow-sm text-center">
                 <div class="card-body p-4">
-                    <form action="{{ route('profile.avatar') }}" method="POST" enctype="multipart/form-data"
-                        id="avatarForm">
-                        @csrf
-                        <label class="profile-avatar-wrapper" for="avatarInput">
-                            <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="profile-avatar">
-                            <div class="avatar-overlay">
-                                <i class="fas fa-camera"></i>
+                   <form action="{{ route('profile.avatar') }}" method="POST" enctype="multipart/form-data" id="avatarForm">
+                    @csrf
+                    
+                    <label class="profile-avatar-wrapper position-relative d-inline-block" for="avatarInput" id="avatarLabel" style="cursor: pointer;">
+                        {{-- Avatar Image --}}
+                        <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="profile-avatar rounded-circle">
+                        
+                        {{-- Camera Hover Icon --}}
+                        <div class="avatar-overlay">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                
+                        {{-- 🌀 Bootstrap Loading Spinner (Hidden by default) --}}
+                        <div id="avatarSpinner" class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 rounded-circle d-none d-flex align-items-center justify-content-center" style="z-index: 5;">
+                            <div class="spinner-border text-light" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
-                        </label>
-                        <input type="file" id="avatarInput" name="avatar" accept="image/*" class="d-none"
-                            onchange="document.getElementById('avatarForm').submit();">
-                    </form>
+                        </div>
+                    </label>
+                    
+                    {{-- Hidden File Input --}}
+                    <input type="file" id="avatarInput" name="avatar" accept="image/*" class="d-none" 
+                           onchange="document.getElementById('avatarSpinner').classList.remove('d-none'); document.getElementById('avatarForm').submit();">
+                </form>
 
                     <h5 class="mt-3 mb-1">{{ $user->name }}</h5>
                     <p class="text-muted small mb-2">{{ $user->email }}</p>

@@ -58,6 +58,20 @@
                                 </select>
                                 @error('parent_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Associated Department <span class="text-danger">*</span></label>
+                                <select name="department_id" class="form-select @error('department_id') is-invalid @enderror" required>
+                                    <option value="">Select Department</option>
+                                    @foreach($departments as $dept)
+                                        <option value="{{ $dept->id }}"
+                                            {{ old('department_id', $category->department_id ?? '') == $dept->id ? 'selected' : '' }}>
+                                            {{ $dept->name }} ({{ $dept->code }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('department_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <small class="text-muted">Select which department this category belongs to. This will auto-select the department when creating incidents.</small>
+                            </div>
                             <div class="col-md-3">
                                 <label class="form-label">Sort Order</label>
                                 <input type="number" name="sort_order" class="form-control @error('sort_order') is-invalid @enderror"

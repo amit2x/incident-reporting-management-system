@@ -67,6 +67,149 @@
 </style>
 @endpush
 
+{{-- Include media viewer styles --}}
+@push('styles')
+<style>
+    #mediaModal .modal-content {
+        background: #1a1a2e;
+        border-radius: 16px;
+    }
+    
+    #mediaModal .modal-header {
+        padding: 16px 24px;
+    }
+    
+    #mediaModal .btn-close-white {
+        filter: brightness(0) invert(1);
+    }
+    
+    #mediaModal .media-thumbnail {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+        opacity: 0.6;
+    }
+    
+    #mediaModal .media-thumbnail:hover {
+        opacity: 0.9;
+        transform: scale(1.05);
+    }
+    
+    #mediaModal .media-thumbnail.active {
+        border-color: #fff;
+        opacity: 1;
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+    
+    #mediaModal .media-thumbnail-doc {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+        opacity: 0.6;
+        background: #2a2a4e;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #888;
+    }
+    
+    #mediaModal .media-thumbnail-doc:hover {
+        opacity: 0.9;
+        transform: scale(1.05);
+    }
+    
+    #mediaModal .media-thumbnail-doc.active {
+        border-color: #fff;
+        opacity: 1;
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+    
+    #mediaModal .nav-arrow {
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(4px);
+        border: none;
+        color: white;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    
+    #mediaModal .nav-arrow:hover {
+        background: rgba(255,255,255,0.2);
+        transform: scale(1.1);
+    }
+    
+    .media-thumbnail-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .media-thumbnail-wrapper .file-type-badge {
+        position: absolute;
+        bottom: 4px;
+        right: 4px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        font-size: 8px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        text-transform: uppercase;
+    }
+    
+    
+    .media-thumb-wrapper {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    transition: transform 0.2s ease;
+}
+
+.media-thumb-wrapper:hover {
+    transform: scale(1.03);
+    z-index: 1;
+}
+
+.media-thumb-wrapper .play-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.4);
+    border-radius: 50%;
+    padding: 12px;
+}
+
+.media-thumb-wrapper video {
+    background: #000;
+}
+
+.media-thumb-wrapper .file-type-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+</style>
+@endpush
+
+
+
 @section('content')
 <div class="py-3">
 
@@ -444,6 +587,7 @@
                                 <span class="fw-medium" style="white-space: pre-wrap;">{{ $incident->resolution_notes
                                     }}</span>
 
+
                                 {{-- Resolution Attachments --}}
                                 @php
                                 $resolutionMedia = $incident->media()
@@ -453,30 +597,32 @@
                                 ])
                                 ->get();
                                 @endphp
-                                @if($resolutionMedia->count() > 0)
-                                <div class="mt-3">
-                                    <small class="text-muted d-block mb-2">📎 Resolution Attachments</small>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        @foreach($resolutionMedia as $media)
-                                        @if($media->isImage())
-                                        <a href="{{ $media->url }}" target="_blank" class="d-inline-block">
-                                            <img src="{{ $media->url }}"
-                                                style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;cursor:pointer;"
-                                                class="border shadow-sm">
-                                        </a>
-                                        @else
-                                        <a href="{{ $media->url }}" target="_blank"
-                                            class="badge bg-white border text-dark text-decoration-none d-inline-flex align-items-center gap-1"
-                                            style="padding:8px 12px;font-size:0.75rem;">
-                                            <i class="fas fa-file text-muted"></i>
-                                            {{ Str::limit($media->original_name, 25) }}
-                                            <small class="text-muted">({{ round($media->file_size/1024, 1) }}KB)</small>
-                                        </a>
-                                        @endif
-                                        @endforeach
-                                    </div>
-                                </div>
-                                @endif
+                                
+                                {{-- Resolution Attachments --}}
+@if($resolutionMedia->count() > 0)
+<div class="mt-3">
+    <small class="text-muted d-block mb-2">📎 Resolution Attachments</small>
+    <div class="d-flex flex-wrap gap-2">
+        @foreach($resolutionMedia as $media)
+        @if($media->isImage())
+        <img src="{{ $media->url }}" 
+             style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;cursor:pointer;"
+             class="border shadow-sm"
+             onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'image'); return false;">
+        @else
+        <span class="badge bg-white border text-dark text-decoration-none d-inline-flex align-items-center gap-1"
+              style="padding:8px 12px;font-size:0.75rem;cursor:pointer;"
+              onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'document'); return false;">
+            <i class="fas fa-file text-muted"></i>
+            {{ Str::limit($media->original_name, 25) }}
+            <small class="text-muted">({{ round($media->file_size/1024, 1) }}KB)</small>
+        </span>
+        @endif
+        @endforeach
+    </div>
+</div>
+@endif
+                                
                             </div>
                         </div>
                         @endif
@@ -492,6 +638,8 @@
                             </div>
                         </div>
                         @endif
+                        
+                        
 
                         {{-- Closing Information - Full width always --}}
                         @if($incident->status === 'closed')
@@ -518,25 +666,25 @@
                                     {{ trim(str_replace('🔒 **Incident Closed**', '', $closingComment->content)) }}
                                 </div>
                                 @endif
+                                
                                 @if($closingMedia->count() > 0)
-                                <div class="d-flex flex-wrap gap-2 mt-2">
-                                    @foreach($closingMedia as $media)
-                                    @if($media->isImage())
-                                    <a href="{{ $media->url }}" target="_blank">
-                                        <img src="{{ $media->url }}"
-                                            style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;"
-                                            class="border shadow-sm">
-                                    </a>
-                                    @else
-                                    <a href="{{ $media->url }}" target="_blank"
-                                        class="badge bg-white border text-dark text-decoration-none d-inline-flex align-items-center gap-1"
-                                        style="padding:8px 12px;">
-                                        <i class="fas fa-file"></i> {{ Str::limit($media->original_name, 25) }}
-                                    </a>
-                                    @endif
-                                    @endforeach
-                                </div>
-                                @endif
+<div class="d-flex flex-wrap gap-2 mt-2">
+    @foreach($closingMedia as $media)
+    @if($media->isImage())
+    <img src="{{ $media->url }}" 
+         style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;cursor:pointer;"
+         class="border shadow-sm"
+         onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'image'); return false;">
+    @else
+    <span class="badge bg-white border text-dark text-decoration-none d-inline-flex align-items-center gap-1"
+          style="padding:8px 12px;cursor:pointer;"
+          onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'document'); return false;">
+        <i class="fas fa-file"></i> {{ Str::limit($media->original_name, 25) }}
+    </span>
+    @endif
+    @endforeach
+</div>
+@endif
                             </div>
                         </div>
                         @endif
@@ -546,24 +694,57 @@
             </div>
 
 
+            
+            
             {{-- Media --}}
-            @if($incident->media->count() > 0)
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header bg-white"><strong><i class="fas fa-paperclip text-success me-2"></i>Attachments
-                        ({{ $incident->media->count() }})</strong></div>
-                <div class="card-body">
-                    <div class="row g-2">@foreach($incident->media as $media)<div class="col-4 col-md-3 col-lg-2">
-                            @if($media->isImage())<img src="{{ $media->url }}" class="img-fluid rounded media-thumb"
-                                style="width:100%;height:100px;object-fit:cover;"
-                                onclick="window.open('{{ $media->url }}','_blank')">@else<a href="{{ $media->url }}"
-                                target="_blank" class="text-decoration-none">
-                                <div class="border rounded p-2 text-center" style="height:100px;"><i
-                                        class="fas fa-file fa-2x text-muted mt-2"></i><small
-                                        class="d-block text-truncate mt-1">{{ $media->original_name }}</small></div>
-                            </a>@endif</div>@endforeach</div>
+@if($incident->media->count() > 0)
+<div class="card mb-3 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong><i class="fas fa-paperclip text-success me-2"></i>Attachments ({{ $incident->media->count() }})</strong>
+        <button class="btn btn-sm btn-outline-primary" onclick="openMediaModal(0)">
+            <i class="fas fa-expand me-1"></i>View All
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="row g-2" id="mediaGallery">
+            @foreach($incident->media as $index => $media)
+            <div class="col-4 col-md-3 col-lg-2">
+                <div class="media-thumb-wrapper position-relative" style="cursor:pointer;" 
+                     onclick="openMediaModal({{ $index }})">
+                    @if($media->isImage())
+                        <img src="{{ $media->url }}" 
+                             class="img-fluid rounded w-100" 
+                             style="height:100px;object-fit:cover;"
+                             alt="{{ $media->original_name }}"
+                             loading="lazy">
+                    @elseif($media->isVideo())
+                        <div class="position-relative rounded bg-dark" style="height:100px;overflow:hidden;">
+                            <video src="{{ $media->url }}" 
+                                   style="width:100%;height:100%;object-fit:cover;"
+                                   preload="metadata"></video>
+                            <div class="position-absolute top-50 start-50 translate-middle text-white">
+                                <i class="fas fa-play-circle fa-2x" style="opacity:0.7;"></i>
+                            </div>
+                        </div>
+                    @else
+                        <div class="border rounded d-flex flex-column align-items-center justify-content-center bg-light" 
+                             style="height:100px;">
+                            <i class="fas fa-file fa-2x text-muted"></i>
+                            <small class="text-muted text-center text-truncate w-100 px-1" 
+                                   style="font-size:0.6rem;">{{ Str::limit($media->original_name, 15) }}</small>
+                        </div>
+                    @endif
+                    <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-50 text-white small px-1 text-truncate"
+                         style="font-size:0.55rem; border-radius: 0 0 4px 4px;">
+                        {{ Str::limit($media->original_name, 20) }}
+                    </div>
                 </div>
             </div>
-            @endif
+            @endforeach
+        </div>
+    </div>
+</div>
+@endif
 
             {{-- Comments --}}
             <div class="card shadow-sm" id="commentsSection">
@@ -686,9 +867,83 @@
     </div>
 </div>
 
+{{-- Media Modal for viewing images/videos/files --}}
+{{-- Media Modal --}}
+<div class="modal fade" id="mediaModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content bg-dark border-0">
+            <div class="modal-header border-0 pb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark" id="mediaCounter">1 / 1</span>
+                    <span class="text-muted small" id="mediaFileName">file.jpg</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="#" id="mediaDownloadBtn" class="btn btn-sm btn-light" download title="Download file">
+                        <i class="fas fa-download"></i>
+                    </a>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0">
+                <div class="position-relative" style="min-height: 60vh; max-height: 85vh;">
+                    <img id="modalImage" src="" alt="Media" 
+                         style="display: none; max-width: 100%; max-height: 80vh; object-fit: contain; margin: 0 auto;"
+                         class="d-block">
+                    
+                    <video id="modalVideo" controls style="display: none; max-width: 100%; max-height: 80vh; margin: 0 auto;">
+                        <source id="modalVideoSource" src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    
+                    <div id="modalDocument" style="display: none; text-align: center; padding: 40px; color: white;">
+                        <i class="fas fa-file fa-5x mb-3"></i>
+                        <p id="modalDocName" class="mb-2">document.pdf</p>
+                        <p class="text-muted small">Click the download button to view this file</p>
+                    </div>
+                    
+                    <div id="mediaLoader" class="text-center py-5" style="display: none;">
+                        <div class="spinner-border text-light" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+
+                    <button id="prevMediaBtn" class="btn btn-dark rounded-circle position-absolute start-3 top-50 translate-middle-y" 
+                            style="width: 44px; height: 44px; z-index: 10; opacity: 0.7; display: none;">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button id="nextMediaBtn" class="btn btn-dark rounded-circle position-absolute end-3 top-50 translate-middle-y" 
+                            style="width: 44px; height: 44px; z-index: 10; opacity: 0.7; display: none;">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <div class="d-flex gap-2 flex-wrap" id="mediaThumbnails"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="mediaData" data-media="{{ json_encode($incident->media->map(function($media) {
+    return [
+        'id' => $media->id,
+        'url' => $media->url,
+        'thumbnail' => $media->thumbnail_url ?? $media->url,
+        'type' => $media->media_type,
+        'name' => $media->original_name,
+        'mime_type' => $media->mime_type,
+        'size' => $media->file_size,
+        'is_image' => $media->isImage(),
+        'is_video' => $media->isVideo(),
+        'is_document' => !$media->isImage() && !$media->isVideo(),
+    ];
+}), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) }}">
+</div>
+
 {{-- Modals: Assign, Reject, Escalate, Resolve --}}
 @include('incidents.partials.modals')
 
 @endsection
-{{-- Java Scripts --}}
+
 @include('incidents.partials.core_show_script')

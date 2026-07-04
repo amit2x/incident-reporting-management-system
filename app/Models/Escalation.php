@@ -45,12 +45,18 @@ class Escalation extends Model
         return $this->belongsTo(Incident::class);
     }
 
+   
     /**
      * User who initiated the escalation
      */
     public function escalatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'escalated_by');
+    }
+    
+     public function responder()
+    {
+        return $this->belongsTo(User::class, 'responded_by');
     }
 
     /**

@@ -112,7 +112,7 @@
 
     {{-- SLA Overview Cards --}}
     <div class="row g-3 mb-3">
-        <div class="col-md-4 text-center">
+        <div class="col-md-4 text-center g-1">
             <div class="card shadow-sm h-100">
                 <div class="card-body p-4">
                     <p class="text-muted small mb-2">Overall SLA Compliance</p>
@@ -124,21 +124,27 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 g-1">
             <div class="card shadow-sm h-100">
-                <div class="card-body p-3 text-center">
-                    <div class="display-6 fw-bold text-info">{{ round($avgResponseTime, 1) }}m</div>
-                    <p class="text-muted small mb-0">Average Response Time</p>
+                <div class="card-body p-3 text-center d-flex align-items-center">
+                    <div class="row w-100 g-0">
+                        <!-- Left Half: Average Response Time -->
+                        <div class="col-12 border-bottom p-4">
+                            <div class="display-6 fw-bold text-info">{{ round($avgResponseTime, 1) }}m</div>
+                            <p class="text-muted small mb-0">Avg. Response Time</p>
+                        </div>
+                        
+                        <!-- Right Half: Average Resolution Time -->
+                        <div class="col-12 p-4">
+                            <div class="display-6 fw-bold text-success">{{ round($avgResolutionTime, 1) }}m</div>
+                            <p class="text-muted small mb-0">Avg. Resolution Time</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card shadow-sm mt-2">
-                <div class="card-body p-3 text-center">
-                    <div class="display-6 fw-bold text-success">{{ round($avgResolutionTime, 1) }}m</div>
-                    <p class="text-muted small mb-0">Average Resolution Time</p>
-                </div>
-            </div>
+
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 g-1">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white py-2"><strong>SLA Trend</strong></div>
                 <div class="card-body p-2">

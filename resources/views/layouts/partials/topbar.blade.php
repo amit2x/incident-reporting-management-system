@@ -166,7 +166,8 @@
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Silent-Request': 'true'
             },
             credentials: 'same-origin'
         })
@@ -205,7 +206,9 @@
         fetch('/notifications/latest', {
             headers: {
                 'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Silent-Request': 'true'
+
             },
             credentials: 'same-origin'
         })

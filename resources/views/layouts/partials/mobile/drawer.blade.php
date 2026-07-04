@@ -6,19 +6,28 @@
     {{-- Header --}}
     @auth
     <div class="drawer-header">
-        <img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo" class="drawer-logo">
-        <span class="brand-name">IRMSystem</span>
+        
+            <img src="{{ asset('images/masterLogo.webp') }}" 
+                 alt="IRMSystem Logo" 
+                 class="drawer-logo"
+                 fetchpriority="high">
+        <!--<img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo" class="drawer-logo">-->
+        <!--<span class="brand-name">IRMSystem</span>-->
     </div>
 
     @else
     <div class="drawer-header">
 
-        <div class="drawer-header guest-header">
-            <img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo" class="drawer-logo">
-            <div>
-                <span class="brand-name d-block">IRMSystem</span>
-                <small class="text-muted">Welcome, Guest</small>
-            </div>
+        <div class="drawer-header">
+            <img src="{{ asset('images/masterLogo.webp') }}" 
+                 alt="IRMSystem Logo" 
+                 class="drawer-logo"
+                 fetchpriority="high">
+            <!--<img src="{{ asset('images/logo.png') }}" alt="IRMSystem Logo" class="drawer-logo">-->
+            <!--<div>-->
+            <!--    <span class="brand-name d-block">IRMSystem</span>-->
+            <!--    <small class="text-muted">Welcome, Guest</small>-->
+            <!--</div>-->
         </div>
     </div>
     @endauth
@@ -32,11 +41,15 @@
         <a href="{{ route('incidents.index') }}"
             class="drawer-link {{ request()->routeIs('incidents.*') ? 'active' : '' }}">
             <i class="fas fa-clipboard-list"></i> All Incidents
+            @if(($globalOpenIncidentCount ?? 0) > 0)
+                        <span class="badge bg-danger ms-auto">{{ $globalOpenIncidentCount }}</span>
+                    @endif
         </a>
+        @can('create-incident')
         <a href="{{ route('incidents.create') }}" class="drawer-link">
             <i class="fas fa-plus-circle"></i> Report Incident
         </a>
-
+        @endcan
         @can('view-reports')
 
         <div class="drawer-divider"></div>

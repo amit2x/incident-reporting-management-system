@@ -55,7 +55,9 @@ class NewIncidentNotification extends Notification implements ShouldQueue
             })
             ->action('View Incident', $url)
             ->line('Please take appropriate action at your earliest convenience.')
-            ->salutation('Regards,<br>IRMS Notification System');
+            // ->salutation('Regards,<br>IRMS Notification System');
+                        ->salutation("Regards,\nSAMANVAY");
+
     }
 
     /**

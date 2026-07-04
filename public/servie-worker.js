@@ -1,9 +1,9 @@
-const CACHE_NAME = 'irms-cache-v1';
+const CACHE_NAME = 'samanvay-cache-v1';
 const ASSETS_TO_CACHE = [
     '/',
     '/css/app.css',
     '/js/app.js',
-    '/images/logo.png',
+    '/images/logo.webp',
     '/offline.html'
 ];
 
@@ -62,7 +62,7 @@ self.addEventListener('push', (event) => {
     const data = event.data?.json() ?? {};
     
     const options = {
-        body: data.body || 'New notification from IRMS',
+        body: data.body || 'New notification from SAMANVAY',
         icon: '/icons/icon-192x192.png',
         badge: '/icons/badge-72x72.png',
         vibrate: [200, 100, 200],
@@ -85,7 +85,7 @@ self.addEventListener('push', (event) => {
 
     event.waitUntil(
         self.registration.showNotification(
-            data.title || 'IRMS Notification',
+            data.title || 'SAMANVAY Notification',
             options
         )
     );

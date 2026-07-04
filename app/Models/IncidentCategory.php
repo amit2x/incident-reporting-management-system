@@ -20,6 +20,7 @@ class IncidentCategory extends Model
         'icon',
         'color',
         'parent_id',
+        'department_id',
         'default_priority',
         'sla_minutes',
         'requires_approval',
@@ -60,6 +61,12 @@ class IncidentCategory extends Model
     // ==========================================
     // RELATIONSHIPS
     // ==========================================
+    
+    // Relationship with department
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
 
     public function parent(): BelongsTo
     {

@@ -103,6 +103,10 @@
                                 <p class="text-muted small mb-0 category-desc">
                                     {{ $category->description ?? 'No description' }}
                                 </p>
+                                
+                                <p class="text-info small mb-0 category-desc">
+                                    {{ $category->department->name ?? 'N/A' }}
+                                </p>
                             </div>
                             <div class="dropdown flex-shrink-0">
                                 <button class="btn btn-light btn-sm" data-bs-toggle="dropdown" aria-label="Actions">

@@ -9,6 +9,7 @@ use App\Models\IncidentCategory;
 use App\Models\IncidentComment;
 use App\Models\IncidentMedia;
 use App\Models\User;
+use App\Models\EscalationMatrix;
 use App\Notifications\NewIncidentNotification;
 use App\Repositories\IncidentRepository;
 use App\Services\IncidentService;
@@ -136,6 +137,10 @@ class IncidentController extends Controller
         $user = Auth::user();
         $tab = $request->get('tab', 'all');
 
+        // dd([
+        //     $user->getRoleNames()->first(),
+        //     $user->department_id,
+        // ]);
         // Apply role-based filters for non-admin
         if (! $user->isAdmin()) {
             $filters['department_id'] = $user->department_id;
@@ -201,8 +206,11 @@ class IncidentController extends Controller
         if ($request->ajax()) {
             return $this->paginatedResponse($incidents);
         }
+        
+        $canEditIncident =  auth()->user()->hasPermissionTo('edit-incident');
 
-        return view('incidents.index', compact('incidents', 'filters', 'stats', 'tab'));
+
+        return view('incidents.index', compact('incidents', 'filters', 'stats', 'tab','canEditIncident' ));
     }
 
     // ==========================================
@@ -245,10 +253,16 @@ class IncidentController extends Controller
     {
         $this->authorize('create-incident');
         $departments = Department::active()->ordered()->get();
-        $categories = IncidentCategory::active()->get();
+        $categories = IncidentCategory::active()
+            ->with('department') // Eager load the department relationship
+            ->orderBy('department_id', 'asc')
+            ->orderBy('name', 'asc') 
+            ->get();
 
         return view('incidents.create', compact('departments', 'categories'));
     }
+    
+    
 
     public function store(Request $request)
     {
@@ -272,7 +286,7 @@ class IncidentController extends Controller
         }
 
         try {
-            $assignedTo = $this->autoAssignIncident($request->department_id, $request->severity);
+            $assignedTo = $this->autoAssignIncident($request->department_id, $request->severity, $request->priority, $request->category_id);
 
             $incident = Incident::create([
                 'title' => $request->title,
@@ -328,45 +342,234 @@ class IncidentController extends Controller
     // ==========================================
     // AUTO ASSIGN
     // ==========================================
-    private function autoAssignIncident(int $departmentId, string $severity): ?User
-    {
-        $department = Department::find($departmentId);
-        if (! $department) {
-            return null;
-        }
+    // private function autoAssignIncident(int $departmentId, string $severity): ?User
+    // {
+    //     $department = Department::find($departmentId);
+    //     if (! $department) {
+    //         return null;
+    //     }
 
-        // For critical/high, try HOD first
-        if (in_array($severity, ['critical', 'high'])) {
-            $hod = $department->getHeadOfDepartment();
-            if ($hod && $hod->status === 'active') {
+    //     // For critical/high, try HOD first
+    //     if (in_array($severity, ['critical', 'high'])) {
+    //         $hod = $department->getHeadOfDepartment();
+    //         if ($hod && $hod->status === 'active') {
+    //             return $hod;
+    //         }
+    //     }
+
+    //     // Get supervisor with least workload
+    //     $supervisors = $department->getSupervisors();
+    //     if ($supervisors->isNotEmpty()) {
+    //         return $supervisors->filter(fn ($u) => $u->status === 'active')
+    //             ->sortBy(fn ($u) => $u->assignedIncidents()->open()->count())
+    //             ->first();
+    //     }
+
+    //     // Get any staff with least workload
+    //     $staff = $department->users()->active()
+    //         ->whereHas('roles', fn ($q) => $q->whereIn('name', ['staff', 'supervisor']))
+    //         ->withCount(['assignedIncidents as open_count' => fn ($q) => $q->open()])
+    //         ->orderBy('open_count')
+    //         ->first();
+
+    //     if ($staff) {
+    //         return $staff;
+    //     }
+
+    //     // Fallback to HOD
+    //     $hod = $department->getHeadOfDepartment();
+
+    //     return ($hod && $hod->status === 'active') ? $hod : null;
+    // }
+    
+    // ==========================================
+// AUTO ASSIGN - Enhanced Logic
+// ==========================================
+private function autoAssignIncident(int $departmentId, string $severity, string $priority, ?int $categoryId = null): ?User
+{
+    $department = Department::find($departmentId);
+    if (! $department) {
+        return null;
+    }
+
+    // Get all active users in the department
+    $departmentUsers = $department->users()->active()->get();
+    if ($departmentUsers->isEmpty()) {
+        return null; // No users in department, keep unassigned
+    }
+
+    // Check if escalation matrix exists for this category
+    $hasEscalationMatrix = false;
+    if ($categoryId) {
+        $hasEscalationMatrix = EscalationMatrix::where('category_id', $categoryId)
+            ->orWhereNull('category_id')
+            ->exists();
+    }
+
+    // If no escalation matrix, default to staff
+    if (! $hasEscalationMatrix) {
+        return $this->assignStaff($department, $departmentUsers);
+    }
+
+    // Get HOD
+    $hod = $department->getHeadOfDepartment();
+    $hodAvailable = $hod && $hod->status === 'active';
+
+    // Get supervisors (users with supervisor role)
+    $supervisors = $departmentUsers->filter(function ($user) {
+        return $user->hasRole('supervisor') && $user->status === 'active';
+    });
+
+    // Get staff (users with staff role, excluding supervisors)
+    $staff = $departmentUsers->filter(function ($user) {
+        return $user->hasRole('staff') && $user->status === 'active';
+    });
+
+    // ==========================================
+    // ASSIGNMENT LOGIC BASED ON SEVERITY
+    // ==========================================
+    
+    // CASE 1: Critical severity with ANY priority
+    if ($severity === 'critical') {
+        if($priority === 'critical'){
+            // First priority: HOD
+            if ($hodAvailable) {
                 return $hod;
             }
         }
-
-        // Get supervisor with least workload
-        $supervisors = $department->getSupervisors();
+        
+        // Second priority: Supervisor with least workload
         if ($supervisors->isNotEmpty()) {
-            return $supervisors->filter(fn ($u) => $u->status === 'active')
-                ->sortBy(fn ($u) => $u->assignedIncidents()->open()->count())
-                ->first();
+            return $this->getUserWithLeastWorkload($supervisors);
         }
-
-        // Get any staff with least workload
-        $staff = $department->users()->active()
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['staff', 'supervisor']))
-            ->withCount(['assignedIncidents as open_count' => fn ($q) => $q->open()])
-            ->orderBy('open_count')
-            ->first();
-
-        if ($staff) {
-            return $staff;
+        
+        // Third priority: Any staff with least workload
+        if ($staff->isNotEmpty()) {
+            return $this->getUserWithLeastWorkload($staff);
         }
-
-        // Fallback to HOD
-        $hod = $department->getHeadOfDepartment();
-
-        return ($hod && $hod->status === 'active') ? $hod : null;
+        
+        // Fallback: Any active user in department
+        return $this->getUserWithLeastWorkload($departmentUsers);
     }
+
+    // CASE 2: High severity with ANY priority
+    if ($severity === 'high') {
+        if($priority === 'critical'){
+            // First priority: Supervisor with least workload
+            if ($supervisors->isNotEmpty()) {
+                return $this->getUserWithLeastWorkload($supervisors);
+            }
+        }
+        
+        // Second priority: Any staff with least workload
+        if ($staff->isNotEmpty()) {
+            return $this->getUserWithLeastWorkload($staff);
+        }
+        
+        // Third priority: HOD
+        if ($hodAvailable) {
+            return $hod;
+        }
+        
+        
+        // Fallback: Any active user in department
+        return $this->getUserWithLeastWorkload($departmentUsers);
+    }
+
+    // CASE 3: Medium severity
+    if ($severity === 'medium' || $severity === 'low') {
+        // First priority: Staff with least workload
+        if ($staff->isNotEmpty()) {
+            return $this->getUserWithLeastWorkload($staff);
+        }
+        
+        // Second priority: Supervisor with least workload
+        if ($supervisors->isNotEmpty()) {
+            return $this->getUserWithLeastWorkload($supervisors);
+        }
+        
+        
+        // Third priority: HOD (if no supervisor/staff available)
+        if ($hodAvailable) {
+            return $hod;
+        }
+        
+        // Fallback: Any active user in department
+        return $this->getUserWithLeastWorkload($departmentUsers);
+    }
+
+    // // CASE 4: Low severity (default to staff)
+    // if ($severity === 'low') {
+    //     // First priority: Staff with least workload
+    //     if ($staff->isNotEmpty()) {
+    //         return $this->getUserWithLeastWorkload($staff);
+    //     }
+        
+    //     // Second priority: Supervisor with least workload
+    //     if ($supervisors->isNotEmpty()) {
+    //         return $this->getUserWithLeastWorkload($supervisors);
+    //     }
+        
+    //     // Third priority: HOD
+    //     if ($hodAvailable) {
+    //         return $hod;
+    //     }
+        
+    //     // Fallback: Any active user in department
+    //     return $this->getUserWithLeastWorkload($departmentUsers);
+    // }
+
+    // Default: Any staff with least workload
+    return $this->assignStaff($department, $departmentUsers);
+}
+
+/**
+ * Get user with the least number of open incidents
+ */
+private function getUserWithLeastWorkload($users): ?User
+{
+    if ($users->isEmpty()) {
+        return null;
+    }
+
+    return $users->sortBy(function ($user) {
+        return $user->assignedIncidents()->open()->count();
+    })->first();
+}
+
+/**
+ * Default assignment - staff with least workload
+ */
+private function assignStaff($department, $departmentUsers): ?User
+{
+    // Get staff users
+    $staff = $departmentUsers->filter(function ($user) {
+        return $user->hasRole('staff') && $user->status === 'active';
+    });
+
+    if ($staff->isNotEmpty()) {
+        return $this->getUserWithLeastWorkload($staff);
+    }
+
+    // Fallback to supervisors
+    $supervisors = $departmentUsers->filter(function ($user) {
+        return $user->hasRole('supervisor') && $user->status === 'active';
+    });
+
+    if ($supervisors->isNotEmpty()) {
+        return $this->getUserWithLeastWorkload($supervisors);
+    }
+
+    // Fallback to HOD
+    $hod = $department->getHeadOfDepartment();
+    if ($hod && $hod->status === 'active') {
+        return $hod;
+    }
+
+    // Final fallback: any active user
+    return $this->getUserWithLeastWorkload($departmentUsers);
+}
+    
 
     // ==========================================
     // FILE HANDLING
@@ -481,6 +684,7 @@ class IncidentController extends Controller
             'assignments' => function ($query) {
                 $query->with(['assignedBy', 'assignedTo'])->latest();
             },
+            'rejectionResponder',
         ]);
 
         // Load counts

@@ -7,7 +7,7 @@
     @auth
     <div class="drawer-header">
         
-            <img src="{{ asset('images/masterLogo.webp') }}" 
+            <img src="{{ asset('images/master-logo.webp') }}" 
                  alt="IRMSystem Logo" 
                  class="drawer-logo"
                  fetchpriority="high">
@@ -19,7 +19,7 @@
     <div class="drawer-header">
 
         <div class="drawer-header">
-            <img src="{{ asset('images/masterLogo.webp') }}" 
+            <img src="{{ asset('images/master-logo.webp') }}" 
                  alt="IRMSystem Logo" 
                  class="drawer-logo"
                  fetchpriority="high">

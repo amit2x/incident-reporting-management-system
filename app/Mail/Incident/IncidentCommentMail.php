@@ -12,16 +12,16 @@ use Illuminate\Mail\Mailables\Envelope;
 class IncidentCommentMail extends BaseMail
 {
     protected Incident $incident;
-
     protected User $actor;
-
     protected IncidentComment $comment;
+    protected ?string $recipientName;
 
-    public function __construct(Incident $incident, User $actor, IncidentComment $comment)
+    public function __construct(Incident $incident, User $actor, IncidentComment $comment, ?string $recipientName = null)
     {
         $this->incident = $incident;
         $this->actor = $actor;
         $this->comment = $comment;
+        $this->recipientName = $recipientName;
 
         $this->statusColor = '#0891B2';
         $this->statusLabel = 'New Comment Added';
@@ -37,13 +37,17 @@ class IncidentCommentMail extends BaseMail
 
     public function content(): Content
     {
+        $greeting = $this->recipientName 
+            ? "Hello {$this->recipientName}," 
+            : "Hello ".($this->actor->name).",";
+
         return new Content(
             view: 'emails.incident.comment',
             with: array_merge($this->getViewData(), [
                 'incident' => $this->incident,
                 'actor' => $this->actor,
                 'comment' => $this->comment,
-                'greeting' => 'Hello '.($this->actor->name).',',
+                'greeting' => $greeting,
                 'body' => 'A new comment has been added to an incident you are following.',
                 'actionUrl' => route('incidents.show', $this->incident).'#comment-'.$this->comment->id,
                 'extraFields' => [
@@ -52,5 +56,11 @@ class IncidentCommentMail extends BaseMail
                 ],
             ])
         );
+    }
+
+    public function setRecipientName(string $name): self
+    {
+        $this->recipientName = $name;
+        return $this;
     }
 }

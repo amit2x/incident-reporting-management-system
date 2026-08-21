@@ -11,13 +11,14 @@ use Illuminate\Mail\Mailables\Envelope;
 class IncidentResolvedMail extends BaseMail
 {
     protected Incident $incident;
-
     protected User $actor;
+    protected ?string $recipientName;
 
-    public function __construct(Incident $incident, User $actor)
+    public function __construct(Incident $incident, User $actor, ?string $recipientName = null)
     {
         $this->incident = $incident;
         $this->actor = $actor;
+        $this->recipientName = $recipientName;
 
         $this->statusColor = '#2E7D32';
         $this->statusLabel = 'Incident Resolved';
@@ -33,13 +34,17 @@ class IncidentResolvedMail extends BaseMail
 
     public function content(): Content
     {
+        $greeting = $this->recipientName 
+            ? "Hello {$this->recipientName}," 
+            : "Hello ".($this->incident->reporter?->name ?? 'User').",";
+
         return new Content(
             view: 'emails.incident.resolved',
             with: array_merge($this->getViewData(), [
                 'incident' => $this->incident,
                 'actor' => $this->actor,
-                'greeting' => 'Hello '.($this->incident->reporter?->name ?? 'User').',',
-                'body' => 'The incident you reported has been resolved. Please verify the resolution.',
+                'greeting' => $greeting,
+                'body' => 'The incident has been resolved. Please verify the resolution.',
                 'actionUrl' => route('incidents.show', $this->incident),
                 'extraFields' => [
                     'Resolved By' => $this->actor->name,
@@ -47,5 +52,11 @@ class IncidentResolvedMail extends BaseMail
                 ],
             ])
         );
+    }
+
+    public function setRecipientName(string $name): self
+    {
+        $this->recipientName = $name;
+        return $this;
     }
 }

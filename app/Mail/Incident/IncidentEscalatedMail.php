@@ -12,16 +12,16 @@ use Illuminate\Mail\Mailables\Envelope;
 class IncidentEscalatedMail extends BaseMail
 {
     protected Incident $incident;
-
     protected User $actor;
-
     protected Escalation $escalation;
+    protected ?string $recipientName;
 
-    public function __construct(Incident $incident, User $actor, Escalation $escalation)
+    public function __construct(Incident $incident, User $actor, Escalation $escalation, ?string $recipientName = null)
     {
         $this->incident = $incident;
         $this->actor = $actor;
         $this->escalation = $escalation;
+        $this->recipientName = $recipientName;
 
         $this->statusColor = '#FF8F00';
         $this->statusLabel = 'Incident Escalated';
@@ -37,13 +37,18 @@ class IncidentEscalatedMail extends BaseMail
 
     public function content(): Content
     {
+        // Use recipient name if provided, otherwise use actor's name
+        $greeting = $this->recipientName 
+            ? "Hello {$this->recipientName}," 
+            : "Hello {$this->actor->name},";
+
         return new Content(
             view: 'emails.incident.escalated',
             with: array_merge($this->getViewData(), [
                 'incident' => $this->incident,
                 'actor' => $this->actor,
                 'escalation' => $this->escalation,
-                'greeting' => 'Hello '.($this->actor->name).',',
+                'greeting' => $greeting,
                 'body' => 'An incident has been escalated to you. Immediate attention is required.',
                 'actionUrl' => route('incidents.show', $this->incident),
                 'extraFields' => [
@@ -53,5 +58,14 @@ class IncidentEscalatedMail extends BaseMail
                 ],
             ])
         );
+    }
+
+    /**
+     * Set the recipient name for personalized greeting.
+     */
+    public function setRecipientName(string $name): self
+    {
+        $this->recipientName = $name;
+        return $this;
     }
 }

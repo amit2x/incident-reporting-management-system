@@ -1,7 +1,7 @@
 {{-- resources/views/incidents/create.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Report New Incident - IRMS')
+@section('title', 'Report New Incident - SAMANVAY')
 
 @push('styles')
 <style>

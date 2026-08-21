@@ -1,7 +1,7 @@
 {{-- resources/views/incidents/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Incidents - IRMS')
+@section('title', 'Incidents - SAMANVAY')
 
 @php
 $user = Auth::user();

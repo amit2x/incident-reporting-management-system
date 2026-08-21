@@ -142,6 +142,9 @@
                         <a href="{{ route('contact.form') }}" class="dropdown-item py-2">
                             <i class="fas fa-headset"></i>&nbsp Contact
                         </a>
+                        <a href="{{ route('guest.help') }}" class="dropdown-item py-2">
+                            <i class="fas fa-circle-question"></i>&nbsp Help
+                        </a>
                         <div class="dropdown-divider bg-danger"></div>
                         <form action="{{ route('logout') }}" method="POST">
                             @csrf

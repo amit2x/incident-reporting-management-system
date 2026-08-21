@@ -142,7 +142,7 @@ $kpiData = $deptKpiData ?? [];
     <div class="col-6 col-md-3 col-lg-2">
         <div class="detail-stat-card">
             <div class="stat-number text-warning">{{ $kpiData['open_incidents'] ?? 0 }}</div>
-            <div class="stat-label">Open</div>
+            <div class="stat-label">Acknowledged</div>
         </div>
     </div>
     <div class="col-6 col-md-3 col-lg-2">
@@ -213,7 +213,7 @@ $kpiData = $deptKpiData ?? [];
     <div class="col-lg-8">
         {{-- Trend --}}
         <div class="card shadow-sm mb-3">
-            <div class="card-header bg-white py-2"><strong><i class="fas fa-chart-line me-2"></i>Trend</strong></div>
+            <div class="card-header bg-white py-2"><strong><i class="fas fa-chart-line me-2"></i>Incidents Trend</strong></div>
             <div class="card-body p-2">
                 <div style="height:200px;"><canvas id="deptTrendChart"></canvas></div>
             </div>

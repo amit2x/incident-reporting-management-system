@@ -1,7 +1,7 @@
 {{-- resources/views/incidents/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title', $incident->incident_id . ' - ' . $incident->title)
+@section('title', $incident->incident_id . ' - ' . $incident->title . ' - SAMANVAY')
 
 @push('styles')
 <style>
@@ -241,9 +241,10 @@
         // Permission hierarchy
         $canEdit = $isReporter || $isAdmin || $isHOD; // Only reporter, admin, HOD can edit
         $canAssign = $isAdmin || $isHOD || $isSupervisor; // Admin, HOD, Supervisor can assign
-        $canEscalate = $isAssignedToMe || $isAdmin || $isHOD || $isSupervisor; // Assigned person or higher
+        $canEscalate = $isAssignedToMe || $isAdmin || $isHOD || $isSupervisor || $isReporter; // Assigned person or higher //Added reporter as instructedby APD
         $canResolve = $isAssignedToMe || $isAdmin || $isHOD; // Only assigned person can resolve
         $canClose = $isAdmin || $isHOD || ($isAssignedToMe && $incident->status === 'resolved'); // Only if resolved
+        $canClose = $isAdmin || $isHOD || $isReporter || ($isAssignedToMe && $incident->status === 'resolved'); // Only if resolved // Added as instructed by APD for reporter can close.
         $canReopen = $isReporter || $isAdmin || $isHOD; // Reporter or higher can reopen
         $canReject = $isAdmin || $isHOD; // Only admin/HOD can reject
         $canDelete = $isAdmin || $isSuperAdmin; // Only admin/super admin can delete
@@ -337,7 +338,8 @@
             {{-- ========================================== --}}
             {{-- ESCALATE - Assigned person, Admin, HOD, Supervisor --}}
             {{-- ========================================== --}}
-            @if($canEscalate && !in_array($incident->status, ['resolved', 'closed', 'rejected', 'escalated']))
+            {{-- @if($canEscalate && !in_array($incident->status, ['resolved', 'closed', 'rejected', 'escalated'])) --}}
+            @if($canEscalate && !in_array($incident->status, ['resolved', 'closed']))
             @can('escalate-incident')
             <button class="btn btn-outline-warning btn-sm border-warning border-1" data-bs-toggle="modal"
                 data-bs-target="#escalateModal" title="Escalate to higher authority">
@@ -505,14 +507,16 @@
                             <div
                                 class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
                                 <small class="text-muted flex-shrink-0" style="min-width:80px;">Category</small>
-                                <span class="fw-medium text-break">{{ $incident->category?->name ?? 'N/A' }}</span>
+                                <span class="fw-medium text-break" >
+                                    <i class="{{ $incident->category->icon ?? 'fas fa-building' }} " style="color:{{ $incident->category->color ?? '' }}"></i>
+                                    {{ $incident->category?->name ?? 'N/A' }}</span>
                             </div>
                         </div>
                         <div class="col-12 col-sm-6">
                             <div
                                 class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-1">
                                 <small class="text-muted flex-shrink-0" style="min-width:80px;">Department</small>
-                                <span class="fw-medium text-break">{{ $incident->department?->name ?? 'N/A' }}</span>
+                                <span class="fw-medium text-break"> <i class="{{ $incident->department->icon ?? 'fas fa-building' }} " style="color:{{ $incident->department->color }}"></i> {{ $incident->department?->name ?? 'N/A' }}</span>
                             </div>
                         </div>
                         <div class="col-12 col-sm-6">
@@ -599,29 +603,29 @@
                                 @endphp
                                 
                                 {{-- Resolution Attachments --}}
-@if($resolutionMedia->count() > 0)
-<div class="mt-3">
-    <small class="text-muted d-block mb-2">📎 Resolution Attachments</small>
-    <div class="d-flex flex-wrap gap-2">
-        @foreach($resolutionMedia as $media)
-        @if($media->isImage())
-        <img src="{{ $media->url }}" 
-             style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;cursor:pointer;"
-             class="border shadow-sm"
-             onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'image'); return false;">
-        @else
-        <span class="badge bg-white border text-dark text-decoration-none d-inline-flex align-items-center gap-1"
-              style="padding:8px 12px;font-size:0.75rem;cursor:pointer;"
-              onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'document'); return false;">
-            <i class="fas fa-file text-muted"></i>
-            {{ Str::limit($media->original_name, 25) }}
-            <small class="text-muted">({{ round($media->file_size/1024, 1) }}KB)</small>
-        </span>
-        @endif
-        @endforeach
-    </div>
-</div>
-@endif
+                                @if($resolutionMedia->count() > 0)
+                                <div class="mt-3">
+                                    <small class="text-muted d-block mb-2">📎 Resolution Attachments</small>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach($resolutionMedia as $media)
+                                        @if($media->isImage())
+                                        <img src="{{ $media->url }}" 
+                                             style="max-width:100%;height:auto;max-height:120px;object-fit:cover;border-radius:8px;cursor:pointer;"
+                                             class="border shadow-sm"
+                                             onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'image'); return false;">
+                                        @else
+                                        <span class="badge bg-white border text-dark text-decoration-none d-inline-flex align-items-center gap-1"
+                                              style="padding:8px 12px;font-size:0.75rem;cursor:pointer;"
+                                              onclick="openCommentMediaInModal('{{ $media->url }}', '{{ addslashes($media->original_name) }}', 'document'); return false;">
+                                            <i class="fas fa-file text-muted"></i>
+                                            {{ Str::limit($media->original_name, 25) }}
+                                            <small class="text-muted">({{ round($media->file_size/1024, 1) }}KB)</small>
+                                        </span>
+                                        @endif
+                                        @endforeach
+                                    </div>
+                                </div>
+                                @endif
                                 
                             </div>
                         </div>
@@ -801,6 +805,11 @@
 
             {{-- Escalation History --}}
             @include('incidents.partials.escalation-history')
+            
+            {{-- ========================================== --}}
+            {{-- ACTION HISTORY (NEW) --}}
+            {{-- ========================================== --}}
+            @include('incidents.partials.action-history')
 
             {{-- Assignment History --}}
             @if($incident->assignmentHistory()->count() > 1)

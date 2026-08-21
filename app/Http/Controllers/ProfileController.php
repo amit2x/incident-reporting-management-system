@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 
 class ProfileController extends Controller
@@ -74,8 +75,10 @@ class ProfileController extends Controller
      */
     public function updateAvatar(Request $request)
     {
+        //just log avatar image metadata no need to store this.
+        Log::info($request->all());
         $request->validate([
-            'avatar' => 'required|image|max:10240|mimes:jpg,jpeg,png',
+            'avatar' => 'required|image|max:10240|mimes:webp',
         ]);
 
         $user = Auth::user();

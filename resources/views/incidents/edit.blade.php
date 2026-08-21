@@ -1,7 +1,7 @@
 {{-- resources/views/incidents/edit.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Edit Incident #' . $incident->incident_id . ' - IRMS')
+@section('title', 'Edit Incident #' . $incident->incident_id . ' - SAMANVAY')
 
 @push('styles')
 <style>

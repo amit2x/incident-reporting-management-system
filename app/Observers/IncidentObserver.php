@@ -24,7 +24,7 @@ class IncidentObserver
         event(new IncidentCreated($incident));
         
         // Queue notifications
-        SendIncidentNotifications::dispatch($incident);
+        // SendIncidentNotifications::dispatch($incident); //Alread sent notification from incident controller
         
         // Log
         Log::info('Incident created', [

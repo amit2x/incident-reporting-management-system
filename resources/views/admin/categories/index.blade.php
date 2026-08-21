@@ -36,11 +36,33 @@
         font-size: 0.65rem;
         padding: 3px 8px;
     }
+
+    
+    .filter-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 20px;
+        border: 1px solid #e5e7eb;
+    }
+    .filter-section .form-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6b7280;
+        margin-bottom: 4px;
+    }
+    .filter-section .form-control,
+    .filter-section .form-select {
+        font-size: 0.8125rem;
+        border-radius: 8px;
+    }
 </style>
 @endpush
 
 @section('content')
-<div class="container-fluid px-3 py-3">
+<div class="container-fluid py-3">
 
     {{-- Header --}}
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
@@ -81,6 +103,93 @@
                 <small class="text-muted">Need Approval</small>
             </div>
         </div>
+    </div>
+
+    {{-- Filters --}}
+    <div class="filter-section">
+        <form method="GET" action="{{ route('admin.categories.index') }}" id="filterForm">
+            <div class="row g-2 align-items-end">
+                {{-- Search --}}
+                <div class="col-md-3 col-sm-6">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" 
+                           placeholder="Search categories..." 
+                           value="{{ request('search') }}">
+                </div>
+    
+                {{-- Status --}}
+                <div class="col-md-1 col-sm-6">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
+                        <option value="inactive" {{ request('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                    </select>
+                </div>
+    
+                {{-- Department --}}
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label">Department</label>
+                    <select name="department_id" class="form-select form-select-sm">
+                        <option value="">All Departments</option>
+                        @foreach($departments as $dept)
+                            <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>
+                                {{ $dept->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+    
+                {{-- Approval --}}
+                <div class="col-md-1 col-sm-6">
+                    <label class="form-label">Approval</label>
+                    <select name="requires_approval" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="1" {{ request('requires_approval') == '1' ? 'selected' : '' }}>Requires Approval</option>
+                        <option value="0" {{ request('requires_approval') == '0' ? 'selected' : '' }}>No Approval</option>
+                    </select>
+                </div>
+    
+                {{-- Sort --}}
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort" class="form-select form-select-sm">
+                        <option value="name_asc" {{ request('sort') == 'name_asc' ? 'selected' : '' }}>Name (A-Z)</option>
+                        <option value="name_desc" {{ request('sort') == 'name_desc' ? 'selected' : '' }}>Name (Z-A)</option>
+                        <option value="incidents_desc" {{ request('sort') == 'incidents_desc' ? 'selected' : '' }}>Most Used</option>
+                        <option value="incidents_asc" {{ request('sort') == 'incidents_asc' ? 'selected' : '' }}>Least Used</option>
+                        <option value="sla_asc" {{ request('sort') == 'sla_asc' ? 'selected' : '' }}>SLA (Low to High)</option>
+                        <option value="sla_desc" {{ request('sort') == 'sla_desc' ? 'selected' : '' }}>SLA (High to Low)</option>
+                        <option value="created_desc" {{ request('sort') == 'created_desc' ? 'selected' : '' }}>Newest</option>
+                        <option value="created_asc" {{ request('sort') == 'created_asc' ? 'selected' : '' }}>Oldest</option>
+                    </select>
+                </div>
+    
+                {{-- Per Page --}}
+                <div class="col-md-1 col-sm-4">
+                    <label class="form-label">Per Page</label>
+                    <select name="per_page" class="form-select form-select-sm">
+                        <option value="12" {{ request('per_page') == 12 ? 'selected' : '' }}>12</option>
+                        <option value="24" {{ request('per_page') == 24 ? 'selected' : '' }}>24</option>
+                        <option value="48" {{ request('per_page') == 48 ? 'selected' : '' }}>48</option>
+                        <option value="96" {{ request('per_page') == 96 ? 'selected' : '' }}>96</option>
+                        <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
+                    </select>
+                </div>
+    
+                {{-- Actions --}}
+                <div class="col-md-1 col-sm-4">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-filter me-1"></i> Filter
+                    </button>
+                </div>
+                <div class="col-md-1 col-sm-4">
+                    <a href="{{ route('admin.categories.index') }}" class="btn btn-light btn-sm w-100">
+                        <i class="fas fa-redo"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
     </div>
 
     {{-- Category Grid --}}
@@ -189,7 +298,8 @@
                                 </span>
                             @endif
 
-                            @if($category->relationLoaded('children') && $category->children->count() > 0)                                <span class="badge bg-light text-dark" style="font-size: 0.65rem;">
+                            @if($category->relationLoaded('children') && $category->children->count() > 0)
+                                <span class="badge bg-light text-dark" style="font-size: 0.65rem;">
                                     <i class="fas fa-sitemap me-1"></i>{{ $category->children->count() }} sub
                                 </span>
                             @endif
@@ -214,7 +324,7 @@
         @empty
             <div class="col-12">
                 <div class="text-center py-5 text-muted">
-                    <i class="fas fa-tags fa-3x mb-3 d-block"></i>
+                    <i class="fas fa-tags fa-3x mb-3 d-block mx-auto"></i>
                     <h5>No categories found</h5>
                     <p class="mb-3">Create your first incident category to get started</p>
                     <a href="{{ route('admin.categories.create') }}" class="btn btn-primary">
@@ -222,8 +332,16 @@
                     </a>
                 </div>
             </div>
+
         @endforelse
     </div>
+
+    {{-- Pagination --}}
+    @if($categories->hasPages())
+        <div class="mt-4">
+            {{ $categories->appends(request()->query())->links('pagination::bootstrap-5') }}
+        </div>
+    @endif
 </div>
 @endsection
 
@@ -244,6 +362,13 @@ document.addEventListener('DOMContentLoaded', function() {
             new bootstrap.Tooltip(el);
         });
     }
+
+    // Auto-submit on filter change (optional)
+    document.querySelectorAll('#filterForm select, #filterForm input').forEach(function(el) {
+        el.addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+    });
 });
 </script>
 @endpush

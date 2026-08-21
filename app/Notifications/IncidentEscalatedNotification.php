@@ -8,7 +8,6 @@ use App\Models\Incident;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class IncidentEscalatedNotification extends Notification implements ShouldQueue
@@ -16,12 +15,8 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected Incident $incident;
-
     protected Escalation $escalation;
 
-    /**
-     * Create a new notification instance.
-     */
     public function __construct(Incident $incident, Escalation $escalation)
     {
         $this->incident = $incident;
@@ -29,17 +24,12 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
         $this->afterCommit();
     }
 
-    /**
-     * Get the notification's delivery channels.
-     */
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
     }
-
-    /**
-     * Get the mail representation of the notification.
-     */
+    
+    
     // public function toMail(object $notifiable): MailMessage
     // {
     //     $url = route('incidents.show', $this->incident->id);
@@ -60,42 +50,48 @@ class IncidentEscalatedNotification extends Notification implements ShouldQueue
     //         // ->salutation('Regards,<br>IRMS Notification System');
     //         ->salutation("Regards,\nSAMANVAY");
 
-    // }
 
     public function toMail(object $notifiable)
     {
         $actor = $this->getActor();
+        
+        if (!$actor) {
+            $actor = auth()->user() ?? User::find(1);
+        }
 
-        return (new IncidentEscalatedMail($this->incident, $actor, $this->escalation))
+        // Get recipient name
+        $recipientName = $notifiable instanceof User ? $notifiable->name : 'User';
+
+        // Create mail with personalized greeting
+        $mail = (new IncidentEscalatedMail($this->incident, $actor, $this->escalation))
+            ->setRecipientName($recipientName)
             ->to($notifiable->email);
+        
+        return $mail;
     }
 
-    /**
-     * Get the array representation of the notification.
-     */
     public function toArray(object $notifiable): array
     {
+        $actor = $this->getActor();
+        
         return [
             'type' => 'incident_escalated',
             'incident_id' => $this->incident->id,
             'incident_number' => $this->incident->incident_id,
             'title' => $this->incident->title,
-            'escalated_by' => $this->getActor()?->name ?? 'System',
-            'escalation_level' => $this->escalation->level,
-            'message' => "Incident #{$this->incident->incident_id} has been escalated to you",
-            'reason' => $this->escalation->reason,
+            'level' => $this->escalation->level,
+            'escalated_by' => $actor?->name ?? 'System',
+            'message' => "Incident #{$this->incident->incident_id} has been escalated to Level {$this->escalation->level}.",
             'url' => route('incidents.show', $this->incident->id),
         ];
     }
 
     protected function getActor(): ?User
     {
-        // Check if we're in a web context
         if (auth()->check()) {
             return auth()->user();
         }
 
-        // Get from escalation record
         if ($this->escalation->escalated_by) {
             return User::find($this->escalation->escalated_by);
         }

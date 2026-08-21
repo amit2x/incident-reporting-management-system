@@ -376,75 +376,398 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==========================================
     // REUSABLE IMAGE COMPRESSION UTILITY
     // ==========================================
-    const ImageCompressor = {
-        MAX_DIMENSION: 1920,
-        QUALITY: 0.7,
-        MIN_SIZE_TO_COMPRESS: 200 * 1024,
+    // const ImageCompressor = {
+    //     MAX_DIMENSION: 1920,
+    //     QUALITY: 0.7,
+    //     MIN_SIZE_TO_COMPRESS: 200 * 1024,
 
+    //     compress: function(file) {
+    //         return new Promise((resolve) => {
+    //             if (!file.type.startsWith('image/') || file.size < this.MIN_SIZE_TO_COMPRESS) {
+    //                 resolve(file);
+    //                 return;
+    //             }
+
+    //             const reader = new FileReader();
+    //             reader.onload = (e) => {
+    //                 const img = new Image();
+    //                 img.onload = () => {
+    //                     let { width, height } = img;
+
+    //                     if (width > this.MAX_DIMENSION || height > this.MAX_DIMENSION) {
+    //                         if (width > height) {
+    //                             height = Math.round((height * this.MAX_DIMENSION) / width);
+    //                             width = this.MAX_DIMENSION;
+    //                         } else {
+    //                             width = Math.round((width * this.MAX_DIMENSION) / height);
+    //                             height = this.MAX_DIMENSION;
+    //                         }
+    //                     }
+
+    //                     const canvas = document.createElement('canvas');
+    //                     canvas.width = width;
+    //                     canvas.height = height;
+    //                     const ctx = canvas.getContext('2d');
+    //                     ctx.drawImage(img, 0, 0, width, height);
+
+    //                     canvas.toBlob((blob) => {
+    //                         if (blob && blob.size < file.size) {
+    //                             const compressed = new File([blob], file.name, {
+    //                                 type: 'image/jpeg',
+    //                                 lastModified: Date.now()
+    //                             });
+    //                             resolve(compressed);
+    //                         } else {
+    //                             resolve(file);
+    //                         }
+    //                     }, 'image/jpeg', this.QUALITY);
+    //                 };
+    //                 img.onerror = () => resolve(file);
+    //                 img.src = e.target.result;
+    //             };
+    //             reader.onerror = () => resolve(file);
+    //             reader.readAsDataURL(file);
+    //         });
+    //     },
+
+    //     compressMultiple: async function(files) {
+    //         const results = [];
+    //         for (const file of Array.from(files)) {
+    //             const processed = await this.compress(file);
+    //             results.push(processed);
+    //         }
+    //         return results;
+    //     },
+
+    //     formatSize: function(bytes) {
+    //         if (bytes === 0) return '0 B';
+    //         const k = 1024;
+    //         const sizes = ['B', 'KB', 'MB', 'GB'];
+    //         const i = Math.floor(Math.log(bytes) / Math.log(k));
+    //         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    //     }
+    // };
+    
+    // ==========================================
+    // REUSABLE IMAGE COMPRESSION UTILITY - WebP Version
+    // ==========================================
+    const ImageCompressor = {
+        // Configuration - All configurable in one place
+        MAX_DIMENSION: 1920,
+        QUALITY: 0.82,
+        MIN_SIZE_TO_COMPRESS: 50 * 1024, // 50KB
+        FORMAT: 'image/webp', // Change to 'image/avif' for next-gen format
+        
+        // Browser support check
+        SUPPORTS_WEBP: (function() {
+            try {
+                return document.createElement('canvas').toDataURL('image/webp').indexOf('image/webp') === 5;
+            } catch (e) {
+                return false;
+            }
+        })(),
+        
+        SUPPORTS_BLOB: typeof HTMLCanvasElement !== 'undefined' && 
+                       typeof HTMLCanvasElement.prototype.toBlob === 'function',
+    
+        /**
+         * Compress a single image to WebP format.
+         * @param {File} file - The image file to compress
+         * @returns {Promise<File>} - Compressed WebP file or original if not beneficial
+         */
         compress: function(file) {
-            return new Promise((resolve) => {
-                if (!file.type.startsWith('image/') || file.size < this.MIN_SIZE_TO_COMPRESS) {
+            return new Promise(async (resolve) => {
+                // === Early exits ===
+                
+                // 1. Check browser support
+                if (!this.SUPPORTS_WEBP || !this.SUPPORTS_BLOB) {
+                    console.warn('Browser does not support WebP or toBlob, keeping original:', file.name);
                     resolve(file);
                     return;
                 }
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        let { width, height } = img;
-
-                        if (width > this.MAX_DIMENSION || height > this.MAX_DIMENSION) {
-                            if (width > height) {
-                                height = Math.round((height * this.MAX_DIMENSION) / width);
-                                width = this.MAX_DIMENSION;
-                            } else {
-                                width = Math.round((width * this.MAX_DIMENSION) / height);
-                                height = this.MAX_DIMENSION;
-                            }
+    
+                // 2. Skip non-images
+                if (!file.type.startsWith('image/')) {
+                    resolve(file);
+                    return;
+                }
+    
+                // 3. Skip animated GIFs (canvas only captures first frame)
+                if (file.type === 'image/gif') {
+                    console.log('⏭️ Skipping animated GIF:', file.name);
+                    resolve(file);
+                    return;
+                }
+    
+                // 4. Skip if already WebP and small enough
+                if (file.type === 'image/webp' && file.size < this.MIN_SIZE_TO_COMPRESS) {
+                    resolve(file);
+                    return;
+                }
+    
+                // 5. Skip very small files
+                if (file.size < this.MIN_SIZE_TO_COMPRESS) {
+                    resolve(file);
+                    return;
+                }
+    
+                try {
+                    // === Load image using createImageBitmap (faster) or fallback ===
+                    let img;
+                    let width, height;
+    
+                    try {
+                        // Modern API - faster, lower memory
+                        const bitmap = await createImageBitmap(file);
+                        width = bitmap.width;
+                        height = bitmap.height;
+                        img = bitmap;
+                    } catch (e) {
+                        // Fallback for Safari
+                        const imageData = await this._readFileAsDataURL(file);
+                        const loaded = await this._loadImageFromDataURL(imageData);
+                        img = loaded;
+                        width = loaded.width;
+                        height = loaded.height;
+                    }
+    
+                    // === Resize if needed ===
+                    let newWidth = width;
+                    let newHeight = height;
+    
+                    if (width > this.MAX_DIMENSION || height > this.MAX_DIMENSION) {
+                        if (width > height) {
+                            newHeight = Math.round((height * this.MAX_DIMENSION) / width);
+                            newWidth = this.MAX_DIMENSION;
+                        } else {
+                            newWidth = Math.round((width * this.MAX_DIMENSION) / height);
+                            newHeight = this.MAX_DIMENSION;
                         }
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        canvas.toBlob((blob) => {
-                            if (blob && blob.size < file.size) {
-                                const compressed = new File([blob], file.name, {
-                                    type: 'image/jpeg',
-                                    lastModified: Date.now()
-                                });
-                                resolve(compressed);
-                            } else {
-                                resolve(file);
-                            }
-                        }, 'image/jpeg', this.QUALITY);
-                    };
-                    img.onerror = () => resolve(file);
-                    img.src = e.target.result;
-                };
-                reader.onerror = () => resolve(file);
+                    }
+    
+                    // === Draw on canvas ===
+                    const canvas = document.createElement('canvas');
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    const ctx = canvas.getContext('2d');
+                    
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    
+                    if (img instanceof ImageBitmap) {
+                        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                    } else {
+                        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                    }
+    
+                    // === Convert to WebP ===
+                    const blob = await new Promise((resolve) => {
+                        canvas.toBlob((blob) => resolve(blob), this.FORMAT, this.QUALITY);
+                    });
+    
+                    // === Release canvas memory immediately ===
+                    canvas.width = 0;
+                    canvas.height = 0;
+                    if (img instanceof ImageBitmap) {
+                        img.close();
+                    }
+    
+                    if (!blob) {
+                        console.warn('WebP conversion failed, keeping original:', file.name);
+                        resolve(file);
+                        return;
+                    }
+    
+                    // === Create new filename (handle files without extension) ===
+                    const newName = file.name.includes('.')
+                        ? file.name.replace(/\.[^.]+$/, '.webp')
+                        : file.name + '.webp';
+    
+                    const compressed = new File([blob], newName, {
+                        type: this.FORMAT,
+                        lastModified: Date.now()
+                    });
+    
+                    // === CRITICAL: Keep original if WebP is larger ===
+                    if (compressed.size >= file.size) {
+                        console.log(
+                            `%c⏭️ Keeping original (WebP larger)`,
+                            'color:orange',
+                            file.name,
+                            this.formatSize(file.size),
+                            '→',
+                            this.formatSize(compressed.size)
+                        );
+                        resolve(file);
+                        return;
+                    }
+    
+                    // === Success ===
+                    const saved = this.getCompressionRatio(file, compressed);
+                    console.log(
+                        `%c✅ WebP`,
+                        'color:green',
+                        file.name,
+                        this.formatSize(file.size),
+                        '→',
+                        this.formatSize(compressed.size),
+                        `(${saved}% smaller)`
+                    );
+    
+                    resolve(compressed);
+    
+                } catch (error) {
+                    console.warn('Compression failed, using original:', file.name, error);
+                    resolve(file);
+                }
+            });
+        },
+    
+        /**
+         * Compress multiple files to WebP format.
+         * FIXED: No variable shadowing bug
+         */
+        compressMultiple: async function(files) {
+            const results = [];
+            const total = files.length;
+            let processedCount = 0;
+    
+            for (const file of Array.from(files)) {
+                const compressedFile = await this.compress(file);
+                results.push(compressedFile);
+    
+                // Progress callback (if set)
+                if (this.onProgress) {
+                    this.onProgress({
+                        current: ++processedCount,
+                        total: total,
+                        file: file.name
+                    });
+                }
+            }
+    
+            return results;
+        },
+    
+        /**
+         * Helper: Read file as DataURL (fallback).
+         */
+        _readFileAsDataURL: function(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
         },
-
-        compressMultiple: async function(files) {
-            const results = [];
-            for (const file of Array.from(files)) {
-                const processed = await this.compress(file);
-                results.push(processed);
-            }
-            return results;
+    
+        /**
+         * Helper: Load image from DataURL (fallback).
+         */
+        _loadImageFromDataURL: function(dataURL) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = dataURL;
+            });
         },
-
+    
+        /**
+         * Format file size to human readable format.
+         * @param {number} bytes - Size in bytes
+         * @returns {string} - Formatted size
+         */
         formatSize: function(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
             const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
+    
+        /**
+         * Check if a file is an image.
+         * @param {File} file - The file to check
+         * @returns {boolean} - True if image
+         */
+        isImage: function(file) {
+            return file.type.startsWith('image/');
+        },
+    
+        /**
+         * Check if a file is already WebP.
+         * @param {File} file - The file to check
+         * @returns {boolean} - True if WebP
+         */
+        isWebP: function(file) {
+            return file.type === 'image/webp';
+        },
+    
+        /**
+         * Get compression ratio for a file.
+         * @param {File} original - Original file
+         * @param {File} compressed - Compressed file
+         * @returns {number} - Compression ratio percentage
+         */
+        getCompressionRatio: function(original, compressed) {
+            if (original.size === 0) return 0;
+            return Math.round((1 - compressed.size / original.size) * 100);
+        },
+    
+        /**
+         * Set progress callback.
+         * @param {Function} callback - Progress callback function
+         * @returns {Object} - this for chaining
+         */
+        setProgressCallback: function(callback) {
+            this.onProgress = callback;
+            return this;
+        },
+    
+        /**
+         * Check if browser supports WebP.
+         * @returns {boolean}
+         */
+        isWebPSupported: function() {
+            return this.SUPPORTS_WEBP;
+        },
+    
+        /**
+         * Check if browser supports required APIs.
+         * @returns {boolean}
+         */
+        isSupported: function() {
+            return this.SUPPORTS_WEBP && this.SUPPORTS_BLOB;
+        },
+    
+        /**
+         * Get estimated size after compression (useful for UI preview).
+         * @param {File} file - The file to estimate
+         * @returns {number} - Estimated size in bytes
+         */
+        estimateCompressedSize: function(file) {
+            if (!this.isImage(file)) return file.size;
+            if (file.type === 'image/webp') return file.size;
+            
+            // Rough estimate: WebP is typically 25-35% smaller
+            const ratio = 0.30; // 30% average reduction
+            return Math.round(file.size * (1 - ratio));
+        },
+    
+        /**
+         * Get the optimal quality for a given file type.
+         * @param {File} file - The file to check
+         * @returns {number} - Quality value
+         */
+        getOptimalQuality: function(file) {
+            if (file.type === 'image/png') {
+                return 0.85; // PNGs benefit from higher quality
+            }
+            if (file.type === 'image/jpeg') {
+                return 0.82; // Good balance for photos
+            }
+            return this.QUALITY;
         }
     };
 

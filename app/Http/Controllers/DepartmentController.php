@@ -13,12 +13,88 @@ class DepartmentController extends Controller
         $this->middleware('role:admin|super-admin');
     }
 
-    public function index()
-    {
-        $departments = Department::withCount(['users', 'incidents'])
-            ->ordered()
-            ->get();
+    // public function index()
+    // {
+    //     $departments = Department::withCount(['users', 'incidents'])
+    //         ->ordered()
+    //         ->get();
 
+    //     return view('admin.departments.index', compact('departments'));
+    // }
+    
+    /**
+     * Display a listing of departments with filters.
+     */
+    public function index(Request $request)
+    {
+        $query = Department::withCount(['users', 'incidents']);
+    
+        // ==========================================
+        // APPLY FILTERS
+        // ==========================================
+    
+        // 1. Search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+    
+        // 2. Status filter
+        if ($request->filled('status')) {
+            $query->where('is_active', $request->status === 'active');
+        }
+    
+        // 3. Has users filter
+        if ($request->filled('has_users')) {
+            if ($request->has_users == '1') {
+                $query->having('users_count', '>', 0);
+            } else {
+                $query->having('users_count', '=', 0);
+            }
+        }
+    
+        // 4. Sort options
+        switch ($request->get('sort')) {
+            case 'name_asc':
+                $query->orderBy('name', 'asc');
+                break;
+            case 'name_desc':
+                $query->orderBy('name', 'desc');
+                break;
+            case 'users_desc':
+                $query->orderBy('users_count', 'desc');
+                break;
+            case 'users_asc':
+                $query->orderBy('users_count', 'asc');
+                break;
+            case 'incidents_desc':
+                $query->orderBy('incidents_count', 'desc');
+                break;
+            case 'incidents_asc':
+                $query->orderBy('incidents_count', 'asc');
+                break;
+            case 'created_desc':
+                $query->orderBy('created_at', 'desc');
+                break;
+            case 'created_asc':
+                $query->orderBy('created_at', 'asc');
+                break;
+            default:
+                $query->ordered(); // Uses existing ordered scope
+                break;
+        }
+    
+        // ==========================================
+        // GET DATA
+        // ==========================================
+    
+        // Paginate results (12 per page)
+        $departments = $query->paginate(12)->withQueryString();
+    
         return view('admin.departments.index', compact('departments'));
     }
 

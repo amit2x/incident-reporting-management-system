@@ -38,6 +38,7 @@ class ImageHelper
 
     /**
      * Process an uploaded image file.
+     * Skips conversion if already WebP.
      */
     public function processImage(UploadedFile $file, array $options = []): array
     {
@@ -45,14 +46,67 @@ class ImageHelper
         $metadata = [];
 
         try {
+            
+            $options = array_merge($this->config, $options);
+            $this->validateFile($file);
+    
+            $mimeType = $file->getMimeType();
+            $fileSize = $file->getSize();
+                // ==========================================
+            // OPTIMIZATION: Skip processing if already WebP and small
+            // ==========================================
+            if ($mimeType === 'image/webp' && $fileSize < 300 * 1024) {
+                Log::info('Image already optimized WebP, skipping processing', [
+                    'filename' => $file->getClientOriginalName(),
+                    'size' => $fileSize,
+                ]);
+    
+                // Just store the file directly
+                $storedFilename = $this->generateFilename($file, 'webp');
+                $storedPath = $this->storeFileDirectly($file, $storedFilename, $options);
+                
+                $thumbnailPath = null;
+                if ($options['generate_thumbnail'] ?? true) {
+                    $thumbnailPath = $this->generateThumbnailFromFile($file, $storedFilename, $options);
+                }
+    
+                return [
+                    'success' => true,
+                    'stored_path' => $storedPath,
+                    'thumbnail_path' => $thumbnailPath,
+                    'stored_filename' => $storedFilename,
+                    'webp_data' => Storage::disk('public')->get($storedPath),
+                    'already_webp' => true,
+                    'metadata' => [
+                        'file' => [
+                            'original_filename' => $file->getClientOriginalName(),
+                            'stored_filename' => $storedFilename,
+                            'mime_type' => $mimeType,
+                            'original_size' => $fileSize,
+                            'compressed_size' => $fileSize,
+                            'compression_ratio' => 0,
+                        ],
+                        'image' => [
+                            'converted_to_webp' => false,
+                            'already_webp' => true,
+                            'width' => 0,
+                            'height' => 0,
+                        ],
+                        'processing' => [
+                            'processed_at' => now()->toIso8601String(),
+                            'processing_time_ms' => 0,
+                            'server_converted' => false,
+                            'already_webp' => true,
+                        ],
+                    ],
+                ];
+            }
+            
             // Merge options with defaults
             $options = array_merge($this->config, $options);
 
             // Validate file
             $this->validateFile($file);
-
-            // Generate unique filename
-            $storedFilename = $this->generateFilename($file);
 
             // Get original metadata
             $metadata['file'] = $this->getFileMetadata($file);
@@ -61,11 +115,84 @@ class ImageHelper
             $imageInfo = $this->getImageInfo($file);
             $metadata['image'] = $imageInfo;
 
-            // Get EXIF data
+            // Get EXIF data (only for JPEG/PNG, WebP doesn't support EXIF)
             $exifData = $this->extractExifData($file);
             if (! empty($exifData)) {
                 $metadata['exif'] = $exifData;
             }
+
+            // ==========================================
+            // OPTIMIZATION: Skip conversion if already WebP
+            // ==========================================
+            if ($file->getMimeType() === 'image/webp') {
+                Log::info('Image already WebP, skipping conversion', [
+                    'filename' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                ]);
+
+                // Generate unique filename (preserve webp extension)
+                $storedFilename = $this->generateFilename($file, 'webp');
+                
+                // Store the file directly
+                $storedPath = $file->storeAs(
+                    $options['storage_path'] . '/' . date('Y/m'),
+                    $storedFilename,
+                    'public'
+                );
+
+                // Generate thumbnail from WebP
+                $thumbnailPath = null;
+                if ($options['generate_thumbnail'] ?? true) {
+                    $thumbnailPath = $this->generateThumbnailFromFile($file, $storedFilename, $options);
+                }
+
+                // Build minimal metadata
+                $metadata['image']['converted_to_webp'] = false;
+                $metadata['image']['already_webp'] = true;
+                $metadata['image']['webp_quality'] = null;
+                $metadata['image']['width'] = $imageInfo['original_width'] ?? 0;
+                $metadata['image']['height'] = $imageInfo['original_height'] ?? 0;
+                $metadata['image']['aspect_ratio'] = $this->calculateAspectRatio(
+                    $imageInfo['original_width'] ?? 0,
+                    $imageInfo['original_height'] ?? 0
+                );
+
+                // Generate hashes
+                $fileContent = Storage::disk('public')->get($storedPath);
+                $metadata['hash'] = $this->generateHashes($fileContent);
+
+                // Processing metadata
+                $metadata['processing'] = [
+                    'processed_at' => now()->toIso8601String(),
+                    'processing_time_ms' => round((microtime(true) - $startTime) * 1000, 2),
+                    'pipeline_version' => '1.0.0',
+                    'client_compressed' => false,
+                    'server_converted' => false,
+                    'already_webp' => true,
+                ];
+
+                // File metadata update
+                $metadata['file']['stored_filename'] = $storedFilename;
+                $metadata['file']['compressed_size'] = $file->getSize();
+                $metadata['file']['compression_ratio'] = 0;
+
+                return [
+                    'success' => true,
+                    'stored_path' => $storedPath,
+                    'thumbnail_path' => $thumbnailPath,
+                    'stored_filename' => $storedFilename,
+                    'metadata' => $metadata,
+                    'webp_data' => $fileContent,
+                    'already_webp' => true,
+                ];
+            }
+
+            // ==========================================
+            // Process non-WebP images (JPEG, PNG, etc.)
+            // ==========================================
+
+            // Generate unique filename
+            $storedFilename = $this->generateFilename($file, 'webp');
 
             // Calculate optimal dimensions
             $dimensions = $this->calculateDimensions($imageInfo, $options);
@@ -73,6 +200,7 @@ class ImageHelper
             // Convert to WebP
             $webpData = $this->convertToWebP($file, $dimensions, $options['webp_quality']);
             $metadata['image']['converted_to_webp'] = true;
+            $metadata['image']['already_webp'] = false;
             $metadata['image']['webp_quality'] = $options['webp_quality'];
             $metadata['image']['width'] = $dimensions['width'];
             $metadata['image']['height'] = $dimensions['height'];
@@ -97,6 +225,7 @@ class ImageHelper
                 'pipeline_version' => '1.0.0',
                 'client_compressed' => false,
                 'server_converted' => true,
+                'already_webp' => false,
             ];
 
             // File metadata update
@@ -113,6 +242,7 @@ class ImageHelper
                 'stored_filename' => $storedFilename,
                 'metadata' => $metadata,
                 'webp_data' => $webpData['data'],
+                'already_webp' => false,
             ];
 
         } catch (Exception $e) {
@@ -127,6 +257,39 @@ class ImageHelper
                 'error' => $e->getMessage(),
                 'metadata' => $metadata,
             ];
+        }
+    }
+    
+    
+    /**
+     * Generate thumbnail from an already uploaded file (for WebP).
+     */
+    protected function generateThumbnailFromFile(UploadedFile $file, string $filename, array $options): ?string
+    {
+        try {
+            $image = $this->imageManager->read($file);
+
+            $width = $options['thumbnail_width'] ?? 300;
+            $height = $options['thumbnail_height'] ?? 300;
+
+            $image->cover($width, $height);
+
+            $thumbnailData = $image->toWebp(70)->toString();
+
+            $thumbFilename = 'thumb_' . $filename;
+            $thumbPath = 'thumbnails/' . $thumbFilename;
+
+            Storage::disk('public')->put($thumbPath, $thumbnailData);
+
+            return $thumbPath;
+
+        } catch (Exception $e) {
+            Log::warning('Thumbnail generation failed', [
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 
@@ -239,12 +402,10 @@ class ImageHelper
         $maxWidth = $options['max_width'];
         $maxHeight = $options['max_height'];
 
-        // If image is smaller than max dimensions, keep original size
         if ($width <= $maxWidth && $height <= $maxHeight) {
             return ['width' => $width, 'height' => $height];
         }
 
-        // Calculate scaling factor
         $scaleFactor = min($maxWidth / $width, $maxHeight / $height);
 
         return [
@@ -261,12 +422,10 @@ class ImageHelper
         try {
             $image = $this->imageManager->read($file);
 
-            // Resize if needed
             if ($dimensions['width'] !== $image->width() || $dimensions['height'] !== $image->height()) {
                 $image->resize($dimensions['width'], $dimensions['height']);
             }
 
-            // Encode as WebP
             $encoded = $image->toWebp($quality);
 
             return [
@@ -280,7 +439,7 @@ class ImageHelper
     }
 
     /**
-     * Generate thumbnail.
+     * Generate thumbnail from image data.
      */
     protected function generateThumbnail(string $imageData, string $filename, array $options): ?string
     {
@@ -329,75 +488,13 @@ class ImageHelper
     /**
      * Extract EXIF data from image.
      */
-    // protected function extractExifData(UploadedFile $file): array
-    // {
-    //     try {
-    //         $exif = @exif_read_data($file->getRealPath());
-
-    //         if ($exif === false) {
-    //             return ['available' => false];
-    //         }
-
-    //         $data = ['available' => true];
-
-    //         // DateTime
-    //         if (isset($exif['DateTimeOriginal'])) {
-    //             $data['taken_at'] = $this->normalizeExifDate($exif['DateTimeOriginal']);
-    //         } elseif (isset($exif['DateTime'])) {
-    //             $data['taken_at'] = $this->normalizeExifDate($exif['DateTime']);
-    //         }
-
-    //         // Camera Info
-    //         if (isset($exif['Make'])) {
-    //             $data['camera_make'] = trim($exif['Make']);
-    //         }
-    //         if (isset($exif['Model'])) {
-    //             $data['camera_model'] = trim($exif['Model']);
-    //         }
-    //         if (isset($exif['LensModel'])) {
-    //             $data['lens_model'] = trim($exif['LensModel']);
-    //         }
-
-    //         // Camera Settings
-    //         if (isset($exif['ISOSpeedRatings'])) {
-    //             $data['iso'] = (int) $exif['ISOSpeedRatings'];
-    //         }
-    //         if (isset($exif['FNumber'])) {
-    //             $data['aperture'] = $this->normalizeAperture($exif['FNumber']);
-    //         }
-    //         if (isset($exif['ExposureTime'])) {
-    //             $data['shutter_speed'] = $this->normalizeShutterSpeed($exif['ExposureTime']);
-    //         }
-    //         if (isset($exif['Flash'])) {
-    //             $data['flash_used'] = ($exif['Flash'] & 1) === 1;
-    //         }
-
-    //         // GPS Data
-    //         if (isset($exif['GPSLatitude']) && isset($exif['GPSLongitude'])) {
-    //             $data['gps'] = [
-    //                 'latitude' => $this->convertGpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef'] ?? 'N'),
-    //                 'longitude' => $this->convertGpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef'] ?? 'E'),
-    //                 'altitude' => isset($exif['GPSAltitude']) ? (float) $exif['GPSAltitude'] : null,
-    //             ];
-    //         }
-
-    //         return $data;
-
-    //     } catch (Exception $e) {
-    //         Log::debug('EXIF extraction failed', [
-    //             'file' => $file->getClientOriginalName(),
-    //             'error' => $e->getMessage(),
-    //         ]);
-
-    //         return ['available' => false, 'error' => $e->getMessage()];
-    //     }
-    // }
-
-    /**
-     * Extract EXIF data from image - Enhanced version.
-     */
     protected function extractExifData(UploadedFile $file): array
     {
+        // WebP doesn't support EXIF, skip early
+        if ($file->getMimeType() === 'image/webp') {
+            return ['available' => false, 'reason' => 'WebP format does not support EXIF'];
+        }
+
         try {
             $exif = @exif_read_data($file->getRealPath());
 
@@ -583,10 +680,44 @@ class ImageHelper
     /**
      * Normalize EXIF date format.
      */
+    // protected function normalizeExifDate(string $date): string
+    // {
+    //     return str_replace(' ', 'T', str_replace(':', '-', $date, 2));
+    // }
+
+
+    // protected function normalizeExifDate(string $date): string
+    // {
+    //     $date = str_replace(':', '-', $date); // Replace colons with hyphens
+    //     return str_replace(' ', 'T', $date);  // Replace space with T
+    // }
+    
+    /**
+     * Normalize EXIF date format.--- error also
+     */
+    // protected function normalizeExifDate(string $date): string
+    // {
+    //     // Convert "2024:01:15 14:30:25" to "2024-01-15T14:30:25"
+    //     // First replace the first two colons (date part)
+    //     $date = str_replace(':', '-', $date, 2);
+    //     // Then replace the space with T
+    //     $date = str_replace(' ', 'T', $date);
+    //     return $date;
+    // }
+    
+    //updated--
+    
+
+    
     protected function normalizeExifDate(string $date): string
     {
-        // Convert "2024:01:15 14:30:25" to "2024-01-15T14:30:25"
-        return str_replace(' ', 'T', str_replace(':', '-', $date, 2));
+        $date = trim($date);
+    
+        $dt = \DateTime::createFromFormat('!Y:m:d H:i:s', $date);
+    
+        return $dt instanceof \DateTime
+            ? $dt->format('Y-m-d\TH:i:s')
+            : $date;
     }
 
     /**
@@ -631,12 +762,12 @@ class ImageHelper
     /**
      * Generate unique filename for stored image.
      */
-    protected function generateFilename(UploadedFile $file): string
+    protected function generateFilename(UploadedFile $file, string $extension = 'webp'): string
     {
         $timestamp = now()->timestamp;
         $random = uniqid();
 
-        return $timestamp.'_'.$random.'.webp';
+        return $timestamp.'_'.$random.'.'.$extension;
     }
 
     /**
@@ -662,7 +793,6 @@ class ImageHelper
     {
         $metadata = $processedData['metadata'];
 
-        // Add upload information
         $metadata['upload'] = [
             'uploaded_by' => $userId,
             'source' => $requestInfo['source'] ?? 'Web',
@@ -672,7 +802,6 @@ class ImageHelper
             'ip' => $requestInfo['ip'] ?? null,
         ];
 
-        // Add audit information
         $metadata['audit'] = [
             'duplicate' => false,
             'duplicate_of' => null,

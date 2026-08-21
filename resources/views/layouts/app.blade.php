@@ -22,7 +22,6 @@
     <meta name="apple-mobile-web-app-title" content="SAMANVAY">
     <meta name="user-authenticated" content="{{ auth()->check() ? 'true' : 'false' }}">
 
-
     {{-- Icons --}}
     <link rel="apple-touch-icon" sizes="57x57" href="{{ asset('icons/apple-icon-57x57.png') }}">
     <link rel="apple-touch-icon" sizes="60x60" href="{{ asset('icons/apple-icon-60x60.png') }}">
@@ -43,12 +42,6 @@
     <meta name="msapplication-TileColor" content="#ffffff">
     <meta name="msapplication-TileImage" content="{{ asset('icons/ms-icon-144x144.png') }}">
     <meta name="theme-color" content="#ffffff">
-
-    
-    
-    <!--<link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32x32.png') }}">-->
-    <!--<link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon-16x16.png') }}">-->
-    <!--<link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-icon.png') }}">-->
 
     @include('layouts.partials.styles.icons')
 
@@ -71,10 +64,18 @@
     {{-- Responsive Styles --}}
     @include('layouts.partials.styles.responsive')
 
+    {{-- Celebration Styles --}}
+    @include('layouts.partials.celebrations.styles')
+
     @stack('styles')
 </head>
 <body>
     <div id="app" class="app-wrapper">
+
+        {{-- ========================================== --}}
+        {{-- CELEBRATION BANNERS --}}
+        {{-- ========================================== --}}
+        @include('layouts.partials.celebrations.banner')
 
         {{-- ========================================== --}}
         {{-- DESKTOP SIDEBAR (Visible on Desktop Only) --}}
@@ -141,26 +142,34 @@
         {{-- ========================================== --}}
         @include('layouts.partials.components.back-to-top')
 
-    {{-- Global Loader --}}
-    @include('components.global-loader')
-    </div>
-    
-    
+        {{-- Global Loader --}}
+        @include('components.global-loader')
 
-    
+        {{-- ========================================== --}}
+        {{-- NEW YEAR OVERLAY --}}
+        {{-- ========================================== --}}
+        @include('layouts.partials.celebrations.new-year-overlay')
+
+    </div>
+
     {{-- Loader Scripts --}}
     @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
     <script src="{{ asset('js/global-loaders.js') }}"></script>
+    <script src="{{ asset('js/modules/image-upload_handlers.js') }}"></script>
     @endpush
 
     {{-- Core Scripts --}}
     @include('layouts.partials.scripts.icons')
     @include('layouts.partials.scripts.core')
+
+    {{-- Celebration Scripts --}}
+    @include('layouts.partials.celebrations.scripts')
+
     @auth
     <script>
     // Register Firebase Service Worker
     if ('serviceWorker' in navigator && 'Notification' in window) {
-        // Only register if not already registered
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
             const hasFirebaseSW = registrations.some(reg => reg.scope.includes('firebase'));
 
@@ -177,10 +186,7 @@
     }
     </script>
     @endauth
+
     @stack('scripts')
-    
-    
-
-
 </body>
 </html>

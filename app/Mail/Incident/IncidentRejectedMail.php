@@ -11,13 +11,14 @@ use Illuminate\Mail\Mailables\Envelope;
 class IncidentRejectedMail extends BaseMail
 {
     protected Incident $incident;
-
     protected User $actor;
+    protected ?string $recipientName;
 
-    public function __construct(Incident $incident, User $actor)
+    public function __construct(Incident $incident, User $actor, ?string $recipientName = null)
     {
         $this->incident = $incident;
         $this->actor = $actor;
+        $this->recipientName = $recipientName;
 
         $this->statusColor = '#DC2626';
         $this->statusLabel = 'Incident Rejected';
@@ -33,12 +34,16 @@ class IncidentRejectedMail extends BaseMail
 
     public function content(): Content
     {
+        $greeting = $this->recipientName 
+            ? "Hello {$this->recipientName}," 
+            : "Hello ".($this->incident->reporter?->name ?? 'User').",";
+
         return new Content(
             view: 'emails.incident.rejected',
             with: array_merge($this->getViewData(), [
                 'incident' => $this->incident,
                 'actor' => $this->actor,
-                'greeting' => 'Hello '.($this->incident->reporter?->name ?? 'User').',',
+                'greeting' => $greeting,
                 'body' => 'The incident you reported has been rejected. Please review the reason and take necessary action.',
                 'actionUrl' => route('incidents.show', $this->incident),
                 'extraFields' => [
@@ -47,5 +52,11 @@ class IncidentRejectedMail extends BaseMail
                 ],
             ])
         );
+    }
+
+    public function setRecipientName(string $name): self
+    {
+        $this->recipientName = $name;
+        return $this;
     }
 }

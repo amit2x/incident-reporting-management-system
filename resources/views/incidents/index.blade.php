@@ -1,7 +1,7 @@
 {{-- resources/views/incidents/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Incidents - IRMS')
+@section('title', 'Incidents - SAMANVAY')
 
 @php
 $user = Auth::user();
@@ -387,6 +387,12 @@ $activeTab = request('tab', 'all');
             </a>
         </li>
         <li class="nav-item d-flex d-md-inline-flex">
+            <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'reported' ? 'active bg-warning text-dark' : 'bg-light text-dark' }}" 
+               href="{{ route('incidents.index', ['tab' => 'reported']) }}">
+                <i class="fas fa-pen me-1_5"></i> <span>My Reports</span>
+            </a>
+        </li>
+        <li class="nav-item d-flex d-md-inline-flex">
             <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'escalated' ? 'active bg-danger text-white' : 'bg-light text-dark' }}" 
                href="{{ route('incidents.index', ['tab' => 'escalated']) }}">
                 <i class="fas fa-arrow-up me-1_5 text-warning text-center"></i> <span>Escalated</span>
@@ -410,12 +416,6 @@ $activeTab = request('tab', 'all');
                 <i class="fas fa-history me-1_5"></i> <span>History</span>
             </a>
         </li>
-        <li class="nav-item d-flex d-md-inline-flex">
-            <a class="nav-link rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center text-nowrap {{ $activeTab === 'reported' ? 'active bg-warning text-dark' : 'bg-light text-dark' }}" 
-               href="{{ route('incidents.index', ['tab' => 'reported']) }}">
-                <i class="fas fa-pen me-1_5"></i> <span>My Reports</span>
-            </a>
-        </li>
     </ul>
 </div>
 
@@ -425,7 +425,8 @@ $activeTab = request('tab', 'all');
     {{-- Filters --}}
     
     {{-- Filters - Collapsible on Mobile --}}
-    @if($activeTab === 'all')
+    {{-- @if($activeTab === 'all' )  --}}
+    @if(true)
     <div class="card shadow-sm mt-3 border-0 rounded-3">
         <div class="card-body py-3">
             {{-- Filter Toggle Button for Mobile --}}
@@ -483,7 +484,9 @@ $activeTab = request('tab', 'all');
                         @endif
                         <div class="col-auto ms-auto">
                             <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">
-                                <i class="fas fa-filter me-1"></i> Filter
+                                <i class="fas fa-filter me-1"></i> 
+                                    <span class="btn-text">Filter</span>
+
                             </button>
                             <a href="{{ route('incidents.index') }}" class="btn btn-light btn-sm rounded-pill px-3">
                                 <i class="fas fa-redo"></i>
@@ -548,10 +551,12 @@ $activeTab = request('tab', 'all');
 
                             <td><span class="badge info-chip py-1" 
                                 style="background: {{ $incident->category?->color ?? '#6B7280' }}20; color: {{ $incident->category?->color ?? '#6B7280'}}">
+                                <i class="{{ $incident->category->icon ?? 'fas fa-folder-open' }} " style="color:{{ $incident->category->color ?? '' }}"></i>
                                 {{ $incident->category?->name ?? 'N/A' }}</span>
                             </td>
                             <td>
                                 <span class="badge" style="background: {{ $incident->department?->color ?? '#6B7280' }}20; color: {{ $incident->department?->color ?? '#6B7280' }}">
+                                    <i class="{{ $incident->department->icon ?? 'fas fa-building' }} " style="color:{{ $incident->department->color ?? '' }}"></i>
                                             {{ $incident->department?->code ?? 'N/A' }}
                                         </span>
                             </td>
@@ -646,7 +651,7 @@ $activeTab = request('tab', 'all');
 
                     {{-- Title & Description --}}
                     <div class="px-3 pb-2">
-                        <h6 class="fw-bold mb-1" style="font-size: 0.95rem;">{{ $incident->title }}</h6>
+                        <h6 class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">{{ $incident->title }}</h6>
                         <p class="text-muted mb-0" style="font-size: 0.75rem; line-height: 1.4;">
                             {{ Str::limit($incident->description, 80) }}
                         </p>
@@ -655,10 +660,11 @@ $activeTab = request('tab', 'all');
                     {{-- Info Chips --}}
                     <div class="px-3 pb-2 d-flex gap-2 flex-wrap">
                         <span class="info-chip">
-                            <i class="fas fa-folder-open"></i> {{ $incident->category?->name ?? 'Uncategorized' }}
+                            <i class="{{ $incident->category->icon ?? 'fas fa-folder-open' }} " style="color:{{ $incident->category->color ?? '' }}"></i>
+                            {{ $incident->category?->name ?? 'Uncategorized' }}
                         </span>
                         <span class="info-chip">
-                            <i class="fas fa-building"></i> {{ $incident->department?->code ?? 'N/A' }}
+                            <i class="{{ $incident->department->icon ?? 'fas fa-building' }} " style="color:{{ $incident->department->color ?? '' }}"></i> {{ $incident->department?->code ?? 'N/A' }}
                         </span>
                     </div>
 
@@ -786,39 +792,7 @@ $activeTab = request('tab', 'all');
         </div>
     </div>
 </div>
-<!--{{-- Media Modal - Fixed with proper focus management --}}-->
-<!--<div class="modal fade" id="mediaModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="true">-->
-<!--    <div class="modal-dialog modal-dialog-centered modal-lg">-->
-<!--        <div class="modal-content bg-transparent border-0">-->
-<!--            <div class="modal-body p-0">-->
-<!--                <div class="position-relative bg-white rounded-3 overflow-hidden" style="min-height: 500px;">-->
-<!--                    <img id="modalMedia" src="" alt="" class="w-100" style="display: none; max-height: 80vh; object-fit: contain;">-->
-<!--                    <video id="modalVideo" controls style="display: none; width: 100%; max-height: 80vh;">-->
-<!--                        <source id="videoSource" src="">-->
-<!--                    </video>-->
-<!--                    <div id="modalDocument" class="text-center text-white p-5" style="display: none;">-->
-<!--                        <i class="fas fa-file fa-4x mb-3"></i>-->
-<!--                        <p>Document preview not available</p>-->
-<!--                        <a id="downloadLink" href="#" class="btn btn-primary rounded-pill px-4" download>Download File</a>-->
-<!--                    </div>-->
-                    
-<!--                    {{-- Navigation Buttons --}}-->
-<!--                    <button id="prevMediaBtn" class="btn btn-dark rounded-circle position-absolute start-3 top-50 translate-middle-y" style="width: 40px; height: 40px; z-index: 10;">-->
-<!--                        <i class="fas fa-chevron-left"></i>-->
-<!--                    </button>-->
-<!--                    <button id="nextMediaBtn" class="btn btn-dark rounded-circle position-absolute end-3 top-50 translate-middle-y" style="width: 40px; height: 40px; z-index: 10;">-->
-<!--                        <i class="fas fa-chevron-right"></i>-->
-<!--                    </button>-->
-                    
-<!--                    <div id="mediaCounter" class="position-absolute bottom-3 start-50 translate-middle-x bg-dark bg-opacity-75 text-white px-3 py-1 rounded-pill" style="font-size: 0.8rem; bottom: 10px;"></div>-->
-<!--                </div>-->
-<!--            </div>-->
-<!--            <div class="modal-footer border-0 justify-content-center pt-3">-->
-<!--                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>-->
-<!--            </div>-->
-<!--        </div>-->
-<!--    </div>-->
-<!--</div>-->
+
 
 {{-- Comments Modal --}}
 <div class="modal fade" id="commentsModal" tabindex="-1" role="dialog" aria-labelledby="commentsModalTitle" aria-hidden="true">
@@ -1150,4 +1124,56 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 </script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const filterForm = document.getElementById('filterForm');
+        
+        if (filterForm) {
+            // Target the submit button, icon, and text within the form
+            const submitBtn = filterForm.querySelector('button[type="submit"]');
+            const btnIcon = submitBtn ? submitBtn.querySelector('i') : null;
+            const btnText = submitBtn ? submitBtn.querySelector('.btn-text') : null;
+
+            // Function to change button state to loading
+            function showLoadingState() {
+                if (submitBtn) {
+                    submitBtn.disabled = true; // Prevents double submissions
+                }
+                if (btnIcon) {
+                    // Changes to FontAwesome spinning gear icon
+                    btnIcon.className = 'fas fa-cog fa-spin me-1'; 
+                }
+                if (btnText) {
+                    btnText.textContent = 'Filtering...';
+                }
+            }
+
+            // Trigger submit and loader on dropdown change
+            const dropdowns = filterForm.querySelectorAll('select');
+            dropdowns.forEach(select => {
+                select.addEventListener('change', function () {
+                    showLoadingState();
+                    filterForm.submit();
+                });
+            });
+
+            // Trigger submit and loader on search text input (Debounced)
+            const searchInput = filterForm.querySelector('input[name="search"]');
+            let debounceTimer;
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function () {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        showLoadingState();
+                        filterForm.submit();
+                    }, 500); 
+                });
+            }
+        }
+    });
+</script>
+
 @endpush

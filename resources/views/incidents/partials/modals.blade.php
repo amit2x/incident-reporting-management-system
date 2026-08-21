@@ -16,7 +16,7 @@
                     <div class="mb-3">
                         <label class="form-label">{{ $incident->assignedTo ? 'Reassign To' : 'Assign To' }} <span
                                 class="text-danger">*</span></label>
-                        <select name="assigned_to" class="form-select select2" required>
+                        <select name="assigned_to" class="form-select select23" required>
                             <option value="">{{ $incident->assignedTo ? 'Select New User' : 'Select User' }}</option>
                             @php
                             $availableUsers = \App\Models\User::where('department_id', $incident->department_id)
@@ -95,7 +95,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Target Department <span class="text-danger">*</span></label>
-                        <select name="to_department_id" id="escalateDeptSelect" class="form-select select2" required>
+                        <select name="to_department_id" id="escalateDeptSelect" class="form-select select23" required>
                             <option value="">Select Department First</option>
                             @foreach(\App\Models\Department::active()->ordered()->get() as $dept)
                             <option value="{{ $dept->id }}">{{ $dept->name }} ({{ $dept->code }})</option>
@@ -105,7 +105,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Escalate To <span class="text-danger">*</span></label>
-                        <select name="escalated_to" id="escalateUserSelect" class="form-select select2" required>
+                        <select name="escalated_to" id="escalateUserSelect" class="form-select select23" required>
                             <option value="">Select Department First</option>
                         </select>
                         <small class="text-muted" id="escalateUserCount"></small>
@@ -155,9 +155,10 @@
                     </div>
                     <div class="mb-0">
                         <label class="form-label">Attach Files (Optional)</label>
-                        <input type="file" name="files[]" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                            class="form-control">
-                        <small class="text-muted">Attach resolution evidence, photos, or documents</small>
+                        <!--<input type="file" name="files[]" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"-->
+                        <!--    class="form-control">-->
+                        <input type="file" name="files[]" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" class="form-control">
+                        <small class="text-muted">Attach resolution evidence, photos, video or documents</small>
                         <div id="resolveFilePreview" class="d-flex flex-wrap gap-2 mt-2"></div>
                     </div>
                 </div>

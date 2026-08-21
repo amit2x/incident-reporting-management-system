@@ -11,13 +11,14 @@ use Illuminate\Mail\Mailables\Envelope;
 class IncidentCreatedMail extends BaseMail
 {
     protected Incident $incident;
-
     protected ?User $actor;
+    protected ?string $recipientName;
 
-    public function __construct(Incident $incident, ?User $actor = null)
+    public function __construct(Incident $incident, ?User $actor = null, ?string $recipientName = null)
     {
         $this->incident = $incident;
         $this->actor = $actor ?? $incident->reporter;
+        $this->recipientName = $recipientName;
 
         $this->statusColor = '#0D47A1';
         $this->statusLabel = 'New Incident Reported';
@@ -33,19 +34,35 @@ class IncidentCreatedMail extends BaseMail
 
     public function content(): Content
     {
+        // Use recipient name if provided, otherwise use a generic greeting
+        $greeting = $this->recipientName 
+            ? "Hello {$this->recipientName}," 
+            : 'Hello Team,';
+
         return new Content(
             view: 'emails.incident.created',
             with: array_merge($this->getViewData(), [
                 'incident' => $this->incident,
                 'actor' => $this->actor,
-                'greeting' => 'Hello Team,',
+                'greeting' => $greeting,
                 'body' => 'A new incident has been reported. Please review and take appropriate action.',
                 'actionUrl' => route('incidents.show', $this->incident),
                 'extraFields' => [
-                    'Reported By' => $this->incident->reporter?->name ?? 'N/A',
-                    'Status' => ucfirst($this->incident->status),
+                    'Reported By' => $this->incident->is_anonymous 
+                        ? 'Anonymous' 
+                        : ($this->incident->reporter?->name ?? 'N/A'),
+                    'Status' => ucfirst(str_replace('_', ' ', $this->incident->status)),
                 ],
             ])
         );
+    }
+
+    /**
+     * Set the recipient name for personalized greeting.
+     */
+    public function setRecipientName(string $name): self
+    {
+        $this->recipientName = $name;
+        return $this;
     }
 }

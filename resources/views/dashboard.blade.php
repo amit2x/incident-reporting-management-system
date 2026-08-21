@@ -1,7 +1,7 @@
 {{-- resources/views/dashboard.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Dashboard - IRMS')
+@section('title', 'Dashboard - SAMANVAY')
 
 @php
 $user = Auth::user();

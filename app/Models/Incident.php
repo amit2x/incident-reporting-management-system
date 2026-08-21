@@ -185,6 +185,14 @@ class Incident extends Model
     // ==========================================
     // RELATIONSHIPS
     // ==========================================
+    
+    /**
+     * Get all status actions for this incident.
+     */
+    public function statusActions(): HasMany
+    {
+        return $this->hasMany(IncidentStatusAction::class)->orderBy('acted_at', 'desc');
+    }
 
     public function reporter(): BelongsTo
     {
@@ -443,13 +451,13 @@ class Incident extends Model
     // STATUS MANAGEMENT METHODS
     // ==========================================
 
-    public function acknowledge(): void
-    {
-        $this->update([
-            'status' => 'acknowledged',
-            'acknowledged_at' => now(),
-        ]);
-    }
+    // public function acknowledge(): void
+    // {
+    //     $this->update([
+    //         'status' => 'acknowledged',
+    //         'acknowledged_at' => now(),
+    //     ]);
+    // }
 
     public function startProgress(): void
     {
@@ -459,61 +467,61 @@ class Incident extends Model
         ]);
     }
 
-    public function escalate(int $toUserId, string $reason): Escalation
-    {
-        $escalation = $this->escalations()->create([
-            'escalated_by' => auth()->id(),
-            'escalated_to' => $toUserId,
-            'from_department_id' => $this->department_id,
-            'to_department_id' => User::find($toUserId)->department_id,
-            'level' => $this->escalations()->count() + 1,
-            'reason' => $reason,
-            'status' => 'pending',
-        ]);
+    // public function escalate(int $toUserId, string $reason): Escalation
+    // {
+    //     $escalation = $this->escalations()->create([
+    //         'escalated_by' => auth()->id(),
+    //         'escalated_to' => $toUserId,
+    //         'from_department_id' => $this->department_id,
+    //         'to_department_id' => User::find($toUserId)->department_id,
+    //         'level' => $this->escalations()->count() + 1,
+    //         'reason' => $reason,
+    //         'status' => 'pending',
+    //     ]);
 
-        $this->update([
-            'status' => 'escalated',
-            'escalated_to' => $toUserId,
-            'escalated_at' => now(),
-        ]);
+    //     $this->update([
+    //         'status' => 'escalated',
+    //         'escalated_to' => $toUserId,
+    //         'escalated_at' => now(),
+    //     ]);
 
-        return $escalation;
-    }
+    //     return $escalation;
+    // }
 
-    public function resolve(string $notes): void
-    {
-        $this->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-            'resolution_notes' => $notes,
-        ]);
-    }
+    // public function resolve(string $notes): void
+    // {
+    //     $this->update([
+    //         'status' => 'resolved',
+    //         'resolved_at' => now(),
+    //         'resolution_notes' => $notes,
+    //     ]);
+    // }
 
-    public function close(): void
-    {
-        $this->update([
-            'status' => 'closed',
-            'closed_at' => now(),
-        ]);
-    }
+    // public function close(): void
+    // {
+    //     $this->update([
+    //         'status' => 'closed',
+    //         'closed_at' => now(),
+    //     ]);
+    // }
 
-    public function reject(string $reason): void
-    {
-        $this->update([
-            'status' => 'rejected',
-            'rejection_reason' => $reason,
-        ]);
-    }
+    // public function reject(string $reason): void
+    // {
+    //     $this->update([
+    //         'status' => 'rejected',
+    //         'rejection_reason' => $reason,
+    //     ]);
+    // }
 
-    public function reopen(): void
-    {
-        $this->update([
-            'status' => 'open',
-            'resolved_at' => null,
-            'closed_at' => null,
-            'resolution_notes' => null,
-        ]);
-    }
+    // public function reopen(): void
+    // {
+    //     $this->update([
+    //         'status' => 'open',
+    //         'resolved_at' => null,
+    //         'closed_at' => null,
+    //         'resolution_notes' => null,
+    //     ]);
+    // }
 
     // ==========================================
     // HELPER METHODS
@@ -642,8 +650,23 @@ class Incident extends Model
         });
     }
 
+    // public function logActivity(string $action, ?array $oldValues, ?array $newValues): void
+    // {
+    //     $this->logs()->create([
+    //         'user_id' => auth()->id(),
+    //         'action' => $action,
+    //         'old_values' => $oldValues,
+    //         'new_values' => $newValues,
+    //         'description' => $this->getActionDescription($action),
+    //         'ip_address' => request()->ip(),
+    //         'user_agent' => request()->userAgent(),
+    //     ]);
+    // }
+    
+    
     public function logActivity(string $action, ?array $oldValues, ?array $newValues): void
     {
+        // 1. Existing log entry (keep this)
         $this->logs()->create([
             'user_id' => auth()->id(),
             'action' => $action,
@@ -653,6 +676,70 @@ class Incident extends Model
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
+    
+        // 2. NEW: Record in incident_status_actions for status changes
+        $statusActions = ['assigned', 'acknowledged', 'in_progress', 'escalated', 'resolved', 'closed', 'rejected', 'reopened'];
+        
+        if (in_array($action, $statusActions)) {
+            $this->recordStatusAction($action, $oldValues, $newValues);
+        }
+    }
+    
+    /**
+     * Record action in incident_status_actions table
+     */
+    protected function recordStatusAction(string $action, ?array $oldValues, ?array $newValues): void
+    {
+        $userId = auth()->id() ?? 1; // Fallback to system user
+        
+        $previousStatus = $oldValues['status'] ?? null;
+        $newStatus = $newValues['status'] ?? $this->status;
+        
+        $reason = match ($action) {
+            'assigned' => $newValues['assigned_to'] ?? 'Incident assigned',
+            'acknowledged' => 'Incident acknowledged',
+            'in_progress' => 'Work started on incident',
+            'escalated' => $newValues['reason'] ?? 'Incident escalated',
+            'resolved' => $this->resolution_notes ?? 'Incident resolved',
+            'closed' => 'Incident closed',
+            'rejected' => $this->rejection_reason ?? 'Incident rejected',
+            'reopened' => 'Incident reopened',
+            default => $this->getActionDescription($action),
+        };
+    
+        // Use the relationship if it exists, or direct DB insert
+        if (method_exists($this, 'statusActions') && $this->statusActions()->getRelated() instanceof \App\Models\IncidentStatusAction) {
+            $this->statusActions()->create([
+                'action' => $action,
+                'user_id' => $userId,
+                'previous_status' => $previousStatus,
+                'new_status' => $newStatus,
+                'reason' => $reason,
+                'metadata' => json_encode([
+                    'old_values' => $oldValues,
+                    'new_values' => $newValues,
+                    'log_description' => $this->getActionDescription($action),
+                ]),
+                'acted_at' => now(),
+            ]);
+        } else {
+            // Direct DB insert as fallback
+            DB::table('incident_status_actions')->insert([
+                'incident_id' => $this->id,
+                'action' => $action,
+                'user_id' => $userId,
+                'previous_status' => $previousStatus,
+                'new_status' => $newStatus,
+                'reason' => $reason,
+                'metadata' => json_encode([
+                    'old_values' => $oldValues,
+                    'new_values' => $newValues,
+                ]),
+                'acted_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function handleStatusChange(string $oldStatus, string $newStatus): void
@@ -996,5 +1083,524 @@ class Incident extends Model
             'id',              // Local key on incidents table
             'responded_by'     // Local key on escalations table
         )->where('escalations.response_type', 'rejected');
+    }
+    
+    
+    
+    
+    
+    
+     // ==========================================
+    // STATUS MANAGEMENT METHODS WITH REASON
+    // ==========================================
+
+    /**
+     * Acknowledge the incident with reason.--
+     */
+    public function acknowledge(?string $reason = null, ?User $actor = null): void
+    {
+        $actor = $actor ?? auth()->user();
+        $oldStatus = $this->status;
+        
+        $this->update([
+            'status' => 'acknowledged',
+            'acknowledged_at' => now(),
+        ]);
+
+        $this->statusActions()->create([
+            'action' => 'acknowledged',
+            'user_id' => $actor?->id ?? 1,
+            'previous_status' => $oldStatus,
+            'new_status' => 'acknowledged',
+            'reason' => $reason ?? 'Incident acknowledged',
+            'metadata' => [
+                'acknowledged_by' => $actor?->name,
+                'acknowledged_at' => now()->toDateTimeString(),
+            ],
+            'acted_at' => now(),
+        ]);
+
+        $this->logActivity('acknowledged', null, [
+            'acknowledged_by' => $actor?->name,
+            'reason' => $reason,
+        ]);
+    }
+
+    /**
+     * Resolve the incident with resolution notes.--
+     */
+    public function resolve(string $notes, ?User $actor = null): void
+    {
+        $actor = $actor ?? auth()->user();
+        $oldStatus = $this->status;
+        
+        $this->update([
+            'status' => 'resolved',
+            'resolved_at' => now(),
+            'resolution_notes' => $notes,
+        ]);
+
+        $this->statusActions()->create([
+            'action' => 'resolved',
+            'user_id' => $actor?->id ?? 1,
+            'previous_status' => $oldStatus,
+            'new_status' => 'resolved',
+            'reason' => $notes,
+            'metadata' => [
+                'resolved_by' => $actor?->name,
+                'resolved_at' => now()->toDateTimeString(),
+            ],
+            'acted_at' => now(),
+        ]);
+
+        $this->logActivity('resolved', null, [
+            'resolved_by' => $actor?->name,
+            'resolution_notes' => $notes,
+        ]);
+    }
+
+    /**
+     * Close the incident with closing remarks.--
+     */
+    public function close(?string $remarks = null, ?User $actor = null): void
+    {
+        $actor = $actor ?? auth()->user();
+        $oldStatus = $this->status;
+        
+        $this->update([
+            'status' => 'closed',
+            'closed_at' => now(),
+        ]);
+
+        $this->statusActions()->create([
+            'action' => 'closed',
+            'user_id' => $actor?->id ?? 1,
+            'previous_status' => $oldStatus,
+            'new_status' => 'closed',
+            'reason' => $remarks ?? 'Incident closed',
+            'metadata' => [
+                'closed_by' => $actor?->name,
+                'closed_at' => now()->toDateTimeString(),
+            ],
+            'acted_at' => now(),
+        ]);
+
+        $this->logActivity('closed', null, [
+            'closed_by' => $actor?->name,
+            'remarks' => $remarks,
+        ]);
+    }
+
+    /**
+     * Reject the incident with rejection reason.--
+     */
+    public function reject(string $reason, ?User $actor = null): void
+    {
+        $actor = $actor ?? auth()->user();
+        $oldStatus = $this->status;
+        
+        $this->update([
+            'status' => 'rejected',
+            'rejection_reason' => $reason,
+        ]);
+
+        $this->statusActions()->create([
+            'action' => 'rejected',
+            'user_id' => $actor?->id ?? 1,
+            'previous_status' => $oldStatus,
+            'new_status' => 'rejected',
+            'reason' => $reason,
+            'metadata' => [
+                'rejected_by' => $actor?->name,
+                'rejected_at' => now()->toDateTimeString(),
+            ],
+            'acted_at' => now(),
+        ]);
+
+        $this->logActivity('rejected', null, [
+            'rejected_by' => $actor?->name,
+            'rejection_reason' => $reason,
+        ]);
+    }
+
+    /**
+     * Reopen the incident with reason.--
+     */
+    public function reopen(?string $reason = null, ?User $actor = null): void
+    {
+        $actor = $actor ?? auth()->user();
+        $oldStatus = $this->status;
+        
+        $this->update([
+            'status' => 'open',
+            'resolved_at' => null,
+            'closed_at' => null,
+            'resolution_notes' => null,
+        ]);
+
+        $this->statusActions()->create([
+            'action' => 'reopened',
+            'user_id' => $actor?->id ?? 1,
+            'previous_status' => $oldStatus,
+            'new_status' => 'open',
+            'reason' => $reason ?? 'Incident reopened',
+            'metadata' => [
+                'reopened_by' => $actor?->name,
+                'reopened_at' => now()->toDateTimeString(),
+                'previous_status' => $oldStatus,
+            ],
+            'acted_at' => now(),
+        ]);
+
+        $this->logActivity('reopened', null, [
+            'reopened_by' => $actor?->name,
+            'reason' => $reason,
+        ]);
+    }
+
+    /**
+     * Escalate the incident with reason (uses existing escalations table).--
+     */
+    public function escalate(int $toUserId, string $reason, ?User $actor = null): Escalation
+    {
+        $actor = $actor ?? auth()->user();
+        $oldStatus = $this->status;
+        
+        $escalation = $this->escalations()->create([
+            'escalated_by' => $actor?->id ?? 1,
+            'escalated_to' => $toUserId,
+            'from_department_id' => $this->department_id,
+            'to_department_id' => User::find($toUserId)?->department_id,
+            'level' => $this->escalations()->count() + 1,
+            'reason' => $reason,
+            'status' => 'pending',
+        ]);
+
+        $this->update([
+            'status' => 'escalated',
+            'escalated_to' => $toUserId,
+            'escalated_at' => now(),
+        ]);
+
+        // Also record in status_actions for consistency
+        $this->statusActions()->create([
+            'action' => 'escalated',
+            'user_id' => $actor?->id ?? 1,
+            'previous_status' => $oldStatus,
+            'new_status' => 'escalated',
+            'reason' => $reason,
+            'metadata' => [
+                'escalated_by' => $actor?->name,
+                'escalated_to' => User::find($toUserId)?->name,
+                'escalation_id' => $escalation->id,
+                'level' => $escalation->level,
+            ],
+            'acted_at' => now(),
+        ]);
+
+        $this->logActivity('escalated', null, [
+            'escalated_by' => $actor?->name,
+            'escalated_to' => User::find($toUserId)?->name,
+            'reason' => $reason,
+        ]);
+
+        return $escalation;
+    }
+
+    /**
+     * Assign the incident with notes.
+     */
+    public function assign(int $toUserId, ?string $notes = null, ?User $actor = null): IncidentAssignment
+    {
+        $actor = $actor ?? auth()->user();
+        $oldStatus = $this->status;
+        $oldAssigneeId = $this->assigned_to;
+        
+        // Deactivate current assignment
+        $currentAssignment = $this->currentAssignment();
+        if ($currentAssignment) {
+            $currentAssignment->update([
+                'is_active' => false,
+                'unassigned_at' => now(),
+            ]);
+        }
+
+        // Create new assignment
+        $assignment = $this->assignments()->create([
+            'assigned_by' => $actor?->id ?? 1,
+            'assigned_to' => $toUserId,
+            'notes' => $notes ?? ($this->assigned_to ? 'Reassigned' : 'Assigned'),
+            'assigned_at' => now(),
+            'is_active' => true,
+        ]);
+
+        $newStatus = $this->status === 'open' ? 'acknowledged' : $this->status;
+        
+        $this->update([
+            'assigned_to' => $toUserId,
+            'status' => $newStatus,
+            'acknowledged_at' => $this->status === 'open' ? now() : $this->acknowledged_at,
+        ]);
+
+        // Also record in status_actions for consistency
+        $this->statusActions()->create([
+            'action' => 'assigned',
+            'user_id' => $actor?->id ?? 1,
+            'previous_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'reason' => $notes ?? ($oldAssigneeId ? 'Reassigned' : 'Assigned'),
+            'metadata' => [
+                'assigned_by' => $actor?->name,
+                'assigned_to' => User::find($toUserId)?->name,
+                'assignment_id' => $assignment->id,
+                'previous_assignee' => $oldAssigneeId ? User::find($oldAssigneeId)?->name : null,
+            ],
+            'acted_at' => now(),
+        ]);
+
+        $this->logActivity('assigned', 
+            ['assigned_to' => $oldAssigneeId],
+            ['assigned_to' => User::find($toUserId)?->name, 'assigned_by' => $actor?->name]
+        );
+
+        return $assignment;
+    }
+
+    // ==========================================
+    // GET ACTOR METHODS
+    // ==========================================
+
+    public function getResolvedByActor(): ?User
+    {
+        $action = $this->statusActions()
+            ->where('action', 'resolved')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->user;
+    }
+
+    public function getClosedByActor(): ?User
+    {
+        $action = $this->statusActions()
+            ->where('action', 'closed')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->user;
+    }
+
+    public function getRejectedByActor(): ?User
+    {
+        $action = $this->statusActions()
+            ->where('action', 'rejected')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->user;
+    }
+
+    public function getReopenedByActor(): ?User
+    {
+        $action = $this->statusActions()
+            ->where('action', 'reopened')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->user;
+    }
+
+    public function getAcknowledgedByActor(): ?User
+    {
+        $action = $this->statusActions()
+            ->where('action', 'acknowledged')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->user;
+    }
+
+    public function getEscalatedByActor(): ?User
+    {
+        $action = $this->statusActions()
+            ->where('action', 'escalated')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->user;
+    }
+
+    public function getAssignedByActor(): ?User
+    {
+        $action = $this->statusActions()
+            ->where('action', 'assigned')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->user;
+    }
+
+    // ==========================================
+    // GET REASON METHODS
+    // ==========================================
+
+    public function getResolutionReason(): ?string
+    {
+        $action = $this->statusActions()
+            ->where('action', 'resolved')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->reason ?? $this->resolution_notes;
+    }
+
+    public function getClosureReason(): ?string
+    {
+        $action = $this->statusActions()
+            ->where('action', 'closed')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->reason;
+    }
+
+    public function getRejectionReason(): ?string
+    {
+        $action = $this->statusActions()
+            ->where('action', 'rejected')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->reason ?? $this->rejection_reason;
+    }
+
+    public function getReopenReason(): ?string
+    {
+        $action = $this->statusActions()
+            ->where('action', 'reopened')
+            ->latest('acted_at')
+            ->first();
+        
+        return $action?->reason;
+    }
+
+    // ==========================================
+    // COMPLETE ACTION HISTORY
+    // ==========================================
+
+    // public function getCompleteActionHistory(): array
+    // {
+    //     return $this->statusActions()
+    //         ->with('user')
+    //         ->latestFirst()
+    //         ->get()
+    //         ->map(function ($action) {
+    //             return [
+    //                 'id' => $action->id,
+    //                 'action' => $action->action_label,
+    //                 'icon' => $action->action_icon,
+    //                 'color' => $action->action_color,
+    //                 'user' => $action->user?->name ?? 'System',
+    //                 'user_avatar' => $action->user?->avatar_url,
+    //                 'from_status' => $action->previous_status ? ucfirst(str_replace('_', ' ', $action->previous_status)) : null,
+    //                 'to_status' => $action->new_status ? ucfirst(str_replace('_', ' ', $action->new_status)) : null,
+    //                 'reason' => $action->formatted_reason,
+    //                 'metadata' => $action->metadata,
+    //                 'acted_at' => $action->formatted_acted_at,
+    //                 'acted_at_raw' => $action->acted_at->toDateTimeString(),
+    //             ];
+    //         })
+    //         ->toArray();
+    // }
+    
+    // In app/Models/Incident.php
+
+public function getCompleteActionHistory(): array
+{
+    return $this->statusActions()
+        ->with('user')
+        ->latestFirst()
+        ->get()
+        ->map(function ($action) {
+            // Check if this is a rejection action
+            $isRejection = in_array($action->action, ['rejected', 'rejected_escalation']);
+            
+            return [
+                'id' => $action->id,
+                'action' => $action->action_label,
+                'icon' => $action->action_icon,
+                'color' => $action->action_color,
+                'user' => $action->user?->name ?? 'System',
+                'user_avatar' => $action->user?->avatar_url,
+                'from_status' => $action->previous_status ? ucfirst(str_replace('_', ' ', $action->previous_status)) : null,
+                'to_status' => $action->new_status ? ucfirst(str_replace('_', ' ', $action->new_status)) : null,
+                'reason' => $action->formatted_reason,
+                'metadata' => $action->metadata,
+                'is_rejection' => $isRejection,
+                'acted_at' => $action->formatted_acted_at,
+                'acted_at_raw' => $action->acted_at->toDateTimeString(),
+            ];
+        })
+        ->toArray();
+}
+
+    public function getActionSummary(): array
+    {
+        return [
+            'total_actions' => $this->statusActions()->count(),
+            'resolutions' => $this->statusActions()->where('action', 'resolved')->count(),
+            'closures' => $this->statusActions()->where('action', 'closed')->count(),
+            'rejections' => $this->statusActions()->where('action', 'rejected')->count(),
+            'reopens' => $this->statusActions()->where('action', 'reopened')->count(),
+            'acknowledgements' => $this->statusActions()->where('action', 'acknowledged')->count(),
+            'escalations' => $this->statusActions()->where('action', 'escalated')->count(),
+            'assignments' => $this->statusActions()->where('action', 'assigned')->count(),
+        ];
+    }
+
+    public function getStatusChanges(): array
+    {
+        return $this->statusActions()
+            ->whereIn('action', ['acknowledged', 'resolved', 'closed', 'rejected', 'reopened', 'escalated'])
+            ->with('user')
+            ->latestFirst()
+            ->get()
+            ->map(function ($action) {
+                return [
+                    'from' => $action->previous_status ? ucfirst(str_replace('_', ' ', $action->previous_status)) : 'Created',
+                    'to' => ucfirst(str_replace('_', ' ', $action->new_status)),
+                    'by' => $action->user?->name ?? 'System',
+                    'reason' => $action->formatted_reason,
+                    'at' => $action->formatted_acted_at,
+                ];
+            })
+            ->toArray();
+    }
+
+    /**
+     * Get actor for notification based on status.
+     */
+    public function getActorForNotification(string $notificationType): ?User
+    {
+        return match ($notificationType) {
+            'assigned' => $this->getAssignedByActor(),
+            'acknowledged' => $this->getAcknowledgedByActor(),
+            'escalated' => $this->getEscalatedByActor(),
+            'resolved' => $this->getResolvedByActor(),
+            'closed' => $this->getClosedByActor(),
+            'rejected' => $this->getRejectedByActor(),
+            'reopened' => $this->getReopenedByActor(),
+            default => $this->getPrimaryActor(),
+        };
+    }
+
+    public function getPrimaryActor(): ?User
+    {
+        $latestAction = $this->statusActions()->latestFirst()->first();
+        if ($latestAction) {
+            return $latestAction->user;
+        }
+
+        return $this->reporter;
     }
 }

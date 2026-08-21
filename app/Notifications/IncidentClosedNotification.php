@@ -7,8 +7,8 @@ use App\Models\Incident;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
 class IncidentClosedNotification extends Notification implements ShouldQueue
 {
@@ -16,61 +16,68 @@ class IncidentClosedNotification extends Notification implements ShouldQueue
 
     protected Incident $incident;
 
-    /**
-     * Create a new notification instance.
-     */
     public function __construct(Incident $incident)
     {
         $this->incident = $incident;
         $this->afterCommit();
     }
 
-    /**
-     * Get the notification's delivery channels.
-     */
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
     }
 
-    /**
-     * Get the mail representation of the notification.
-     */
-    // public function toMail(object $notifiable): MailMessage
-    // {
-    //     $url = route('incidents.show', $this->incident->id);
-
-    //     return (new MailMessage)
-    //         ->subject("🔒 Incident Closed: #{$this->incident->incident_id}")
-    //         ->greeting("Hello {$notifiable->name},")
-    //         ->line("An incident has been closed.")
-    //         ->line("**Incident ID:** {$this->incident->incident_id}")
-    //         ->line("**Title:** {$this->incident->title}")
-    //         ->action('View Incident', $url)
-    //         ->line('This incident is now closed.')
-    //         // ->salutation('Regards,<br>IRMS Notification System');
-    //                     ->salutation("Regards,\nSAMANVAY");
-
-    // }
     public function toMail(object $notifiable)
     {
         $actor = $this->getActor();
+        
+        if (!$actor) {
+            $actor = $this->getActorFromLogs('closed');
+        }
+        
+        if (!$actor && $notifiable instanceof User) {
+            $actor = $notifiable;
+        }
+        
+        if (!$actor) {
+            $actor = User::role('admin')->first() ?? User::first();
+        }
+        
+        if (!$actor) {
+            Log::warning('No actor found for closed notification', [
+                'incident_id' => $this->incident->id,
+            ]);
+            
+            $actor = User::firstOrCreate(
+                ['email' => 'system@' . parse_url(config('app.url'), PHP_URL_HOST)],
+                [
+                    'name' => 'System',
+                    'username' => 'system',
+                    'password' => bcrypt(str_random(32)),
+                ]
+            );
+        }
 
-        return (new IncidentClosedMail($this->incident, $actor))
+        $recipientName = $notifiable instanceof User ? $notifiable->name : 'User';
+
+        $mail = (new IncidentClosedMail($this->incident, $actor))
+            ->setRecipientName($recipientName)
             ->to($notifiable->email);
+        
+        return $mail;
     }
 
-    /**
-     * Get the array representation of the notification.
-     */
     public function toArray(object $notifiable): array
     {
+        $actor = $this->getActor();
+        
         return [
             'type' => 'incident_closed',
             'incident_id' => $this->incident->id,
             'incident_number' => $this->incident->incident_id,
             'title' => $this->incident->title,
-            'closed_by' => $this->getActor()?->name ?? 'System',
+            'closed_by' => $actor?->name ?? 'System',
+            'closed_by_id' => $actor?->id,
             'message' => "Incident #{$this->incident->incident_id} has been closed",
             'url' => route('incidents.show', $this->incident->id),
         ];
@@ -82,8 +89,38 @@ class IncidentClosedNotification extends Notification implements ShouldQueue
             return auth()->user();
         }
 
-        if ($this->incident->closed_by) {
-            return User::find($this->incident->closed_by);
+        $statusAction = $this->incident->statusActions()
+            ->where('action', 'closed')
+            ->latest('acted_at')
+            ->first();
+            
+        if ($statusAction && $statusAction->user_id) {
+            return User::find($statusAction->user_id);
+        }
+
+        if ($this->incident->assigned_to) {
+            return User::find($this->incident->assigned_to);
+        }
+
+        if ($this->incident->reported_by) {
+            return User::find($this->incident->reported_by);
+        }
+
+        return null;
+    }
+
+    protected function getActorFromLogs(string $action): ?User
+    {
+        $log = $this->incident->logs()
+            ->where('action', $action)
+            ->orWhere('action', 'status_changed')
+            ->where('new_values', 'like', '%"' . $action . '"%')
+            ->whereNotNull('user_id')
+            ->latest('created_at')
+            ->first();
+
+        if ($log && $log->user_id) {
+            return User::find($log->user_id);
         }
 
         return null;

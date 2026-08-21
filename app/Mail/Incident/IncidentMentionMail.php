@@ -1,56 +1,99 @@
 <?php
 
-namespace App\Mail\Incident;
+namespace App\Notifications;
 
-use App\Mail\BaseMail;
+use App\Mail\Incident\IncidentMentionMail;
 use App\Models\Incident;
 use App\Models\IncidentComment;
 use App\Models\User;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
-class IncidentMentionMail extends BaseMail
+class MentionNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
+
     protected Incident $incident;
-
-    protected User $actor;
-
     protected IncidentComment $comment;
 
-    public function __construct(Incident $incident, User $actor, IncidentComment $comment)
+    public function __construct(Incident $incident, IncidentComment $comment)
     {
         $this->incident = $incident;
-        $this->actor = $actor;
         $this->comment = $comment;
-
-        $this->statusColor = '#7C3AED';
-        $this->statusLabel = 'You were mentioned';
-        $this->statusType = 'mention';
+        $this->afterCommit();
     }
 
-    public function envelope(): Envelope
+    public function via(object $notifiable): array
     {
-        return new Envelope(
-            subject: $this->subjectPrefix.' You were mentioned in an Incident – '.$this->incident->incident_id,
-        );
+        return ['mail', 'database'];
     }
 
-    public function content(): Content
+    public function toMail(object $notifiable)
     {
-        return new Content(
-            view: 'emails.incident.mention',
-            with: array_merge($this->getViewData(), [
-                'incident' => $this->incident,
-                'actor' => $this->actor,
-                'comment' => $this->comment,
-                'greeting' => 'Hello '.($this->actor->name).',',
-                'body' => 'You were mentioned in a comment on an incident.',
-                'actionUrl' => route('incidents.show', $this->incident).'#comment-'.$this->comment->id,
-                'extraFields' => [
-                    'Comment' => $this->comment->content,
-                    'Mentioned By' => $this->actor->name,
-                ],
-            ])
-        );
+        $actor = $this->getActor();
+        
+        if (!$actor) {
+            $actor = auth()->user() ?? User::find($this->comment->user_id);
+        }
+        
+        if (!$actor) {
+            $actor = User::role('admin')->first() ?? User::first();
+        }
+        
+        if (!$actor) {
+            Log::warning('No actor found for mention notification', [
+                'incident_id' => $this->incident->id,
+            ]);
+            
+            $actor = User::firstOrCreate(
+                ['email' => 'system@' . parse_url(config('app.url'), PHP_URL_HOST)],
+                [
+                    'name' => 'System',
+                    'username' => 'system',
+                    'password' => bcrypt(str_random(32)),
+                ]
+            );
+        }
+
+        $recipientName = $notifiable instanceof User ? $notifiable->name : 'User';
+
+        $mail = (new IncidentMentionMail($this->incident, $actor, $this->comment))
+            ->setRecipientName($recipientName)
+            ->to($notifiable->email);
+        
+        return $mail;
+    }
+
+    public function toArray(object $notifiable): array
+    {
+        $actor = $this->getActor();
+        
+        return [
+            'type' => 'mention',
+            'incident_id' => $this->incident->id,
+            'incident_number' => $this->incident->incident_id,
+            'title' => $this->incident->title,
+            'comment_id' => $this->comment->id,
+            'mentioned_by' => $actor?->name ?? 'System',
+            'mentioned_by_id' => $actor?->id,
+            'comment_preview' => \Str::limit($this->comment->content, 100),
+            'message' => "{$actor?->name ?? 'Someone'} mentioned you in incident #{$this->incident->incident_id}",
+            'url' => route('incidents.show', $this->incident->id) . '#comment-' . $this->comment->id,
+        ];
+    }
+
+    protected function getActor(): ?User
+    {
+        if (auth()->check()) {
+            return auth()->user();
+        }
+
+        if ($this->comment->user_id) {
+            return $this->comment->user;
+        }
+
+        return null;
     }
 }

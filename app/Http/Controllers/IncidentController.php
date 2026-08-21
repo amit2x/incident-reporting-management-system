@@ -44,90 +44,6 @@ class IncidentController extends Controller
         $this->middleware('auth');
     }
 
-    // ==========================================
-    // INDEX
-    // ==========================================
-    // public function index(Request $request)
-    // {
-    //     $filters = $request->only([
-    //         'department_id', 'category_id', 'severity', 'priority',
-    //         'status', 'assigned_to', 'date_from', 'date_to', 'search',
-    //     ]);
-
-    //     $user = Auth::user();
-
-    //     // Apply role-based filters
-    //     if (! $user->isAdmin()) {
-    //         $filters['department_id'] = $user->department_id;
-    //     }
-
-    //     // Get stats
-    //     $stats = $this->getQuickStats($filters);
-
-    //     // Get incidents
-    //     $incidents = $this->incidentRepository->getFeedIncidents($filters, 15);
-
-    //     if ($request->ajax()) {
-    //         return $this->paginatedResponse($incidents);
-    //     }
-
-    //     return view('incidents.index', compact('incidents', 'filters', 'stats'));
-    // }
-
-    // last-version
-    // public function index(Request $request)
-    // {
-    //     $filters = $request->only([
-    //         'department_id', 'category_id', 'severity', 'priority',
-    //         'status', 'assigned_to', 'date_from', 'date_to', 'search',
-    //     ]);
-
-    //     $user = Auth::user();
-    //     $tab = $request->input('tab', 'all');
-
-    //     // Apply role-based filters for non-admin
-    //     if (! $user->isAdmin()) {
-    //         $filters['department_id'] = $user->department_id;
-    //     }
-
-    //     // Get stats (always for all incidents in user's scope)
-    //     $stats = $this->getQuickStats($filters);
-
-    //     // Get incidents based on tab
-    //     switch ($tab) {
-    //         case 'escalated':
-    //             // Show incidents escalated to current user
-    //             $incidents = Incident::where('escalated_to', $user->id)
-    //                 ->where('status', 'escalated')
-    //                 ->with(['department', 'category', 'reporter', 'assignedTo'])
-    //                 ->latest('escalated_at')
-    //                 ->paginate(15);
-    //             break;
-
-    //         case 'assigned':
-    //             // Show incidents assigned to current user
-    //             $incidents = Incident::where('assigned_to', $user->id)
-    //                 ->whereIn('status', ['open', 'acknowledged', 'in_progress'])
-    //                 ->with(['department', 'category', 'reporter'])
-    //                 ->latest()
-    //                 ->paginate(15);
-    //             break;
-
-    //         default:
-    //             // Show all incidents (filtered)
-    //             $incidents = $this->incidentRepository->getFeedIncidents($filters, 15);
-    //             break;
-    //     }
-
-    //     if ($request->ajax()) {
-    //         return $this->paginatedResponse($incidents);
-    //     }
-
-    //     return view('incidents.index', compact('incidents', 'filters', 'stats', 'tab'));
-    // }
-
-    // app/Http/Controllers/IncidentController.php
-
     public function index(Request $request)
     {
         $filters = $request->only([
@@ -138,10 +54,7 @@ class IncidentController extends Controller
         $user = Auth::user();
         $tab = $request->get('tab', 'all');
 
-        // dd([
-        //     $user->getRoleNames()->first(),
-        //     $user->department_id,
-        // ]);
+        
         // Apply role-based filters for non-admin
         if (! $user->isAdmin()) {
             $filters['department_id'] = $user->department_id;
@@ -264,6 +177,7 @@ class IncidentController extends Controller
 
     public function store(Request $request)
     {
+        Log::debug($request->all());
         $this->authorize('create-incident');
 
         $validator = Validator::make($request->all(), [
@@ -337,49 +251,7 @@ class IncidentController extends Controller
         }
     }
 
-    // ==========================================
-    // AUTO ASSIGN
-    // ==========================================
-    // private function autoAssignIncident(int $departmentId, string $severity): ?User
-    // {
-    //     $department = Department::find($departmentId);
-    //     if (! $department) {
-    //         return null;
-    //     }
-
-    //     // For critical/high, try HOD first
-    //     if (in_array($severity, ['critical', 'high'])) {
-    //         $hod = $department->getHeadOfDepartment();
-    //         if ($hod && $hod->status === 'active') {
-    //             return $hod;
-    //         }
-    //     }
-
-    //     // Get supervisor with least workload
-    //     $supervisors = $department->getSupervisors();
-    //     if ($supervisors->isNotEmpty()) {
-    //         return $supervisors->filter(fn ($u) => $u->status === 'active')
-    //             ->sortBy(fn ($u) => $u->assignedIncidents()->open()->count())
-    //             ->first();
-    //     }
-
-    //     // Get any staff with least workload
-    //     $staff = $department->users()->active()
-    //         ->whereHas('roles', fn ($q) => $q->whereIn('name', ['staff', 'supervisor']))
-    //         ->withCount(['assignedIncidents as open_count' => fn ($q) => $q->open()])
-    //         ->orderBy('open_count')
-    //         ->first();
-
-    //     if ($staff) {
-    //         return $staff;
-    //     }
-
-    //     // Fallback to HOD
-    //     $hod = $department->getHeadOfDepartment();
-
-    //     return ($hod && $hod->status === 'active') ? $hod : null;
-    // }
-
+    
     // ==========================================
     // AUTO ASSIGN - Enhanced Logic
     // ==========================================
@@ -566,6 +438,341 @@ class IncidentController extends Controller
         return $this->getUserWithLeastWorkload($departmentUsers);
     }
 
+
+
+
+
+
+/*** 
+* NEW method written on 06-07-2026
+*/
+
+
+// ==========================================
+// FILE HANDLING - OPTIMIZED
+// ==========================================
+
+/**
+ * Store incident file with client-side compression support.
+ * Skips server processing if already WebP and small enough.
+ */
+private function storeIncidentFile(Incident $incident, $file, array $requestInfo = []): void
+{
+    try {
+        $mediaType = $this->getMediaType($file);
+        $isImage = $mediaType === 'image';
+        $fileSize = $file->getSize();
+        $mimeType = $file->getMimeType();
+        $isWebP = $mimeType === 'image/webp';
+        
+        // ==========================================
+        // CASE 1: Already WebP and small enough (< 300KB)
+        // Skip server processing entirely
+        // ==========================================
+        if ($isImage && $isWebP && $fileSize < 300 * 1024) {
+            Log::info('File already optimized WebP, storing directly', [
+                'filename' => $file->getClientOriginalName(),
+                'size' => $fileSize,
+            ]);
+            
+            $this->storeFileDirectly($incident, $file, $mediaType);
+            return;
+        }
+        
+        // ==========================================
+        // CASE 2: Image but not WebP or too large
+        // Use server-side processing
+        // ==========================================
+        if ($isImage) {
+            // Only process images that need optimization
+            $imageHelper = app(ImageHelper::class);
+            
+            $result = $imageHelper->processImage($file, [
+                'storage_path' => 'incidents/' . $incident->id,
+                'generate_thumbnail' => true,
+                // Only process if file is large or not WebP
+                'force_process' => !$isWebP || $fileSize > 500 * 1024,
+            ]);
+
+            if ($result['success']) {
+                $this->storeProcessedImage($incident, $file, $result, $requestInfo);
+                return;
+            }
+            
+            // If processing fails, fallback to legacy
+            Log::warning('Image processing failed, using legacy storage', [
+                'filename' => $file->getClientOriginalName(),
+                'error' => $result['error'] ?? 'Unknown error',
+            ]);
+        }
+        
+        // ==========================================
+        // CASE 3: Non-image files or processing failed
+        // Store directly (no compression)
+        // ==========================================
+        $this->storeFileDirectly($incident, $file, $mediaType);
+        
+    } catch (\Exception $e) {
+        Log::error('File storage failed, using fallback', [
+            'incident_id' => $incident->id,
+            'file' => $file->getClientOriginalName(),
+            'error' => $e->getMessage(),
+        ]);
+        
+        // Ultimate fallback
+        $this->storeFileDirectly($incident, $file, $this->getMediaType($file));
+    }
+}
+
+/**
+ * Store processed image with metadata.
+ */
+private function storeProcessedImage(Incident $incident, $file, array $result, array $requestInfo): void
+{
+    // Get upload metadata
+    $metadata = app(ImageHelper::class)->getUploadMetadata(
+        $result,
+        Auth::id(),
+        array_merge($requestInfo, [
+            'source' => 'Web',
+            'ip' => request()->ip(),
+            'browser' => request()->userAgent() ? $this->parseBrowser(request()->userAgent()) : null,
+            'os' => request()->userAgent() ? $this->parseOS(request()->userAgent()) : null,
+            'device' => request()->userAgent() ? $this->parseDevice(request()->userAgent()) : null,
+        ])
+    );
+
+    // Create media record
+    IncidentMedia::create([
+        'incident_id' => $incident->id,
+        'uploaded_by' => Auth::id(),
+        'media_type' => 'image',
+        'file_path' => $result['stored_path'],
+        'file_name' => $result['stored_filename'],
+        'original_name' => $file->getClientOriginalName(),
+        'mime_type' => 'image/webp',
+        'file_size' => strlen($result['webp_data']),
+        'thumbnail_path' => $result['thumbnail_path'],
+        'sort_order' => $incident->media()->count(),
+        'metadata' => $metadata,
+    ]);
+
+    Log::info('Image processed and stored', [
+        'incident_id' => $incident->id,
+        'original_size' => $metadata['file']['original_size'],
+        'compressed_size' => $metadata['file']['compressed_size'],
+        'compression_ratio' => $metadata['file']['compression_ratio'] . '%',
+    ]);
+}
+
+/**
+ * Store file directly (no processing).
+ */
+private function storeFileDirectly(Incident $incident, $file, string $mediaType): void
+{
+    $path = 'incidents/' . $incident->id . '/' . date('Y/m');
+    $originalExtension = $file->getClientOriginalExtension();
+    $fileName = time() . '_' . uniqid() . '.' . $originalExtension;
+    $filePath = $file->storeAs($path, $fileName, 'public');
+
+    // Generate thumbnail for images (if not WebP or if needed)
+    $thumbnailPath = null;
+    if ($mediaType === 'image') {
+        $thumbnailPath = $this->generateThumbnail($file, $path, $fileName);
+    }
+
+    // Simple metadata for direct storage
+    $metadata = [
+        'file' => [
+            'original_filename' => $file->getClientOriginalName(),
+            'stored_filename' => $fileName,
+            'original_extension' => $originalExtension,
+            'mime_type' => $file->getMimeType(),
+            'file_size' => $file->getSize(),
+        ],
+        'processing' => [
+            'processed_at' => now()->toIso8601String(),
+            'client_converted' => $file->getMimeType() === 'image/webp',
+            'server_converted' => false,
+        ],
+        'upload' => [
+            'uploaded_by' => Auth::id(),
+            'ip' => request()->ip(),
+            'source' => 'Web',
+        ],
+    ];
+
+    IncidentMedia::create([
+        'incident_id' => $incident->id,
+        'uploaded_by' => Auth::id(),
+        'media_type' => $mediaType,
+        'file_path' => $filePath,
+        'file_name' => $fileName,
+        'original_name' => $file->getClientOriginalName(),
+        'mime_type' => $file->getMimeType(),
+        'file_size' => $file->getSize(),
+        'thumbnail_path' => $thumbnailPath,
+        'sort_order' => $incident->media()->count(),
+        'metadata' => $metadata,
+    ]);
+
+    Log::info('File stored directly', [
+        'incident_id' => $incident->id,
+        'media_type' => $mediaType,
+        'file_size' => $file->getSize(),
+        'mime_type' => $file->getMimeType(),
+    ]);
+}
+
+/**
+ * Generate thumbnail for image.
+ */
+private function generateThumbnail($file, string $path, string $fileName): ?string
+{
+    try {
+        // Skip if not an image
+        if (!$this->isImageFile($file)) {
+            return null;
+        }
+
+        $manager = new ImageManager(new Driver);
+        $image = $manager->read($file);
+        
+        // Resize to thumbnail
+        $image->resize(300, 300, function ($constraint) {
+            $constraint->aspectRatio();
+            $constraint->upsize();
+        });
+        
+        $thumbPath = $path . '/thumbnails/' . $fileName;
+        Storage::disk('public')->put($thumbPath, $image->toWebp(80));
+        
+        return $thumbPath;
+        
+    } catch (\Exception $e) {
+        Log::warning('Thumbnail generation failed', [
+            'filename' => $fileName,
+            'error' => $e->getMessage(),
+        ]);
+        return null;
+    }
+}
+
+/**
+ * Legacy file storage method (fallback).
+ */
+private function storeIncidentFileLegacy(Incident $incident, $file): void
+{
+    $mediaType = $this->getMediaType($file);
+    $this->storeFileDirectly($incident, $file, $mediaType);
+}
+
+/**
+ * Get media type from file.
+ */
+private function getMediaType($file): string
+{
+    $mime = $file->getMimeType();
+    if (str_starts_with($mime, 'image/')) {
+        return 'image';
+    }
+    if (str_starts_with($mime, 'video/')) {
+        return 'video';
+    }
+    if (str_starts_with($mime, 'audio/')) {
+        return 'audio';
+    }
+    return 'document';
+}
+
+/**
+ * Get media type from mime type.
+ */
+private function getMediaTypeFromMime(string $mime): string
+{
+    if (str_starts_with($mime, 'image/')) {
+        return 'image';
+    }
+    if (str_starts_with($mime, 'video/')) {
+        return 'video';
+    }
+    if (str_starts_with($mime, 'audio/')) {
+        return 'audio';
+    }
+    return 'document';
+}
+
+/**
+ * Check if file is an image.
+ */
+private function isImageFile($file): bool
+{
+    return $this->getMediaType($file) === 'image';
+}
+
+/**
+ * Parse browser from user agent.
+ */
+private function parseBrowser(string $userAgent): string
+{
+    if (str_contains($userAgent, 'Chrome')) {
+        return 'Chrome';
+    }
+    if (str_contains($userAgent, 'Firefox')) {
+        return 'Firefox';
+    }
+    if (str_contains($userAgent, 'Safari')) {
+        return 'Safari';
+    }
+    if (str_contains($userAgent, 'Edge')) {
+        return 'Edge';
+    }
+    if (str_contains($userAgent, 'Opera')) {
+        return 'Opera';
+    }
+    return 'Unknown';
+}
+
+/**
+ * Parse OS from user agent.
+ */
+private function parseOS(string $userAgent): string
+{
+    if (str_contains($userAgent, 'Windows')) {
+        return 'Windows';
+    }
+    if (str_contains($userAgent, 'Mac OS')) {
+        return 'macOS';
+    }
+    if (str_contains($userAgent, 'Linux')) {
+        return 'Linux';
+    }
+    if (str_contains($userAgent, 'Android')) {
+        return 'Android';
+    }
+    if (str_contains($userAgent, 'iPhone') || str_contains($userAgent, 'iPad')) {
+        return 'iOS';
+    }
+    return 'Unknown';
+}
+
+/**
+ * Parse device from user agent.
+ */
+private function parseDevice(string $userAgent): string
+{
+    if (str_contains($userAgent, 'Mobile')) {
+        return 'Mobile';
+    }
+    if (str_contains($userAgent, 'Tablet')) {
+        return 'Tablet';
+    }
+    return 'Desktop';
+}
+
+
+
+
     // ==========================================
     // FILE HANDLING
     // ==========================================
@@ -627,197 +834,197 @@ class IncidentController extends Controller
     // FILE HANDLING - UPDATED
     // ==========================================
 
-    private function storeIncidentFile(Incident $incident, $file, array $requestInfo = []): void
-    {
-        try {
-            $imageHelper = app(ImageHelper::class);
+    // private function storeIncidentFile(Incident $incident, $file, array $requestInfo = []): void
+    // {
+    //     try {
+    //         $imageHelper = app(ImageHelper::class);
 
-            // Process the image
-            $result = $imageHelper->processImage($file, [
-                'storage_path' => 'incidents/'.$incident->id,
-                'generate_thumbnail' => true,
-            ]);
+    //         // Process the image
+    //         $result = $imageHelper->processImage($file, [
+    //             'storage_path' => 'incidents/'.$incident->id,
+    //             'generate_thumbnail' => true,
+    //         ]);
 
-            if (! $result['success']) {
-                // Fallback to original method if processing fails
-                $this->storeIncidentFileLegacy($incident, $file);
+    //         if (! $result['success']) {
+    //             // Fallback to original method if processing fails
+    //             $this->storeIncidentFileLegacy($incident, $file);
 
-                return;
-            }
+    //             return;
+    //         }
 
-            // Get upload metadata
-            $metadata = $imageHelper->getUploadMetadata(
-                $result,
-                Auth::id(),
-                array_merge($requestInfo, [
-                    'source' => 'Web',
-                    'ip' => request()->ip(),
-                    'browser' => request()->userAgent() ? $this->parseBrowser(request()->userAgent()) : null,
-                    'os' => request()->userAgent() ? $this->parseOS(request()->userAgent()) : null,
-                    'device' => request()->userAgent() ? $this->parseDevice(request()->userAgent()) : null,
-                ])
-            );
+    //         // Get upload metadata
+    //         $metadata = $imageHelper->getUploadMetadata(
+    //             $result,
+    //             Auth::id(),
+    //             array_merge($requestInfo, [
+    //                 'source' => 'Web',
+    //                 'ip' => request()->ip(),
+    //                 'browser' => request()->userAgent() ? $this->parseBrowser(request()->userAgent()) : null,
+    //                 'os' => request()->userAgent() ? $this->parseOS(request()->userAgent()) : null,
+    //                 'device' => request()->userAgent() ? $this->parseDevice(request()->userAgent()) : null,
+    //             ])
+    //         );
 
-            // Determine media type
-            $mediaType = $this->getMediaTypeFromMime($file->getMimeType());
+    //         // Determine media type
+    //         $mediaType = $this->getMediaTypeFromMime($file->getMimeType());
 
-            // Create media record
-            $media = IncidentMedia::create([
-                'incident_id' => $incident->id,
-                'uploaded_by' => Auth::id(),
-                'media_type' => $mediaType,
-                'file_path' => $result['stored_path'],
-                'file_name' => $result['stored_filename'],
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => 'image/webp',
-                'file_size' => strlen($result['webp_data']),
-                'thumbnail_path' => $result['thumbnail_path'],
-                'sort_order' => $incident->media()->count(),
-                'metadata' => $metadata, // Store the full metadata as JSON
-            ]);
+    //         // Create media record
+    //         $media = IncidentMedia::create([
+    //             'incident_id' => $incident->id,
+    //             'uploaded_by' => Auth::id(),
+    //             'media_type' => $mediaType,
+    //             'file_path' => $result['stored_path'],
+    //             'file_name' => $result['stored_filename'],
+    //             'original_name' => $file->getClientOriginalName(),
+    //             'mime_type' => 'image/webp',
+    //             'file_size' => strlen($result['webp_data']),
+    //             'thumbnail_path' => $result['thumbnail_path'],
+    //             'sort_order' => $incident->media()->count(),
+    //             'metadata' => $metadata, // Store the full metadata as JSON
+    //         ]);
 
-            Log::info('Image processed and stored', [
-                'incident_id' => $incident->id,
-                'media_id' => $media->id,
-                'original_size' => $metadata['file']['original_size'],
-                'compressed_size' => $metadata['file']['compressed_size'],
-                'compression_ratio' => $metadata['file']['compression_ratio'].'%',
-            ]);
+    //         Log::info('Image processed and stored', [
+    //             'incident_id' => $incident->id,
+    //             'media_id' => $media->id,
+    //             'original_size' => $metadata['file']['original_size'],
+    //             'compressed_size' => $metadata['file']['compressed_size'],
+    //             'compression_ratio' => $metadata['file']['compression_ratio'].'%',
+    //         ]);
 
-        } catch (\Exception $e) {
-            Log::error('Image processing failed, falling back to legacy method', [
-                'incident_id' => $incident->id,
-                'file' => $file->getClientOriginalName(),
-                'error' => $e->getMessage(),
-            ]);
+    //     } catch (\Exception $e) {
+    //         Log::error('Image processing failed, falling back to legacy method', [
+    //             'incident_id' => $incident->id,
+    //             'file' => $file->getClientOriginalName(),
+    //             'error' => $e->getMessage(),
+    //         ]);
 
-            // Fallback to original method
-            $this->storeIncidentFileLegacy($incident, $file);
-        }
-    }
+    //         // Fallback to original method
+    //         $this->storeIncidentFileLegacy($incident, $file);
+    //     }
+    // }
 
     /**
      * Legacy file storage method (fallback).
      */
-    private function storeIncidentFileLegacy(Incident $incident, $file): void
-    {
-        $mediaType = $this->getMediaType($file);
-        $path = 'incidents/'.$incident->id.'/'.date('Y/m');
-        $fileName = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
-        $filePath = $file->storeAs($path, $fileName, 'public');
+    // private function storeIncidentFileLegacy(Incident $incident, $file): void
+    // {
+    //     $mediaType = $this->getMediaType($file);
+    //     $path = 'incidents/'.$incident->id.'/'.date('Y/m');
+    //     $fileName = time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
+    //     $filePath = $file->storeAs($path, $fileName, 'public');
 
-        $thumbnailPath = null;
-        if ($mediaType === 'image') {
-            try {
-                $manager = new ImageManager(new Driver);
-                $image = $manager->read($file);
-                $image->resize(300, 300, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                });
-                $thumbPath = $path.'/thumbnails/'.$fileName;
-                Storage::disk('public')->put($thumbPath, $image->toJpeg(80));
-                $thumbnailPath = $thumbPath;
-            } catch (\Exception $e) {
-                Log::warning('Thumbnail failed: '.$e->getMessage());
-            }
-        }
+    //     $thumbnailPath = null;
+    //     if ($mediaType === 'image') {
+    //         try {
+    //             $manager = new ImageManager(new Driver);
+    //             $image = $manager->read($file);
+    //             $image->resize(300, 300, function ($constraint) {
+    //                 $constraint->aspectRatio();
+    //                 $constraint->upsize();
+    //             });
+    //             $thumbPath = $path.'/thumbnails/'.$fileName;
+    //             Storage::disk('public')->put($thumbPath, $image->toJpeg(80));
+    //             $thumbnailPath = $thumbPath;
+    //         } catch (\Exception $e) {
+    //             Log::warning('Thumbnail failed: '.$e->getMessage());
+    //         }
+    //     }
 
-        IncidentMedia::create([
-            'incident_id' => $incident->id,
-            'uploaded_by' => Auth::id(),
-            'media_type' => $mediaType,
-            'file_path' => $filePath,
-            'file_name' => $fileName,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'file_size' => $file->getSize(),
-            'thumbnail_path' => $thumbnailPath,
-            'sort_order' => $incident->media()->count(),
-            'metadata' => null,
-        ]);
-    }
+    //     IncidentMedia::create([
+    //         'incident_id' => $incident->id,
+    //         'uploaded_by' => Auth::id(),
+    //         'media_type' => $mediaType,
+    //         'file_path' => $filePath,
+    //         'file_name' => $fileName,
+    //         'original_name' => $file->getClientOriginalName(),
+    //         'mime_type' => $file->getMimeType(),
+    //         'file_size' => $file->getSize(),
+    //         'thumbnail_path' => $thumbnailPath,
+    //         'sort_order' => $incident->media()->count(),
+    //         'metadata' => null,
+    //     ]);
+    // }
 
     /**
      * Get media type from mime type.
      */
-    private function getMediaTypeFromMime(string $mime): string
-    {
-        if (str_starts_with($mime, 'image/')) {
-            return 'image';
-        }
-        if (str_starts_with($mime, 'video/')) {
-            return 'video';
-        }
-        if (str_starts_with($mime, 'audio/')) {
-            return 'audio';
-        }
+    // private function getMediaTypeFromMime(string $mime): string
+    // {
+    //     if (str_starts_with($mime, 'image/')) {
+    //         return 'image';
+    //     }
+    //     if (str_starts_with($mime, 'video/')) {
+    //         return 'video';
+    //     }
+    //     if (str_starts_with($mime, 'audio/')) {
+    //         return 'audio';
+    //     }
 
-        return 'document';
-    }
+    //     return 'document';
+    // }
 
     /**
      * Parse browser from user agent.
      */
-    private function parseBrowser(string $userAgent): string
-    {
-        if (str_contains($userAgent, 'Chrome')) {
-            return 'Chrome';
-        }
-        if (str_contains($userAgent, 'Firefox')) {
-            return 'Firefox';
-        }
-        if (str_contains($userAgent, 'Safari')) {
-            return 'Safari';
-        }
-        if (str_contains($userAgent, 'Edge')) {
-            return 'Edge';
-        }
-        if (str_contains($userAgent, 'Opera')) {
-            return 'Opera';
-        }
+    // private function parseBrowser(string $userAgent): string
+    // {
+    //     if (str_contains($userAgent, 'Chrome')) {
+    //         return 'Chrome';
+    //     }
+    //     if (str_contains($userAgent, 'Firefox')) {
+    //         return 'Firefox';
+    //     }
+    //     if (str_contains($userAgent, 'Safari')) {
+    //         return 'Safari';
+    //     }
+    //     if (str_contains($userAgent, 'Edge')) {
+    //         return 'Edge';
+    //     }
+    //     if (str_contains($userAgent, 'Opera')) {
+    //         return 'Opera';
+    //     }
 
-        return 'Unknown';
-    }
+    //     return 'Unknown';
+    // }
 
     /**
      * Parse OS from user agent.
      */
-    private function parseOS(string $userAgent): string
-    {
-        if (str_contains($userAgent, 'Windows')) {
-            return 'Windows';
-        }
-        if (str_contains($userAgent, 'Mac OS')) {
-            return 'macOS';
-        }
-        if (str_contains($userAgent, 'Linux')) {
-            return 'Linux';
-        }
-        if (str_contains($userAgent, 'Android')) {
-            return 'Android';
-        }
-        if (str_contains($userAgent, 'iPhone') || str_contains($userAgent, 'iPad')) {
-            return 'iOS';
-        }
+    // private function parseOS(string $userAgent): string
+    // {
+    //     if (str_contains($userAgent, 'Windows')) {
+    //         return 'Windows';
+    //     }
+    //     if (str_contains($userAgent, 'Mac OS')) {
+    //         return 'macOS';
+    //     }
+    //     if (str_contains($userAgent, 'Linux')) {
+    //         return 'Linux';
+    //     }
+    //     if (str_contains($userAgent, 'Android')) {
+    //         return 'Android';
+    //     }
+    //     if (str_contains($userAgent, 'iPhone') || str_contains($userAgent, 'iPad')) {
+    //         return 'iOS';
+    //     }
 
-        return 'Unknown';
-    }
+    //     return 'Unknown';
+    // }
 
     /**
      * Parse device from user agent.
      */
-    private function parseDevice(string $userAgent): string
-    {
-        if (str_contains($userAgent, 'Mobile')) {
-            return 'Mobile';
-        }
-        if (str_contains($userAgent, 'Tablet')) {
-            return 'Tablet';
-        }
+    // private function parseDevice(string $userAgent): string
+    // {
+    //     if (str_contains($userAgent, 'Mobile')) {
+    //         return 'Mobile';
+    //     }
+    //     if (str_contains($userAgent, 'Tablet')) {
+    //         return 'Tablet';
+    //     }
 
-        return 'Desktop';
-    }
+    //     return 'Desktop';
+    // }
 
     // ==========================================
     // SHOW
@@ -1292,31 +1499,167 @@ class IncidentController extends Controller
     /**
      * Assign or reassign incident to a user - OPTIMIZED
      */
+    // public function assign(Request $request, Incident $incident)
+    // {
+    //     $this->authorize('assign-incident');
+
+    //     $request->validate([
+    //         'assigned_to' => 'required|exists:users,id',
+    //         'notes' => 'nullable|string|max:500',
+    //     ]);
+
+    //     $newUser = User::findOrFail($request->assigned_to);
+    //     $oldAssigneeId = $incident->assigned_to;
+
+    //     // PREVENT REASSIGNING TO THE SAME USER
+    //     if ($oldAssigneeId == $newUser->id) {
+    //         $message = "This incident is already assigned to {$newUser->name}.";
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 422);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     // Use direct DB update to avoid model events where possible
+    //     DB::beginTransaction();
+    //     try {
+    //         // Deactivate current assignment - use query builder for speed
+    //         DB::table('incident_assignments')
+    //             ->where('incident_id', $incident->id)
+    //             ->where('is_active', true)
+    //             ->update([
+    //                 'is_active' => false,
+    //                 'unassigned_at' => now(),
+    //             ]);
+
+    //         // Create new assignment record
+    //         DB::table('incident_assignments')->insert([
+    //             'incident_id' => $incident->id,
+    //             'assigned_by' => Auth::id(),
+    //             'assigned_to' => $newUser->id,
+    //             'notes' => $request->notes ?? ($oldAssigneeId ? 'Reassigned' : 'Assigned'),
+    //             'assigned_at' => now(),
+    //             'is_active' => true,
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
+
+    //         // DETERMINE NEW STATUS
+    //         $newStatus = $incident->status;
+    //         $updateData = ['assigned_to' => $newUser->id];
+
+    //         if ($incident->status === 'rejected') {
+    //             $newStatus = 'open';
+    //             $updateData['status'] = 'open';
+    //             $updateData['rejection_reason'] = null;
+    //             $updateData['resolved_at'] = null;
+    //             $updateData['closed_at'] = null;
+    //             $updateData['resolution_notes'] = null;
+    //             $updateData['sla_due_at'] = now()->addMinutes($incident->category?->sla_minutes ?? 120);
+    //             $updateData['sla_breach_count'] = 0;
+    //         } elseif ($incident->status === 'open') {
+    //             $newStatus = 'acknowledged';
+    //             $updateData['status'] = 'acknowledged';
+    //             $updateData['acknowledged_at'] = $incident->acknowledged_at ?? now();
+    //         }
+
+    //         // Update incident using query builder to avoid model events
+    //         $updateData['updated_at'] = now();
+    //         DB::table('incidents')->where('id', $incident->id)->update($updateData);
+
+    //         // Log activity - quick insert
+    //         $action = $oldAssigneeId ? 'reassigned' : 'assigned';
+    //         DB::table('incident_logs')->insert([
+    //             'incident_id' => $incident->id,
+    //             'user_id' => Auth::id(),
+    //             'action' => $action,
+    //             'old_values' => json_encode(['assigned_to' => $oldAssigneeId, 'status' => $incident->status]),
+    //             'new_values' => json_encode(['assigned_to' => $newUser->id, 'status' => $newStatus]),
+    //             'description' => $oldAssigneeId
+    //                 ? "Reassigned to {$newUser->name}. Status: {$incident->status} → {$newStatus}"
+    //                 : "Assigned to {$newUser->name}. Status: {$incident->status} → {$newStatus}",
+    //             'ip_address' => request()->ip(),
+    //             'user_agent' => request()->userAgent(),
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
+
+    //         DB::commit();
+
+    //         // Send notification asynchronously (don't wait for it)
+    //         dispatch(function () use ($incident, $newUser) {
+    //             try {
+    //                 $freshIncident = Incident::find($incident->id);
+    //                 app(NotificationService::class)->notifyIncidentAssigned($freshIncident, $newUser->id);
+    //             } catch (\Exception $e) {
+    //                 Log::error('Assign notification failed: '.$e->getMessage());
+    //             }
+    //         })->onQueue('notifications');
+
+    //         // RESPONSE
+    //         $message = $oldAssigneeId
+    //             ? "Incident reassigned to {$newUser->name}."
+    //             : "Incident assigned to {$newUser->name}.";
+
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'message' => $message,
+    //                 'new_status' => $newStatus,
+    //                 'assigned_to' => $newUser->name,
+    //             ]);
+    //         }
+
+    //         return back()->with('success', $message);
+
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         Log::error('Assign incident failed: '.$e->getMessage(), [
+    //             'incident_id' => $incident->id,
+    //             'trace' => $e->getTraceAsString(),
+    //         ]);
+
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Failed to assign incident. Please try again.',
+    //             ], 500);
+    //         }
+
+    //         return back()->with('error', 'Failed to assign incident.');
+    //     }
+    // }
+    
+    /**
+     * Assign or reassign incident to a user - OPTIMIZED with Status Actions
+     */
     public function assign(Request $request, Incident $incident)
     {
         $this->authorize('assign-incident');
-
+    
         $request->validate([
             'assigned_to' => 'required|exists:users,id',
             'notes' => 'nullable|string|max:500',
         ]);
-
+    
         $newUser = User::findOrFail($request->assigned_to);
         $oldAssigneeId = $incident->assigned_to;
-
+    
         // PREVENT REASSIGNING TO THE SAME USER
         if ($oldAssigneeId == $newUser->id) {
             $message = "This incident is already assigned to {$newUser->name}.";
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-
             return back()->with('error', $message);
         }
-
-        // Use direct DB update to avoid model events where possible
+    
         DB::beginTransaction();
         try {
+            $oldStatus = $incident->status;
+            $oldAssigneeName = $oldAssigneeId ? User::find($oldAssigneeId)?->name : null;
+    
             // Deactivate current assignment - use query builder for speed
             DB::table('incident_assignments')
                 ->where('incident_id', $incident->id)
@@ -1325,7 +1668,7 @@ class IncidentController extends Controller
                     'is_active' => false,
                     'unassigned_at' => now(),
                 ]);
-
+    
             // Create new assignment record
             DB::table('incident_assignments')->insert([
                 'incident_id' => $incident->id,
@@ -1337,11 +1680,11 @@ class IncidentController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
+    
             // DETERMINE NEW STATUS
             $newStatus = $incident->status;
             $updateData = ['assigned_to' => $newUser->id];
-
+    
             if ($incident->status === 'rejected') {
                 $newStatus = 'open';
                 $updateData['status'] = 'open';
@@ -1356,30 +1699,54 @@ class IncidentController extends Controller
                 $updateData['status'] = 'acknowledged';
                 $updateData['acknowledged_at'] = $incident->acknowledged_at ?? now();
             }
-
+    
             // Update incident using query builder to avoid model events
             $updateData['updated_at'] = now();
             DB::table('incidents')->where('id', $incident->id)->update($updateData);
-
+    
             // Log activity - quick insert
             $action = $oldAssigneeId ? 'reassigned' : 'assigned';
             DB::table('incident_logs')->insert([
                 'incident_id' => $incident->id,
                 'user_id' => Auth::id(),
                 'action' => $action,
-                'old_values' => json_encode(['assigned_to' => $oldAssigneeId, 'status' => $incident->status]),
+                'old_values' => json_encode(['assigned_to' => $oldAssigneeId, 'status' => $oldStatus]),
                 'new_values' => json_encode(['assigned_to' => $newUser->id, 'status' => $newStatus]),
                 'description' => $oldAssigneeId
-                    ? "Reassigned to {$newUser->name}. Status: {$incident->status} → {$newStatus}"
-                    : "Assigned to {$newUser->name}. Status: {$incident->status} → {$newStatus}",
+                    ? "Reassigned to {$newUser->name}. Status: {$oldStatus} → {$newStatus}"
+                    : "Assigned to {$newUser->name}. Status: {$oldStatus} → {$newStatus}",
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
+    
+            // ==========================================
+            // NEW: Record in incident_status_actions
+            // ==========================================
+            $notes = $request->notes ?? ($oldAssigneeId ? 'Reassigned' : 'Assigned');
+            
+            DB::table('incident_status_actions')->insert([
+                'incident_id' => $incident->id,
+                'action' => 'assigned',
+                'user_id' => Auth::id(),
+                'previous_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'reason' => $notes,
+                'metadata' => json_encode([
+                    'assigned_to' => $newUser->id,
+                    'assigned_to_name' => $newUser->name,
+                    'old_assignee' => $oldAssigneeId,
+                    'old_assignee_name' => $oldAssigneeName,
+                    'notes' => $notes,
+                ]),
+                'acted_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+    
             DB::commit();
-
+    
             // Send notification asynchronously (don't wait for it)
             dispatch(function () use ($incident, $newUser) {
                 try {
@@ -1389,12 +1756,12 @@ class IncidentController extends Controller
                     Log::error('Assign notification failed: '.$e->getMessage());
                 }
             })->onQueue('notifications');
-
+    
             // RESPONSE
             $message = $oldAssigneeId
                 ? "Incident reassigned to {$newUser->name}."
                 : "Incident assigned to {$newUser->name}.";
-
+    
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => true,
@@ -1403,34 +1770,34 @@ class IncidentController extends Controller
                     'assigned_to' => $newUser->name,
                 ]);
             }
-
+    
             return back()->with('success', $message);
-
+    
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Assign incident failed: '.$e->getMessage(), [
                 'incident_id' => $incident->id,
                 'trace' => $e->getTraceAsString(),
             ]);
-
+    
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to assign incident. Please try again.',
                 ], 500);
             }
-
+    
             return back()->with('error', 'Failed to assign incident.');
         }
     }
-
+    
     /**
-     * Reassign incident - dedicated method
+     * Reassign incident - dedicated method with Status Actions
      */
     public function reassign(Request $request, Incident $incident)
     {
         $this->authorize('assign-incident');
-
+    
         // Check if incident can be reassigned
         $allowedStatuses = ['open', 'acknowledged', 'in_progress', 'escalated', 'rejected'];
         if (! in_array($incident->status, $allowedStatuses)) {
@@ -1438,15 +1805,14 @@ class IncidentController extends Controller
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 400);
             }
-
             return back()->with('error', $message);
         }
-
+    
         $request->validate([
             'assigned_to' => 'required|exists:users,id',
             'notes' => 'nullable|string|max:500',
         ]);
-
+    
         // Prevent self-reassignment
         if ($incident->assigned_to == $request->assigned_to) {
             $currentAssignee = User::find($incident->assigned_to);
@@ -1454,12 +1820,49 @@ class IncidentController extends Controller
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-
             return back()->with('error', $message);
         }
-
+    
+        // Delegate to assign method which already has full implementation
         return $this->assign($request, $incident);
     }
+
+    /**
+     * Reassign incident - dedicated method
+     */
+    // public function reassign(Request $request, Incident $incident)
+    // {
+    //     $this->authorize('assign-incident');
+
+    //     // Check if incident can be reassigned
+    //     $allowedStatuses = ['open', 'acknowledged', 'in_progress', 'escalated', 'rejected'];
+    //     if (! in_array($incident->status, $allowedStatuses)) {
+    //         $message = 'Cannot reassign - current status: '.ucfirst(str_replace('_', ' ', $incident->status));
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 400);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     $request->validate([
+    //         'assigned_to' => 'required|exists:users,id',
+    //         'notes' => 'nullable|string|max:500',
+    //     ]);
+
+    //     // Prevent self-reassignment
+    //     if ($incident->assigned_to == $request->assigned_to) {
+    //         $currentAssignee = User::find($incident->assigned_to);
+    //         $message = 'Already assigned to '.($currentAssignee?->name ?? 'this user');
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 422);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     return $this->assign($request, $incident);
+    // }
 
     // // ==========================================
     // // ESCALATE
@@ -1509,20 +1912,397 @@ class IncidentController extends Controller
     /**
      * Escalate incident
      */
+     //last working
+    // public function escalate(Request $request, Incident $incident)
+    // {
+    //     $this->authorize('escalate-incident');
+
+    //     $request->validate([
+    //         'escalated_to' => 'required|exists:users,id',
+    //         'to_department_id' => 'required|exists:departments,id',
+    //         'reason' => 'required|string|max:500',
+    //     ]);
+
+    //     $escalatedToId = $request->escalated_to;
+    //     $toDepartmentId = $request->to_department_id;
+    //     $reason = $request->reason;
+
+    //     // ==========================================
+    //     // VALIDATION 1: Cannot escalate to yourself
+    //     // ==========================================
+    //     if ($escalatedToId == Auth::id()) {
+    //         $message = 'You cannot escalate the incident to yourself.';
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 422);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     // ==========================================
+    //     // VALIDATION 2: Cannot escalate to currently assigned user
+    //     // ==========================================
+    //     if ($incident->assigned_to == $escalatedToId) {
+    //         $assignedUser = User::find($incident->assigned_to);
+    //         $message = 'This incident is already assigned to '.($assignedUser?->name ?? 'this user').'. Please escalate to a different person.';
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 422);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     // ==========================================
+    //     // VALIDATION 3: Cannot escalate if already escalated to same user
+    //     // ==========================================
+    //     $alreadyEscalatedToUser = $incident->escalations()
+    //         ->where('escalated_to', $escalatedToId)
+    //         ->where('status', '!=', 'rejected') // Only check non-rejected escalations
+    //         ->exists();
+
+    //     if ($alreadyEscalatedToUser) {
+    //         $escalatedUser = User::find($escalatedToId);
+    //         $message = 'This incident has already been escalated to '.($escalatedUser?->name ?? 'this user').'. Please select a different person or wait for their response.';
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 422);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     // ==========================================
+    //     // VALIDATION 4: Cannot escalate if already in escalated status to same department
+    //     // (Prevents circular escalation)
+    //     // ==========================================
+    //     if ($incident->status === 'escalated' && $incident->escalated_to == $escalatedToId) {
+    //         $message = 'This incident is already escalated to this user.';
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 422);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     // ==========================================
+    //     // VALIDATION 5: Cannot escalate to same department without higher authority
+    //     // ==========================================
+    //     if ($toDepartmentId == $incident->department_id && $incident->status === 'escalated') {
+    //         $message = 'This incident is already in the same department. Please escalate to a different department for higher authority.';
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => $message], 422);
+    //         }
+
+    //         return back()->with('error', $message);
+    //     }
+
+    //     // ==========================================
+    //     // PROCESS ESCALATION
+    //     // ==========================================
+    //     DB::beginTransaction();
+    //     try {
+    //         // Get next escalation level
+    //         $nextLevel = $incident->escalations()->count() + 1;
+
+    //         // Create escalation record using direct insert (faster)
+    //         DB::table('escalations')->insert([
+    //             'incident_id' => $incident->id,
+    //             'escalated_by' => Auth::id(),
+    //             'escalated_to' => $escalatedToId,
+    //             'from_department_id' => $incident->department_id,
+    //             'to_department_id' => $toDepartmentId,
+    //             'level' => $nextLevel,
+    //             'reason' => $reason,
+    //             'status' => 'pending',
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
+
+    //         // Get the escalation ID for notification
+    //         $escalationId = DB::getPdo()->lastInsertId();
+
+    //         // Update incident status
+    //         DB::table('incidents')
+    //             ->where('id', $incident->id)
+    //             ->update([
+    //                 'status' => 'escalated',
+    //                 'escalated_to' => $escalatedToId,
+    //                 'escalated_at' => now(),
+    //                 'updated_at' => now(),
+    //             ]);
+
+    //         // Log activity
+    //         $escalatedToUser = User::find($escalatedToId);
+    //         $toDepartment = Department::find($toDepartmentId);
+
+    //         DB::table('incident_logs')->insert([
+    //             'incident_id' => $incident->id,
+    //             'user_id' => Auth::id(),
+    //             'action' => 'escalated',
+    //             'new_values' => json_encode([
+    //                 'escalated_to' => $escalatedToId,
+    //                 'escalated_to_name' => $escalatedToUser?->name,
+    //                 'to_department' => $toDepartment?->name,
+    //                 'level' => $nextLevel,
+    //                 'reason' => $reason,
+    //             ]),
+    //             'description' => "Escalated to Level {$nextLevel}: ".($escalatedToUser?->name ?? 'N/A').' ('.($toDepartment?->name ?? 'N/A').')',
+    //             'ip_address' => request()->ip(),
+    //             'user_agent' => request()->userAgent(),
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
+
+    //         DB::commit();
+
+    //         // Send notification asynchronously
+    //         dispatch(function () use ($incident, $escalationId) {
+    //             try {
+    //                 $freshIncident = Incident::find($incident->id);
+    //                 $escalation = Escalation::find($escalationId);
+    //                 if ($escalation) {
+    //                     app(NotificationService::class)->notifyIncidentEscalated($freshIncident, $escalation);
+    //                 }
+    //             } catch (\Exception $e) {
+    //                 Log::error('Escalation notification failed: '.$e->getMessage());
+    //             }
+    //         })->onQueue('notifications');
+
+    //         // Response
+    //         $message = "Incident escalated to Level {$nextLevel}: ".($escalatedToUser?->name ?? 'User').' ('.($toDepartment?->name ?? 'Dept').')';
+
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'message' => $message,
+    //                 'level' => $nextLevel,
+    //                 'escalated_to' => $escalatedToUser?->name,
+    //             ]);
+    //         }
+
+    //         return back()->with('success', $message);
+
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         Log::error('Escalation failed: '.$e->getMessage(), [
+    //             'incident_id' => $incident->id,
+    //             'trace' => $e->getTraceAsString(),
+    //         ]);
+
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Failed to escalate incident. Please try again.',
+    //             ], 500);
+    //         }
+
+    //         return back()->with('error', 'Failed to escalate incident.');
+    //     }
+    // }
+
+    // /**
+    //  * Respond to escalation (accept/reject/return) - OPTIMIZED
+    //  */
+    // last working
+    // public function respondToEscalation(Request $request, Incident $incident)
+    // {
+    //     $user = Auth::user();
+
+    //     // Check if user is the escalated person
+    //     if ($incident->escalated_to !== $user->id || $incident->status !== 'escalated') {
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'You are not authorized to respond to this escalation.',
+    //             ], 403);
+    //         }
+
+    //         return back()->with('error', 'You are not authorized to respond to this escalation.');
+    //     }
+
+    //     $request->validate([
+    //         'response_type' => 'required|in:accept,reject,return',
+    //         'response_note' => 'nullable|string|max:1000',
+    //     ]);
+
+    //     // Get the latest pending escalation - use query builder for speed
+    //     $escalation = DB::table('escalations')
+    //         ->where('incident_id', $incident->id)
+    //         ->where('escalated_to', $user->id)
+    //         ->where('status', 'pending')
+    //         ->latest()
+    //         ->first();
+
+    //     if (! $escalation) {
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json(['success' => false, 'message' => 'No pending escalation found.'], 404);
+    //         }
+
+    //         return back()->with('error', 'No pending escalation found.');
+    //     }
+
+    //     $responseType = $request->response_type;
+    //     $responseNote = $request->response_note;
+
+    //     DB::beginTransaction();
+    //     try {
+
+    //         // Update escalation record - direct DB update
+    //         DB::table('escalations')
+    //             ->where('id', $escalation->id)
+    //             ->update([
+    //                 'status' => ($responseType === 'return') ? 'rejected' : $responseType.'ed',
+    //                 'response' => $responseNote,
+    //                 'responded_by' => $user->id,
+    //                 'responded_at' => now(),
+    //                 'response_type' => $responseType,
+    //                 'updated_at' => now(),
+    //             ]);
+
+    //         // Determine new incident status and assignee
+    //         $updateData = [];
+
+    //         switch ($responseType) {
+    //             case 'accept':
+    //                 $updateData = [
+    //                     'status' => 'in_progress',
+    //                     'assigned_to' => $user->id,
+    //                     'escalated_to' => null,
+    //                     'escalated_at' => null,
+    //                     'acknowledged_at' => now(),
+    //                 ];
+    //                 $message = 'Escalation accepted. Incident is now in progress and assigned to you.';
+    //                 break;
+
+    //             case 'reject':
+    //                 $updateData = [
+    //                     'status' => 'open',
+    //                     'escalated_to' => null,
+    //                     'escalated_at' => null,
+    //                 ];
+    //                 $message = 'Escalation rejected. Incident returned to open status.';
+    //                 break;
+
+    //             case 'return':
+    //                 // Return to previous escalation level or original assignee
+    //                 $previousEscalation = DB::table('escalations')
+    //                     ->where('incident_id', $incident->id)
+    //                     ->where('id', '!=', $escalation->id)
+    //                     ->latest()
+    //                     ->first();
+
+    //                 if ($previousEscalation) {
+    //                     $updateData = [
+    //                         'escalated_to' => $previousEscalation->escalated_to,
+    //                         'status' => 'escalated',
+    //                     ];
+    //                 } else {
+    //                     $updateData = [
+    //                         'escalated_to' => null,
+    //                         'escalated_at' => null,
+    //                         'status' => 'open',
+    //                     ];
+    //                 }
+    //                 $message = 'Escalation returned to previous level.';
+    //                 break;
+    //         }
+
+    //         // Update incident
+    //         $updateData['updated_at'] = now();
+    //         DB::table('incidents')
+    //             ->where('id', $incident->id)
+    //             ->update($updateData);
+
+    //         // Log activity
+    //         DB::table('incident_logs')->insert([
+    //             'incident_id' => $incident->id,
+    //             'user_id' => $user->id,
+    //             'action' => 'escalation_'.$responseType.'ed',
+    //             'new_values' => json_encode([
+    //                 'response_type' => $responseType,
+    //                 'response_note' => $responseNote,
+    //                 'escalation_id' => $escalation->id,
+    //             ]),
+    //             'description' => "Escalation {$responseType}ed by {$user->name}".($responseNote ? ': '.$responseNote : ''),
+    //             'ip_address' => request()->ip(),
+    //             'user_agent' => request()->userAgent(),
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
+
+    //         DB::commit();
+
+    //         // Send notification asynchronously - DON'T WAIT
+    //         dispatch(function () use ($incident, $escalation, $responseType, $user) {
+    //             try {
+    //                 $freshIncident = Incident::find($incident->id);
+    //                 $escalatedByUser = User::find($escalation->escalated_by);
+
+    //                 if ($escalatedByUser && $escalatedByUser->id !== $user->id) {
+    //                     // Notify the person who originally escalated
+    //                     $escalatedByUser->notify(new NewIncidentNotification($freshIncident));
+    //                 }
+
+    //                 // If accepted, notify department HOD
+    //                 if ($responseType === 'accept' && $freshIncident->department) {
+    //                     $hod = $freshIncident->department->getHeadOfDepartment();
+    //                     if ($hod && $hod->id !== $user->id) {
+    //                         $hod->notify(new NewIncidentNotification($freshIncident));
+    //                     }
+    //                 }
+    //             } catch (\Exception $e) {
+    //                 Log::error('Escalation response notification failed: '.$e->getMessage());
+    //             }
+    //         })->onQueue('notifications');
+
+    //         // Return response immediately - don't wait for notification
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'message' => $message,
+    //                 'response_type' => $responseType,
+    //             ]);
+    //         }
+
+    //         return back()->with('success', $message);
+
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         Log::error('Escalation response failed: '.$e->getMessage(), [
+    //             'incident_id' => $incident->id,
+    //             'user_id' => $user->id,
+    //             'trace' => $e->getTraceAsString(),
+    //         ]);
+
+    //         if ($request->ajax() || $request->wantsJson()) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Failed to process response. Please try again.',
+    //             ], 500);
+    //         }
+
+    //         return back()->with('error', 'Failed to process response. Please try again.');
+    //     }
+    // }
+    
+    
+    
+    /**
+     * Escalate incident with Status Actions recording
+     */
     public function escalate(Request $request, Incident $incident)
     {
         $this->authorize('escalate-incident');
-
+    
         $request->validate([
             'escalated_to' => 'required|exists:users,id',
             'to_department_id' => 'required|exists:departments,id',
             'reason' => 'required|string|max:500',
         ]);
-
+    
         $escalatedToId = $request->escalated_to;
         $toDepartmentId = $request->to_department_id;
         $reason = $request->reason;
-
+    
         // ==========================================
         // VALIDATION 1: Cannot escalate to yourself
         // ==========================================
@@ -1531,10 +2311,9 @@ class IncidentController extends Controller
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-
             return back()->with('error', $message);
         }
-
+    
         // ==========================================
         // VALIDATION 2: Cannot escalate to currently assigned user
         // ==========================================
@@ -1544,41 +2323,37 @@ class IncidentController extends Controller
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-
             return back()->with('error', $message);
         }
-
+    
         // ==========================================
         // VALIDATION 3: Cannot escalate if already escalated to same user
         // ==========================================
         $alreadyEscalatedToUser = $incident->escalations()
             ->where('escalated_to', $escalatedToId)
-            ->where('status', '!=', 'rejected') // Only check non-rejected escalations
+            ->where('status', '!=', 'rejected')
             ->exists();
-
+    
         if ($alreadyEscalatedToUser) {
             $escalatedUser = User::find($escalatedToId);
             $message = 'This incident has already been escalated to '.($escalatedUser?->name ?? 'this user').'. Please select a different person or wait for their response.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-
             return back()->with('error', $message);
         }
-
+    
         // ==========================================
         // VALIDATION 4: Cannot escalate if already in escalated status to same department
-        // (Prevents circular escalation)
         // ==========================================
         if ($incident->status === 'escalated' && $incident->escalated_to == $escalatedToId) {
             $message = 'This incident is already escalated to this user.';
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-
             return back()->with('error', $message);
         }
-
+    
         // ==========================================
         // VALIDATION 5: Cannot escalate to same department without higher authority
         // ==========================================
@@ -1587,19 +2362,18 @@ class IncidentController extends Controller
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $message], 422);
             }
-
             return back()->with('error', $message);
         }
-
+    
         // ==========================================
         // PROCESS ESCALATION
         // ==========================================
         DB::beginTransaction();
         try {
-            // Get next escalation level
+            $oldStatus = $incident->status;
             $nextLevel = $incident->escalations()->count() + 1;
-
-            // Create escalation record using direct insert (faster)
+    
+            // Create escalation record
             DB::table('escalations')->insert([
                 'incident_id' => $incident->id,
                 'escalated_by' => Auth::id(),
@@ -1612,10 +2386,9 @@ class IncidentController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
-            // Get the escalation ID for notification
+    
             $escalationId = DB::getPdo()->lastInsertId();
-
+    
             // Update incident status
             DB::table('incidents')
                 ->where('id', $incident->id)
@@ -1625,15 +2398,16 @@ class IncidentController extends Controller
                     'escalated_at' => now(),
                     'updated_at' => now(),
                 ]);
-
-            // Log activity
+    
             $escalatedToUser = User::find($escalatedToId);
             $toDepartment = Department::find($toDepartmentId);
-
+    
+            // Log activity
             DB::table('incident_logs')->insert([
                 'incident_id' => $incident->id,
                 'user_id' => Auth::id(),
                 'action' => 'escalated',
+                'old_values' => json_encode(['status' => $oldStatus]),
                 'new_values' => json_encode([
                     'escalated_to' => $escalatedToId,
                     'escalated_to_name' => $escalatedToUser?->name,
@@ -1647,9 +2421,32 @@ class IncidentController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
+    
+            // ==========================================
+            // NEW: Record in incident_status_actions
+            // ==========================================
+            DB::table('incident_status_actions')->insert([
+                'incident_id' => $incident->id,
+                'action' => 'escalated',
+                'user_id' => Auth::id(),
+                'previous_status' => $oldStatus,
+                'new_status' => 'escalated',
+                'reason' => $reason,
+                'metadata' => json_encode([
+                    'escalated_to' => $escalatedToId,
+                    'escalated_to_name' => $escalatedToUser?->name,
+                    'to_department' => $toDepartmentId,
+                    'to_department_name' => $toDepartment?->name,
+                    'level' => $nextLevel,
+                    'escalation_id' => $escalationId,
+                ]),
+                'acted_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+    
             DB::commit();
-
+    
             // Send notification asynchronously
             dispatch(function () use ($incident, $escalationId) {
                 try {
@@ -1662,10 +2459,9 @@ class IncidentController extends Controller
                     Log::error('Escalation notification failed: '.$e->getMessage());
                 }
             })->onQueue('notifications');
-
-            // Response
+    
             $message = "Incident escalated to Level {$nextLevel}: ".($escalatedToUser?->name ?? 'User').' ('.($toDepartment?->name ?? 'Dept').')';
-
+    
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => true,
@@ -1674,34 +2470,34 @@ class IncidentController extends Controller
                     'escalated_to' => $escalatedToUser?->name,
                 ]);
             }
-
+    
             return back()->with('success', $message);
-
+    
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Escalation failed: '.$e->getMessage(), [
                 'incident_id' => $incident->id,
                 'trace' => $e->getTraceAsString(),
             ]);
-
+    
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to escalate incident. Please try again.',
                 ], 500);
             }
-
+    
             return back()->with('error', 'Failed to escalate incident.');
         }
     }
-
+    
     /**
-     * Respond to escalation (accept/reject/return) - OPTIMIZED
+     * Respond to escalation (accept/reject/return) with Status Actions recording
      */
     public function respondToEscalation(Request $request, Incident $incident)
     {
         $user = Auth::user();
-
+    
         // Check if user is the escalated person
         if ($incident->escalated_to !== $user->id || $incident->status !== 'escalated') {
             if ($request->ajax() || $request->wantsJson()) {
@@ -1710,38 +2506,36 @@ class IncidentController extends Controller
                     'message' => 'You are not authorized to respond to this escalation.',
                 ], 403);
             }
-
             return back()->with('error', 'You are not authorized to respond to this escalation.');
         }
-
+    
         $request->validate([
             'response_type' => 'required|in:accept,reject,return',
             'response_note' => 'nullable|string|max:1000',
         ]);
-
-        // Get the latest pending escalation - use query builder for speed
+    
+        // Get the latest pending escalation
         $escalation = DB::table('escalations')
             ->where('incident_id', $incident->id)
             ->where('escalated_to', $user->id)
             ->where('status', 'pending')
             ->latest()
             ->first();
-
+    
         if (! $escalation) {
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => 'No pending escalation found.'], 404);
             }
-
             return back()->with('error', 'No pending escalation found.');
         }
-
+    
         $responseType = $request->response_type;
         $responseNote = $request->response_note;
-
+        $oldStatus = $incident->status;
+    
         DB::beginTransaction();
         try {
-
-            // Update escalation record - direct DB update
+            // Update escalation record
             DB::table('escalations')
                 ->where('id', $escalation->id)
                 ->update([
@@ -1752,14 +2546,18 @@ class IncidentController extends Controller
                     'response_type' => $responseType,
                     'updated_at' => now(),
                 ]);
-
+    
             // Determine new incident status and assignee
             $updateData = [];
-
+            $newStatus = '';
+            $action = '';
+    
             switch ($responseType) {
                 case 'accept':
+                    $newStatus = 'in_progress';
+                    $action = 'accepted_escalation';
                     $updateData = [
-                        'status' => 'in_progress',
+                        'status' => $newStatus,
                         'assigned_to' => $user->id,
                         'escalated_to' => null,
                         'escalated_at' => null,
@@ -1767,55 +2565,62 @@ class IncidentController extends Controller
                     ];
                     $message = 'Escalation accepted. Incident is now in progress and assigned to you.';
                     break;
-
+    
                 case 'reject':
+                    $newStatus = 'open';
+                    $action = 'rejected_escalation';
                     $updateData = [
-                        'status' => 'open',
+                        'status' => $newStatus,
                         'escalated_to' => null,
                         'escalated_at' => null,
                     ];
                     $message = 'Escalation rejected. Incident returned to open status.';
                     break;
-
+    
                 case 'return':
+                    $action = 'returned_escalation';
                     // Return to previous escalation level or original assignee
                     $previousEscalation = DB::table('escalations')
                         ->where('incident_id', $incident->id)
                         ->where('id', '!=', $escalation->id)
                         ->latest()
                         ->first();
-
+    
                     if ($previousEscalation) {
+                        $newStatus = 'escalated';
                         $updateData = [
                             'escalated_to' => $previousEscalation->escalated_to,
-                            'status' => 'escalated',
+                            'status' => $newStatus,
                         ];
                     } else {
+                        $newStatus = 'open';
                         $updateData = [
                             'escalated_to' => null,
                             'escalated_at' => null,
-                            'status' => 'open',
+                            'status' => $newStatus,
                         ];
                     }
                     $message = 'Escalation returned to previous level.';
                     break;
             }
-
+    
             // Update incident
             $updateData['updated_at'] = now();
             DB::table('incidents')
                 ->where('id', $incident->id)
                 ->update($updateData);
-
+    
             // Log activity
             DB::table('incident_logs')->insert([
                 'incident_id' => $incident->id,
                 'user_id' => $user->id,
-                'action' => 'escalation_'.$responseType.'ed',
+                'action' => $action,
+                'old_values' => json_encode(['status' => $oldStatus]),
                 'new_values' => json_encode([
                     'response_type' => $responseType,
                     'response_note' => $responseNote,
                     'escalation_id' => $escalation->id,
+                    'new_status' => $newStatus,
                 ]),
                 'description' => "Escalation {$responseType}ed by {$user->name}".($responseNote ? ': '.$responseNote : ''),
                 'ip_address' => request()->ip(),
@@ -1823,21 +2628,69 @@ class IncidentController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
+    
+            // ==========================================
+            // FIXED: Record in incident_status_actions
+            // Use existing ENUM values
+            // ==========================================
+            $actionType = match ($responseType) {
+                'accept' => 'accepted',      // Use existing 'accepted' or 'acknowledged'
+                'reject' => 'rejected',      // Use existing 'rejected'
+                'return' => 'returned',      // Use existing 'returned' or 'rejected'
+                default => 'escalated',
+            };
+    
+            // For reject, also store the reason in metadata
+            $reason = $responseNote ?? $message;
+    
+            DB::table('incident_status_actions')->insert([
+                'incident_id' => $incident->id,
+                'action' => $actionType,
+                'user_id' => $user->id,
+                'previous_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'reason' => $reason,
+                'metadata' => json_encode([
+                    'response_type' => $responseType,
+                    'escalation_id' => $escalation->id,
+                    'escalated_by' => $escalation->escalated_by,
+                    'responded_by' => $user->id,
+                    'responded_by_name' => $user->name,
+                    'old_escalated_to' => $escalation->escalated_to,
+                    'new_status' => $newStatus,
+                    'response_note' => $responseNote,
+                ]),
+                'acted_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+    
             DB::commit();
-
-            // Send notification asynchronously - DON'T WAIT
+            
+            // ==========================================
+            // SEND ESCALATION RESPONSE NOTIFICATIONS
+            // ==========================================
+            // Get the updated escalation record with response data
+            $updatedEscalation = Escalation::find($escalation->id);
+            
+            // Use the notification service to send notifications
+            $this->notificationService->notifyEscalationResponded(
+                $incident,
+                $updatedEscalation,
+                $responseType,
+                $reason
+            );
+    
+            // Send notification asynchronously
             dispatch(function () use ($incident, $escalation, $responseType, $user) {
                 try {
                     $freshIncident = Incident::find($incident->id);
                     $escalatedByUser = User::find($escalation->escalated_by);
-
+    
                     if ($escalatedByUser && $escalatedByUser->id !== $user->id) {
-                        // Notify the person who originally escalated
                         $escalatedByUser->notify(new NewIncidentNotification($freshIncident));
                     }
-
-                    // If accepted, notify department HOD
+    
                     if ($responseType === 'accept' && $freshIncident->department) {
                         $hod = $freshIncident->department->getHeadOfDepartment();
                         if ($hod && $hod->id !== $user->id) {
@@ -1848,18 +2701,18 @@ class IncidentController extends Controller
                     Log::error('Escalation response notification failed: '.$e->getMessage());
                 }
             })->onQueue('notifications');
-
-            // Return response immediately - don't wait for notification
+    
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => true,
                     'message' => $message,
                     'response_type' => $responseType,
+                    'new_status' => $newStatus,
                 ]);
             }
-
+    
             return back()->with('success', $message);
-
+    
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Escalation response failed: '.$e->getMessage(), [
@@ -1867,19 +2720,18 @@ class IncidentController extends Controller
                 'user_id' => $user->id,
                 'trace' => $e->getTraceAsString(),
             ]);
-
+    
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to process response. Please try again.',
                 ], 500);
             }
-
+    
             return back()->with('error', 'Failed to process response. Please try again.');
         }
     }
 
-    // app/Http/Controllers/IncidentController.php
 
     // public function escalate(Request $request, Incident $incident)
     // {
@@ -1972,38 +2824,82 @@ class IncidentController extends Controller
 
     // app/Http/Controllers/IncidentController.php
 
+    //old last working
+    // public function resolve(Request $request, Incident $incident)
+    // {
+    //     $this->authorize('resolve-incident');
+
+    //     $request->validate([
+    //         'resolution_notes' => 'required|string|max:1000',
+    //         'files.*' => 'nullable|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,mp4,avi,mov,pdf,doc,docx,xls,xlsx',
+    //     ]);
+
+    //     // Update incident status
+    //     $incident->update([
+    //         'status' => 'resolved',
+    //         'resolved_at' => now(),
+    //         'resolution_notes' => $request->resolution_notes,
+    //     ]);
+
+    //     // Handle file uploads for resolution
+    //     if ($request->hasFile('files')) {
+    //         foreach ($request->file('files') as $file) {
+    //             $this->storeIncidentFile($incident, $file);
+    //         }
+    //     }
+
+    //     // Log activity
+    //     $incident->logActivity('resolved', null, [
+    //         'resolution_notes' => $request->resolution_notes,
+    //         'files_count' => $request->hasFile('files') ? count($request->file('files')) : 0,
+    //     ]);
+
+    //     // Send notification
+    //     $this->notificationService->notifyIncidentResolved($incident);
+
+    //     if ($request->ajax() || $request->wantsJson()) {
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Incident resolved successfully.',
+    //             'files_uploaded' => $request->hasFile('files') ? count($request->file('files')) : 0,
+    //         ]);
+    //     }
+
+    //     return back()->with('success', 'Incident resolved successfully.');
+    // }
+    
     public function resolve(Request $request, Incident $incident)
     {
         $this->authorize('resolve-incident');
-
+    
         $request->validate([
             'resolution_notes' => 'required|string|max:1000',
             'files.*' => 'nullable|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,mp4,avi,mov,pdf,doc,docx,xls,xlsx',
         ]);
-
-        // Update incident status
+    
+        $oldStatus = $incident->status;
+        
+        // Update incident
         $incident->update([
             'status' => 'resolved',
             'resolved_at' => now(),
             'resolution_notes' => $request->resolution_notes,
         ]);
-
+    
+        // Log activity (already handles status_actions via logActivity)
+        $incident->logActivity('resolved', ['status' => $oldStatus], ['status' => 'resolved', 'resolution_notes' => $request->resolution_notes,
+            'files_count' => $request->hasFile('files') ? count($request->file('files')) : 0,]);
+    
         // Handle file uploads for resolution
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
                 $this->storeIncidentFile($incident, $file);
             }
         }
-
-        // Log activity
-        $incident->logActivity('resolved', null, [
-            'resolution_notes' => $request->resolution_notes,
-            'files_count' => $request->hasFile('files') ? count($request->file('files')) : 0,
-        ]);
-
+    
         // Send notification
         $this->notificationService->notifyIncidentResolved($incident);
-
+    
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -2011,9 +2907,11 @@ class IncidentController extends Controller
                 'files_uploaded' => $request->hasFile('files') ? count($request->file('files')) : 0,
             ]);
         }
-
+    
         return back()->with('success', 'Incident resolved successfully.');
     }
+    
+    
 
     // ==========================================
     // CLOSE
@@ -2029,62 +2927,146 @@ class IncidentController extends Controller
     //     return back()->with('success', 'Incident closed');
     // }
 
+    // public function close(Request $request, Incident $incident)
+    // {
+    //     $this->authorize('close-incident');
+
+    //     $request->validate([
+    //         'closing_remarks' => 'required|string|max:1000',
+    //         'files.*' => 'nullable|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,pdf,doc,docx,xls,xlsx',
+    //     ]);
+
+    //     $incident->update([
+    //         'status' => 'closed',
+    //         'closed_at' => now(),
+    //     ]);
+
+    //     // Add closing remarks as a system comment
+    //     $incident->comments()->create([
+    //         'user_id' => Auth::id(),
+    //         'content' => "🔒 **Incident Closed**\n".$request->closing_remarks,
+    //         'is_internal' => false,
+    //     ]);
+
+    //     // Handle file uploads
+    //     if ($request->hasFile('files')) {
+    //         foreach ($request->file('files') as $file) {
+    //             $this->storeIncidentFile($incident, $file);
+    //         }
+    //     }
+
+    //     $incident->logActivity('closed', null, ['remarks' => $request->closing_remarks]);
+    //     $incident->increment('comments_count');
+
+    //     $this->notificationService->notifyIncidentClosed($incident);
+
+    //     if ($request->ajax() || $request->wantsJson()) {
+    //         return response()->json(['success' => true, 'message' => 'Incident closed successfully.']);
+    //     }
+
+    //     return back()->with('success', 'Incident closed successfully.');
+    // }
+    
+    
+    /**
+     * Close incident - UPDATED
+     */
     public function close(Request $request, Incident $incident)
     {
         $this->authorize('close-incident');
-
+    
         $request->validate([
-            'closing_remarks' => 'required|string|max:1000',
-            'files.*' => 'nullable|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,pdf,doc,docx,xls,xlsx',
-        ]);
-
+                'closing_remarks' => 'required|string|max:1000',
+                'files.*' => 'nullable|file|max:20480|mimes:jpg,jpeg,png,gif,bmp,webp,pdf,doc,docx,xls,xlsx',
+            ]);
+    
+        $oldStatus = $incident->status;
+        
         $incident->update([
             'status' => 'closed',
             'closed_at' => now(),
         ]);
-
+    
+        // Log activity (already handles status_actions via logActivity)
+        $incident->logActivity('closed', ['status' => $oldStatus], ['status' => 'closed']);
+    
         // Add closing remarks as a system comment
         $incident->comments()->create([
             'user_id' => Auth::id(),
             'content' => "🔒 **Incident Closed**\n".$request->closing_remarks,
             'is_internal' => false,
         ]);
-
+    
         // Handle file uploads
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
                 $this->storeIncidentFile($incident, $file);
             }
         }
-
-        $incident->logActivity('closed', null, ['remarks' => $request->closing_remarks]);
+    
         $incident->increment('comments_count');
-
+    
         $this->notificationService->notifyIncidentClosed($incident);
-
+    
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json(['success' => true, 'message' => 'Incident closed successfully.']);
         }
-
+    
         return back()->with('success', 'Incident closed successfully.');
     }
 
     // ==========================================
     // REOPEN
     // ==========================================
+    // public function reopen(Request $request, Incident $incident)
+    // {
+    //     $this->authorize('reopen-incident');
+
+    //     if (! in_array($incident->status, ['resolved', 'closed'])) {
+    //         if ($request->ajax()) {
+    //             return response()->json(['success' => false, 'message' => 'Only resolved/closed incidents can be reopened.'], 400);
+    //         }
+
+    //         return back()->with('error', 'Only resolved/closed incidents can be reopened.');
+    //     }
+
+    //     $oldStatus = $incident->status;
+    //     $incident->update([
+    //         'status' => 'open',
+    //         'resolved_at' => null,
+    //         'closed_at' => null,
+    //         'resolution_notes' => null,
+    //         'sla_due_at' => now()->addMinutes($incident->category?->sla_minutes ?? 120),
+    //         'sla_breach_count' => 0,
+    //     ]);
+
+    //     $incident->logActivity('reopened', ['status' => $oldStatus], ['status' => 'open']);
+    //     $this->notificationService->notifyIncidentReopened($incident);
+
+    //     if ($request->ajax()) {
+    //         return response()->json(['success' => true, 'message' => 'Incident reopened.']);
+    //     }
+
+    //     return back()->with('success', 'Incident reopened.');
+    // }
+    
+    
+    /**
+     * Reopen incident - UPDATED
+     */
     public function reopen(Request $request, Incident $incident)
     {
         $this->authorize('reopen-incident');
-
-        if (! in_array($incident->status, ['resolved', 'closed'])) {
+    
+        if (!in_array($incident->status, ['resolved', 'closed'])) {
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => 'Only resolved/closed incidents can be reopened.'], 400);
             }
-
             return back()->with('error', 'Only resolved/closed incidents can be reopened.');
         }
-
+    
         $oldStatus = $incident->status;
+        
         $incident->update([
             'status' => 'open',
             'resolved_at' => null,
@@ -2093,38 +3075,68 @@ class IncidentController extends Controller
             'sla_due_at' => now()->addMinutes($incident->category?->sla_minutes ?? 120),
             'sla_breach_count' => 0,
         ]);
-
+    
+        // Log activity (already handles status_actions via logActivity)
         $incident->logActivity('reopened', ['status' => $oldStatus], ['status' => 'open']);
+    
         $this->notificationService->notifyIncidentReopened($incident);
-
+    
         if ($request->ajax()) {
             return response()->json(['success' => true, 'message' => 'Incident reopened.']);
         }
-
+    
         return back()->with('success', 'Incident reopened.');
     }
 
     // ==========================================
     // REJECT
     // ==========================================
+    // public function reject(Request $request, Incident $incident)
+    // {
+    //     $this->authorize('close-incident');
+    //     $request->validate(['rejection_reason' => 'required|string|max:1000']);
+
+    //     $oldStatus = $incident->status;
+    //     $incident->update([
+    //         'status' => 'rejected',
+    //         'rejection_reason' => $request->rejection_reason,
+    //     ]);
+
+    //     $incident->logActivity('rejected', ['status' => $oldStatus], ['status' => 'rejected', 'reason' => $request->rejection_reason]);
+    //     $this->notificationService->notifyIncidentRejected($incident);
+
+    //     if ($request->ajax()) {
+    //         return response()->json(['success' => true, 'message' => 'Incident rejected.']);
+    //     }
+
+    //     return back()->with('success', 'Incident rejected. Reporter notified.');
+    // }
+    
+    /**
+     * Reject incident - UPDATED
+     */
     public function reject(Request $request, Incident $incident)
     {
         $this->authorize('close-incident');
+        
         $request->validate(['rejection_reason' => 'required|string|max:1000']);
-
+    
         $oldStatus = $incident->status;
+        
         $incident->update([
             'status' => 'rejected',
             'rejection_reason' => $request->rejection_reason,
         ]);
-
+    
+        // Log activity (already handles status_actions via logActivity)
         $incident->logActivity('rejected', ['status' => $oldStatus], ['status' => 'rejected', 'reason' => $request->rejection_reason]);
+    
         $this->notificationService->notifyIncidentRejected($incident);
-
+    
         if ($request->ajax()) {
             return response()->json(['success' => true, 'message' => 'Incident rejected.']);
         }
-
+    
         return back()->with('success', 'Incident rejected. Reporter notified.');
     }
 

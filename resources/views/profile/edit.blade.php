@@ -1,4 +1,3 @@
-{{-- resources/views/profile/edit.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'My Profile - IRMS')
@@ -18,6 +17,7 @@
         object-fit: cover;
         border: 4px solid #fff;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
     }
 
     .avatar-overlay {
@@ -36,6 +36,46 @@
 
     .profile-avatar-wrapper:hover .avatar-overlay {
         opacity: 1;
+    }
+
+    .profile-avatar-wrapper:hover .profile-avatar {
+        transform: scale(1.02);
+    }
+
+    .avatar-processing {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.6);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        color: white;
+        gap: 8px;
+        z-index: 10;
+    }
+
+    .avatar-processing.active {
+        display: flex;
+    }
+
+    .avatar-processing .spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .avatar-processing .text {
+        font-size: 0.7rem;
+        opacity: 0.8;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
     }
 
     .nav-pills .nav-link {
@@ -70,30 +110,37 @@
         <div class="col-lg-4">
             <div class="card shadow-sm text-center">
                 <div class="card-body p-4">
-                   <form action="{{ route('profile.avatar') }}" method="POST" enctype="multipart/form-data" id="avatarForm">
-                    @csrf
-                    
-                    <label class="profile-avatar-wrapper position-relative d-inline-block" for="avatarInput" id="avatarLabel" style="cursor: pointer;">
-                        {{-- Avatar Image --}}
-                        <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="profile-avatar rounded-circle">
-                        
-                        {{-- Camera Hover Icon --}}
-                        <div class="avatar-overlay">
-                            <i class="fas fa-camera"></i>
-                        </div>
-                
-                        {{-- 🌀 Bootstrap Loading Spinner (Hidden by default) --}}
-                        <div id="avatarSpinner" class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 rounded-circle d-none d-flex align-items-center justify-content-center" style="z-index: 5;">
-                            <div class="spinner-border text-light" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                    {{-- Avatar Upload Section --}}
+                    <div class="mb-3">
+                        <form action="{{ route('profile.avatar') }}" method="POST" enctype="multipart/form-data" id="avatarForm">
+                            @csrf
+                            
+                            <div class="profile-avatar-wrapper position-relative d-inline-block" id="avatarWrapper">
+                                {{-- Avatar Image --}}
+                                <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="profile-avatar" id="avatarImage">
+                                
+                                {{-- Camera Hover Icon --}}
+                                <div class="avatar-overlay">
+                                    <i class="fas fa-camera"></i>
+                                </div>
+
+                                {{-- Processing Overlay --}}
+                                <div class="avatar-processing" id="avatarProcessing">
+                                    <div class="spinner"></div>
+                                    <span class="text">Processing...</span>
+                                </div>
                             </div>
+                            
+                            {{-- Hidden File Input --}}
+                            <input type="file" id="avatarInput" name="avatar" accept="image/*" class="d-none">
+                            <input type="hidden" name="exif_data" id="exifDataInput" value="">
+                        </form>
+                        
+                        <div class="mt-2">
+                            <small class="text-muted d-block">Click on avatar to change</small>
+                            <small class="text-muted" style="font-size: 0.65rem;">Supported: JPG, PNG, WebP (Max 5MB)</small>
                         </div>
-                    </label>
-                    
-                    {{-- Hidden File Input --}}
-                    <input type="file" id="avatarInput" name="avatar" accept="image/*" class="d-none" 
-                           onchange="document.getElementById('avatarSpinner').classList.remove('d-none'); document.getElementById('avatarForm').submit();">
-                </form>
+                    </div>
 
                     <h5 class="mt-3 mb-1">{{ $user->name }}</h5>
                     <p class="text-muted small mb-2">{{ $user->email }}</p>
@@ -253,3 +300,141 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ==========================================
+    // PROFILE AVATAR UPLOAD WITH IMAGE UPLOAD HANDLER
+    // ==========================================
+    
+    var avatarWrapper = document.getElementById('avatarWrapper');
+    var avatarInput = document.getElementById('avatarInput');
+    var avatarImage = document.getElementById('avatarImage');
+    var avatarProcessing = document.getElementById('avatarProcessing');
+    var avatarForm = document.getElementById('avatarForm');
+    var exifDataInput = document.getElementById('exifDataInput');
+    var processedFileData = null;
+    
+    // Initialize the upload handler for avatar
+    var avatarUploader = new ImageUploadHandler({
+        maxSize: 5 * 1024 * 1024, // 5MB for avatar
+        maxDimension: 800,
+        webpQuality: 0.85,
+        preserveExif: true, // No need for EXIF on avatar , true for testing
+        maxFiles: 1, // Only one file
+        debug: true,
+        onFileProcessed: function(file, metadata, index) {
+            // Store the processed file
+            processedFileData = file;
+            
+            // Show preview immediately
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                avatarImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+            
+            // Store EXIF data if available
+            if (metadata && metadata.exif) {
+                exifDataInput.value = JSON.stringify(metadata.exif);
+            }
+            
+            // Update processing status
+            avatarProcessing.classList.remove('active');
+            
+            // IMPORTANT: Replace the file input with the processed file
+            var dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            avatarInput.files = dataTransfer.files;
+            
+            // Submit the form
+            avatarForm.submit();
+        },
+        onError: function(message) {
+            avatarProcessing.classList.remove('active');
+            alert(message || 'Failed to process image. Please try again.');
+        },
+        onProgress: function(progress) {
+            if (progress.status === 'processing') {
+                avatarProcessing.classList.add('active');
+            }
+        },
+    });
+
+    // Click on avatar wrapper triggers file input
+    if (avatarWrapper) {
+        avatarWrapper.addEventListener('click', function(e) {
+            // Don't trigger if processing
+            if (avatarProcessing.classList.contains('active')) {
+                return;
+            }
+            avatarInput.click();
+        });
+    }
+
+    // Handle file selection
+    if (avatarInput) {
+        avatarInput.addEventListener('change', function(e) {
+            var files = this.files;
+            if (files.length === 0) return;
+
+            // Show processing
+            avatarProcessing.classList.add('active');
+
+            // Process the file using the handler
+            avatarUploader.processFiles(files).then(function(result) {
+                if (!result.success || result.files.length === 0) {
+                    avatarProcessing.classList.remove('active');
+                    alert('Failed to process image. Please try again.');
+                }
+                // The onFileProcessed callback will handle form submission
+            });
+        });
+    }
+
+    // ==========================================
+    // OPTIONAL: Add drag and drop for avatar
+    // ==========================================
+    
+    if (avatarWrapper) {
+        // Add drag and drop support
+        avatarWrapper.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '#3b82f6';
+        });
+
+        avatarWrapper.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '';
+        });
+
+        avatarWrapper.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.style.borderColor = '';
+            
+            var files = e.dataTransfer.files;
+            if (files.length > 0) {
+                // Check if it's an image
+                var file = files[0];
+                if (!file.type.startsWith('image/')) {
+                    alert('Please drop an image file.');
+                    return;
+                }
+                
+                // Trigger file input
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                avatarInput.files = dt.files;
+                
+                // Trigger change event
+                var event = new Event('change', { bubbles: true });
+                avatarInput.dispatchEvent(event);
+            }
+        });
+    }
+
+});
+</script>
+@endpush

@@ -8,20 +8,16 @@ use App\Models\IncidentComment;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
 class NewCommentNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     protected Incident $incident;
-
     protected IncidentComment $comment;
 
-    /**
-     * Create a new notification instance.
-     */
     public function __construct(Incident $incident, IncidentComment $comment)
     {
         $this->incident = $incident;
@@ -29,55 +25,62 @@ class NewCommentNotification extends Notification implements ShouldQueue
         $this->afterCommit();
     }
 
-    /**
-     * Get the notification's delivery channels.
-     */
     public function via(object $notifiable): array
     {
         return ['mail', 'database'];
     }
 
-    /**
-     * Get the mail representation of the notification.
-     */
-    // public function toMail(object $notifiable): MailMessage
-    // {
-    //     $url = route('incidents.show', $this->incident->id) . '#comment-' . $this->comment->id;
-
-    //     return (new MailMessage)
-    //         ->subject("💬 New Comment on Incident #{$this->incident->incident_id}")
-    //         ->greeting("Hello {$notifiable->name},")
-    //         ->line("**{$this->comment->user->name}** commented on incident #{$this->incident->incident_id}:")
-    //         ->line("\"{$this->comment->content}\"")
-    //         ->action('View Comment', $url)
-    //         // ->salutation('Regards,<br>IRMS Notification System');
-    //                     ->salutation("Regards,\nSAMANVAY");
-
-    // }
-
     public function toMail(object $notifiable)
     {
         $actor = $this->getActor();
+        
+        if (!$actor) {
+            $actor = auth()->user() ?? User::find($this->comment->user_id);
+        }
+        
+        if (!$actor) {
+            $actor = User::role('admin')->first() ?? User::first();
+        }
+        
+        if (!$actor) {
+            Log::warning('No actor found for new comment notification', [
+                'incident_id' => $this->incident->id,
+            ]);
+            
+            $actor = User::firstOrCreate(
+                ['email' => 'system@' . parse_url(config('app.url'), PHP_URL_HOST)],
+                [
+                    'name' => 'System',
+                    'username' => 'system',
+                    'password' => bcrypt(str_random(32)),
+                ]
+            );
+        }
 
-        return (new IncidentCommentMail($this->incident, $actor, $this->comment))
+        $recipientName = $notifiable instanceof User ? $notifiable->name : 'User';
+
+        $mail = (new IncidentCommentMail($this->incident, $actor, $this->comment))
+            ->setRecipientName($recipientName)
             ->to($notifiable->email);
+        
+        return $mail;
     }
 
-    /**
-     * Get the array representation of the notification.
-     */
     public function toArray(object $notifiable): array
     {
+        $actor = $this->getActor();
+        
         return [
             'type' => 'new_comment',
             'incident_id' => $this->incident->id,
             'incident_number' => $this->incident->incident_id,
+            'title' => $this->incident->title,
             'comment_id' => $this->comment->id,
-            'comment_by' => $this->getActor()?->name ?? 'System',
+            'comment_by' => $actor?->name ?? 'System',
+            'comment_by_id' => $actor?->id,
             'comment_preview' => \Str::limit($this->comment->content, 100),
-            'commenter_name' => $this->comment->user->name,
             'message' => "{$this->comment->user->name} commented: ".\Str::limit($this->comment->content, 100),
-            'url' => route('incidents.show', $this->incident->id),
+            'url' => route('incidents.show', $this->incident->id) . '#comment-' . $this->comment->id,
         ];
     }
 
@@ -88,7 +91,7 @@ class NewCommentNotification extends Notification implements ShouldQueue
         }
 
         if ($this->comment->user_id) {
-            return User::find($this->comment->user_id);
+            return $this->comment->user;
         }
 
         return null;

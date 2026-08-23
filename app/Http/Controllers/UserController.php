@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Airport;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -64,8 +65,9 @@ class UserController extends Controller
     {
         $departments = Department::active()->ordered()->get();
         $roles = Role::all();
+        $airports = Airport::active()->ordered()->get(); // Assuming the user has access to multiple airports
 
-        return view('admin.users.form', compact('departments', 'roles'));
+        return view('admin.users.form', compact('departments', 'roles', 'airports'));
     }
 
     /**
@@ -81,6 +83,7 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:20',
             'employee_id' => 'nullable|string|max:50|unique:users',
             'department_id' => 'required|exists:departments,id',
+            'airport_id' => 'required|exists:airports,id',
             'designation' => 'nullable|string|max:100',
             'status' => 'required|in:active,inactive,suspended',
             'roles' => 'required|array|min:1',
@@ -95,6 +98,7 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'employee_id' => $validated['employee_id'] ?? null,
             'department_id' => $validated['department_id'],
+            'airport_id' => $validated['airport_id'],
             'designation' => $validated['designation'] ?? null,
             'status' => $validated['status'],
         ]);
@@ -132,8 +136,9 @@ class UserController extends Controller
     {
         $departments = Department::active()->ordered()->get();
         $roles = Role::all();
+        $airports = Airport::active()->ordered()->get(); // Assuming the user has access to multiple airports
 
-        return view('admin.users.form', compact('user', 'departments', 'roles'));
+        return view('admin.users.form', compact('user', 'departments', 'roles', 'airports'));
     }
 
     /**
@@ -149,6 +154,7 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:20',
             'employee_id' => 'nullable|string|max:50|unique:users,employee_id,'.$user->id,
             'department_id' => 'required|exists:departments,id',
+            'airport_id' => 'required|exists:airports,id',
             'designation' => 'nullable|string|max:100',
             'status' => 'required|in:active,inactive,suspended',
             'roles' => 'required|array|min:1',
@@ -162,6 +168,7 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'employee_id' => $validated['employee_id'] ?? null,
             'department_id' => $validated['department_id'],
+            'airport_id' => $validated['airport_id'],
             'designation' => $validated['designation'] ?? null,
             'status' => $validated['status'],
         ];

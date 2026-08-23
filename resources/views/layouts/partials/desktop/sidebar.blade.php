@@ -4,20 +4,15 @@
     <!--    <i class="fas fa-shield-halved"></i>-->
     <!--    <span>IRMSystem</span>-->
     <!--</div>-->
-    
+
     {{-- Brand --}}
     <div class="sidebar-brand">
         @if(file_exists(public_path('images/master-logo.webp')))
-            <img src="{{ asset('images/master-logo.webp') }}" 
-                 alt="IRMSystem Logo" 
-                 class="p-0" 
-                 width="150" 
-                 height="50" 
-                 fetchpriority="high"
-                 style="width: 100%; height: auto; object-fit: contain;">
+        <img src="{{ asset('images/master-logo.webp') }}" alt="IRMSystem Logo" class="p-0" width="150" height="50"
+            fetchpriority="high" style="width: 100%; height: auto; object-fit: contain;">
         @else
-            <i class="fas fa-shield-halved"></i>
-            <span>IRMSystem</span>
+        <i class="fas fa-shield-halved"></i>
+        <span>IRMSystem</span>
         @endif
     </div>
 
@@ -40,9 +35,9 @@
                     class="nav-link {{ request()->routeIs('incidents.*') && !request()->routeIs('incidents.create') ? 'active' : '' }}">
                     <i class="fas fa-clipboard-list"></i>
                     <span>All Incidents</span>
-                    
+
                     @if(($globalOpenIncidentCount ?? 0) > 0)
-                        <span class="badge bg-danger ms-auto">{{ $globalOpenIncidentCount }}</span>
+                    <span class="badge bg-danger ms-auto">{{ $globalOpenIncidentCount }}</span>
                     @endif
 
                 </a>
@@ -98,6 +93,13 @@
         @role('admin|super-admin')
         <div class="nav-section">
             <div class="nav-section-title">Administration</div>
+            <div class="nav-item">
+                <a href="{{ route('admin.airports.index') }}"
+                    class="nav-link {{ request()->routeIs('admin.airports.*') ? 'active' : '' }}">
+                    <i class="fas fa-plane"></i>
+                    <span>Airports</span>
+                </a>
+            </div>
             <div class="nav-item">
                 <a href="{{ route('admin.users.index') }}"
                     class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">

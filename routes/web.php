@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AirportController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CategoryController;
@@ -221,6 +222,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('index');
         Route::put('/', [SettingsController::class, 'update'])->name('update');
+    });
+
+
+    // =====================================
+    // Airport Management Routes
+    // =======================================
+
+
+    Route::middleware('role:super-admin')->prefix('admin')->name('admin.')->group(function () {
+        // Airport Routes
+        Route::resource('airports', AirportController::class);
+
+        // Custom Airport Routes
+        Route::get('airports/{airport}/toggle-status', [AirportController::class, 'toggleStatus'])
+            ->name('airports.toggle-status');
+
+        Route::get('airports/{airport}/statistics', [AirportController::class, 'statistics'])
+            ->name('airports.statistics');
     });
 
     // ==========================================

@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\HasAirport;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Escalation extends Model
 {
-    use HasFactory;
+    use HasFactory, HasAirport;
 
     protected $fillable = [
         'incident_id',
+        'airport_id',
         'escalated_by',
         'escalated_to',
         'from_department_id',
@@ -45,7 +47,7 @@ class Escalation extends Model
         return $this->belongsTo(Incident::class);
     }
 
-   
+
     /**
      * User who initiated the escalation
      */
@@ -53,7 +55,7 @@ class Escalation extends Model
     {
         return $this->belongsTo(User::class, 'escalated_by');
     }
-    
+
      public function responder()
     {
         return $this->belongsTo(User::class, 'responded_by');

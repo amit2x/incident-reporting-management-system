@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\HasAirport;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EscalationMatrix extends Model
 {
-    use HasFactory;
+    use HasFactory , HasAirport;
 
     protected $table = 'escalation_matrices';
 
     protected $fillable = [
         'department_id',
+        'airport_id',
         'category_id',
         'level',
         'timeout_minutes',

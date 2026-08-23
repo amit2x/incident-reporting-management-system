@@ -2,19 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\HasAirport;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class IncidentCategory extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasAirport;
 
     protected $fillable = [
         'name',
+        'airport_id',
         'slug',
         'description',
         'icon',
@@ -61,7 +63,7 @@ class IncidentCategory extends Model
     // ==========================================
     // RELATIONSHIPS
     // ==========================================
-    
+
     // Relationship with department
     public function department()
     {

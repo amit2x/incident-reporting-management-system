@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Events\IncidentCreated;
 use App\Events\IncidentUpdated;
+use App\Traits\HasAirport;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,10 +17,11 @@ use Illuminate\Support\Facades\DB;
 
 class Incident extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasAirport;
 
     protected $fillable = [
         'incident_id',
+        'airport_id',
         'title',
         'description',
         'category_id',
@@ -185,7 +187,7 @@ class Incident extends Model
     // ==========================================
     // RELATIONSHIPS
     // ==========================================
-    
+
     /**
      * Get all status actions for this incident.
      */
@@ -662,8 +664,8 @@ class Incident extends Model
     //         'user_agent' => request()->userAgent(),
     //     ]);
     // }
-    
-    
+
+
     public function logActivity(string $action, ?array $oldValues, ?array $newValues): void
     {
         // 1. Existing log entry (keep this)
@@ -676,25 +678,25 @@ class Incident extends Model
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);
-    
+
         // 2. NEW: Record in incident_status_actions for status changes
         $statusActions = ['assigned', 'acknowledged', 'in_progress', 'escalated', 'resolved', 'closed', 'rejected', 'reopened'];
-        
+
         if (in_array($action, $statusActions)) {
             $this->recordStatusAction($action, $oldValues, $newValues);
         }
     }
-    
+
     /**
      * Record action in incident_status_actions table
      */
     protected function recordStatusAction(string $action, ?array $oldValues, ?array $newValues): void
     {
         $userId = auth()->id() ?? 1; // Fallback to system user
-        
+
         $previousStatus = $oldValues['status'] ?? null;
         $newStatus = $newValues['status'] ?? $this->status;
-        
+
         $reason = match ($action) {
             'assigned' => $newValues['assigned_to'] ?? 'Incident assigned',
             'acknowledged' => 'Incident acknowledged',
@@ -706,7 +708,7 @@ class Incident extends Model
             'reopened' => 'Incident reopened',
             default => $this->getActionDescription($action),
         };
-    
+
         // Use the relationship if it exists, or direct DB insert
         if (method_exists($this, 'statusActions') && $this->statusActions()->getRelated() instanceof \App\Models\IncidentStatusAction) {
             $this->statusActions()->create([
@@ -1084,12 +1086,12 @@ class Incident extends Model
             'responded_by'     // Local key on escalations table
         )->where('escalations.response_type', 'rejected');
     }
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
      // ==========================================
     // STATUS MANAGEMENT METHODS WITH REASON
     // ==========================================
@@ -1101,7 +1103,7 @@ class Incident extends Model
     {
         $actor = $actor ?? auth()->user();
         $oldStatus = $this->status;
-        
+
         $this->update([
             'status' => 'acknowledged',
             'acknowledged_at' => now(),
@@ -1133,7 +1135,7 @@ class Incident extends Model
     {
         $actor = $actor ?? auth()->user();
         $oldStatus = $this->status;
-        
+
         $this->update([
             'status' => 'resolved',
             'resolved_at' => now(),
@@ -1166,7 +1168,7 @@ class Incident extends Model
     {
         $actor = $actor ?? auth()->user();
         $oldStatus = $this->status;
-        
+
         $this->update([
             'status' => 'closed',
             'closed_at' => now(),
@@ -1198,7 +1200,7 @@ class Incident extends Model
     {
         $actor = $actor ?? auth()->user();
         $oldStatus = $this->status;
-        
+
         $this->update([
             'status' => 'rejected',
             'rejection_reason' => $reason,
@@ -1230,7 +1232,7 @@ class Incident extends Model
     {
         $actor = $actor ?? auth()->user();
         $oldStatus = $this->status;
-        
+
         $this->update([
             'status' => 'open',
             'resolved_at' => null,
@@ -1265,7 +1267,7 @@ class Incident extends Model
     {
         $actor = $actor ?? auth()->user();
         $oldStatus = $this->status;
-        
+
         $escalation = $this->escalations()->create([
             'escalated_by' => $actor?->id ?? 1,
             'escalated_to' => $toUserId,
@@ -1315,7 +1317,7 @@ class Incident extends Model
         $actor = $actor ?? auth()->user();
         $oldStatus = $this->status;
         $oldAssigneeId = $this->assigned_to;
-        
+
         // Deactivate current assignment
         $currentAssignment = $this->currentAssignment();
         if ($currentAssignment) {
@@ -1335,7 +1337,7 @@ class Incident extends Model
         ]);
 
         $newStatus = $this->status === 'open' ? 'acknowledged' : $this->status;
-        
+
         $this->update([
             'assigned_to' => $toUserId,
             'status' => $newStatus,
@@ -1358,7 +1360,7 @@ class Incident extends Model
             'acted_at' => now(),
         ]);
 
-        $this->logActivity('assigned', 
+        $this->logActivity('assigned',
             ['assigned_to' => $oldAssigneeId],
             ['assigned_to' => User::find($toUserId)?->name, 'assigned_by' => $actor?->name]
         );
@@ -1376,7 +1378,7 @@ class Incident extends Model
             ->where('action', 'resolved')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->user;
     }
 
@@ -1386,7 +1388,7 @@ class Incident extends Model
             ->where('action', 'closed')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->user;
     }
 
@@ -1396,7 +1398,7 @@ class Incident extends Model
             ->where('action', 'rejected')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->user;
     }
 
@@ -1406,7 +1408,7 @@ class Incident extends Model
             ->where('action', 'reopened')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->user;
     }
 
@@ -1416,7 +1418,7 @@ class Incident extends Model
             ->where('action', 'acknowledged')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->user;
     }
 
@@ -1426,7 +1428,7 @@ class Incident extends Model
             ->where('action', 'escalated')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->user;
     }
 
@@ -1436,7 +1438,7 @@ class Incident extends Model
             ->where('action', 'assigned')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->user;
     }
 
@@ -1450,7 +1452,7 @@ class Incident extends Model
             ->where('action', 'resolved')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->reason ?? $this->resolution_notes;
     }
 
@@ -1460,7 +1462,7 @@ class Incident extends Model
             ->where('action', 'closed')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->reason;
     }
 
@@ -1470,7 +1472,7 @@ class Incident extends Model
             ->where('action', 'rejected')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->reason ?? $this->rejection_reason;
     }
 
@@ -1480,7 +1482,7 @@ class Incident extends Model
             ->where('action', 'reopened')
             ->latest('acted_at')
             ->first();
-        
+
         return $action?->reason;
     }
 
@@ -1512,7 +1514,7 @@ class Incident extends Model
     //         })
     //         ->toArray();
     // }
-    
+
     // In app/Models/Incident.php
 
 public function getCompleteActionHistory(): array
@@ -1524,7 +1526,7 @@ public function getCompleteActionHistory(): array
         ->map(function ($action) {
             // Check if this is a rejection action
             $isRejection = in_array($action->action, ['rejected', 'rejected_escalation']);
-            
+
             return [
                 'id' => $action->id,
                 'action' => $action->action_label,

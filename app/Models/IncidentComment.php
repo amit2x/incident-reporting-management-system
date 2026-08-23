@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\HasAirport;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class IncidentComment extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasAirport;
 
     protected $fillable = [
         'incident_id',
+        'airport_id',
         'user_id',
         'parent_id',
         'content',

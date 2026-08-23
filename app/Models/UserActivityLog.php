@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\HasAirport;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserActivityLog extends Model
 {
-    use HasFactory;
+    use HasFactory, HasAirport;
 
     protected $table = 'user_activity_logs';
 
     protected $fillable = [
         'user_id',
+        'airport_id',
         'action',
         'model_type',
         'model_id',

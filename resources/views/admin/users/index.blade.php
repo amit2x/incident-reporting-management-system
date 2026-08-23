@@ -102,6 +102,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>User</th>
+                            <th>Airport</th>
                             <th>Department</th>
                             <th>Role</th>
                             <th>Status</th>
@@ -123,10 +124,21 @@
                                 </div>
                             </td>
                             <td>
+                                @if($user->airport)
+                                <span class="badge"
+                                    style="background: {{ $user->airport->color }}20; color: {{ $user->airport->color }};">
+                                    {{ $user->airport->code }}
+                                </span>
+                                @else
+                                <span class="text-muted">-</span>
+                                @endif
+                            </td>
+
+                            <td>
                                 @if($user->department)
                                 <span class="badge"
                                     style="background: {{ $user->department->color }}20; color: {{ $user->department->color }};">
-                                    {{ $user->department->name }}
+                                    {{ $user->department->code }}
                                 </span>
                                 @else
                                 <span class="text-muted">-</span>

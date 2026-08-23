@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\HasAirport;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class KpiReport extends Model
 {
-    use HasFactory;
+    use HasFactory, HasAirport;
 
     protected $table = 'kpi_reports';
 
     protected $fillable = [
         'report_type',
+        'airport_id',
         'report_date',
         'department_id',
         'total_incidents',

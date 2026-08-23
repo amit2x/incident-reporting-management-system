@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Support\Facades\Cache;
+use App\Traits\HasAirport;
 
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -21,6 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $fillable = [
         'name',
+        'airport_id',
         'username',
         'email',
         'password',
@@ -56,7 +58,32 @@ class User extends Authenticatable implements MustVerifyEmail
         'initials',
     ];
 
-    // In app/Models/User.php
+    protected static function booted()
+{
+    static::creating(function ($user) {
+
+        if (
+            auth()->check() &&
+            empty($user->airport_id)
+        ) {
+            $user->airport_id = auth()->user()->airport_id;
+        }
+
+    });
+}
+
+    public function scopeCurrentAirport($query)
+    {
+        if (!auth()->check()) {
+            return $query;
+        }
+
+        if (auth()->user()->hasRole('Super Admin')) {
+            return $query;
+        }
+
+        return $query->where('airport_id', auth()->user()->airport_id);
+    }
 
     // Cache role checks to prevent repeated queries
     // Add this to cache roles
@@ -144,6 +171,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function airport(): BelongsTo
+    {
+        return $this->belongsTo(Airport::class);
     }
 
     public function reportedIncidents(): HasMany
@@ -236,7 +268,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     //     return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=random&size=128&bold=true&color=fff';
     // }
-    
+
 //     public function getAvatarUrlAttribute(): string
 // {
 //     // Cache the avatar URL for 1 hour to avoid repeated API calls
@@ -244,12 +276,12 @@ class User extends Authenticatable implements MustVerifyEmail
 //         if ($this->avatar) {
 //             return Storage::url($this->avatar);
 //         }
-        
+
 //         // Add a timeout to prevent hanging
 //         try {
 //             $context = stream_context_create(['http' => ['timeout' => 2]]);
 //             $response = @file_get_contents(
-//                 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . 
+//                 'https://ui-avatars.com/api/?name=' . urlencode($this->name) .
 //                 '&background=random&size=128&bold=true&color=fff',
 //                 false,
 //                 $context
@@ -267,7 +299,7 @@ class User extends Authenticatable implements MustVerifyEmail
 //                 '</text></svg>'
 //             );
 //         }
-        
+
 //         return asset('images/default-avatar.png');
 //     });
 // }

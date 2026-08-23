@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasAirport;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,10 +11,11 @@ use Illuminate\Support\Facades\Storage;
 
 class IncidentMedia extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasAirport;
 
     protected $fillable = [
         'incident_id',
+        'airport_id',
         'uploaded_by',
         'media_type',
         'file_path',

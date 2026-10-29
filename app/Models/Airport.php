@@ -140,11 +140,11 @@ class Airport extends Model
     {
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'LIKE', "%{$search}%")
-              ->orWhere('code', 'LIKE', "%{$search}%")
-              ->orWhere('icao_code', 'LIKE', "%{$search}%")
-              ->orWhere('iata_code', 'LIKE', "%{$search}%")
-              ->orWhere('city', 'LIKE', "%{$search}%")
-              ->orWhere('country', 'LIKE', "%{$search}%");
+                ->orWhere('code', 'LIKE', "%{$search}%")
+                ->orWhere('icao_code', 'LIKE', "%{$search}%")
+                ->orWhere('iata_code', 'LIKE', "%{$search}%")
+                ->orWhere('city', 'LIKE', "%{$search}%")
+                ->orWhere('country', 'LIKE', "%{$search}%");
         });
     }
 
@@ -265,5 +265,21 @@ class Airport extends Model
     public function getIncidentPrefix(): string
     {
         return $this->code;
+    }
+
+    public function attendanceSettings(): array
+    {
+        $defaults = [
+            'allow_self_mark' => true,
+            'location_check_required' => true,
+            'geofence_lat' => $this->latitude ?? 22.6547,
+            'geofence_lng' => $this->longitude ?? 88.4467,
+            'geofence_radius_meters' => 100,
+            'self_mark_start_time' => '11:00',
+            'self_mark_end_time' => '18:00',
+            'timezone' => $this->timezone ?? 'Asia/Kolkata',
+        ];
+
+        return array_merge($defaults, $this->settings['attendance'] ?? []);
     }
 }

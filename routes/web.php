@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\AirportController;
+use App\Http\Controllers\Attendance\AttendanceController;
+use App\Http\Controllers\Attendance\AttendanceReportController;
+use App\Http\Controllers\Attendance\NodalAttendanceController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CategoryController;
@@ -224,11 +227,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/', [SettingsController::class, 'update'])->name('update');
     });
 
-
     // =====================================
     // Airport Management Routes
     // =======================================
-
 
     Route::middleware('role:super-admin')->prefix('admin')->name('admin.')->group(function () {
         // Airport Routes
@@ -425,6 +426,54 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     });
 
+});
+
+// Attendance Routes
+
+Route::middleware(['auth', 'role:admin|super-admin'])->group(function () {
+
+    // ── USER: Self-marking
+    Route::middleware('permission:attendance-mark-self')->group(function () {
+        Route::get('/attendance/mark', [AttendanceController::class, 'markPage'])
+            ->name('attendance.mark-page');
+        Route::post('/attendance/mark', [AttendanceController::class, 'markSelf'])
+            ->name('attendance.mark-self');
+        Route::get('/attendance/my', [AttendanceController::class, 'myAttendance'])
+            ->name('attendance.my');
+    });
+
+    // ── NODAL OFFICER
+    Route::middleware('permission:attendance-mark')
+        ->prefix('nodal')->name('nodal.')->group(function () {
+
+            Route::get('/attendance', [NodalAttendanceController::class, 'index'])
+                ->name('attendance.index');
+            Route::post('/attendance/bulk', [NodalAttendanceController::class, 'bulkMark'])
+                ->name('attendance.bulk');
+            Route::post('/attendance/single', [NodalAttendanceController::class, 'singleMark'])
+                ->name('attendance.single');
+            Route::post('/attendance/{attendance}/override', [NodalAttendanceController::class, 'override'])
+                ->name('attendance.override')
+                ->middleware('permission:attendance-override');
+            Route::get('/attendance/review', [NodalAttendanceController::class, 'review'])
+                ->name('attendance.review');
+            Route::get('/api/departments/{department}/employees', [NodalAttendanceController::class, 'employeesByDepartment'])
+                ->name('api.employees');
+
+            Route::get('/broadcast/create', [NotificationController::class, 'createBroadcast'])
+                ->name('broadcast.create')
+                ->middleware('permission:notifications-broadcast');
+            Route::post('/broadcast', [NotificationController::class, 'sendBroadcast'])
+                ->name('broadcast.send')
+                ->middleware('permission:notifications-broadcast');
+        });
+
+    // ── REPORTS
+    Route::middleware('permission:attendance-view-all')
+        ->prefix('reports/attendance')->name('reports.attendance.')->group(function () {
+            Route::get('/', [AttendanceReportController::class, 'index'])->name('index');
+            Route::get('/export/{format}', [AttendanceReportController::class, 'export'])->name('export');
+        });
 });
 
 // for FCM token service

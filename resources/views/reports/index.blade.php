@@ -231,56 +231,123 @@
 
     {{-- Quick Export Section --}}
     <h5 class="fw-bold mb-3">📥 Quick Export</h5>
-    <div class="row g-3">
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-body p-3 d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-success bg-opacity-10 p-2">
-                        <i class="fas fa-file-excel text-success fa-lg"></i>
-                    </div>
-                    <div>
-                        <h6 class="mb-1">Export All Data</h6>
-                        <p class="text-muted small mb-2">Complete incident data export</p>
-                        <a href="{{ route('reports.export', 'excel') }}" class="btn btn-outline-success btn-sm">
-                            <i class="fas fa-download me-1"></i> Download Excel
-                        </a>
+    <!--<div class="row g-3">-->
+    <!--    <div class="col-md-4">-->
+    <!--        <div class="card shadow-sm">-->
+    <!--            <div class="card-body p-3 d-flex align-items-center gap-3">-->
+    <!--                <div class="rounded-circle bg-success bg-opacity-10 p-2">-->
+    <!--                    <i class="fas fa-file-excel text-success fa-lg"></i>-->
+    <!--                </div>-->
+    <!--                <div>-->
+    <!--                    <h6 class="mb-1">Export All Data</h6>-->
+    <!--                    <p class="text-muted small mb-2">Complete incident data export</p>-->
+    <!--                    <a href="{{ route('reports.export', 'excel') }}" class="btn btn-outline-success btn-sm">-->
+    <!--                        <i class="fas fa-download me-1"></i> Download Excel-->
+    <!--                    </a>-->
+    <!--                </div>-->
+    <!--            </div>-->
+    <!--        </div>-->
+    <!--    </div>-->
+    <!--    <div class="col-md-4">-->
+    <!--        <div class="card shadow-sm">-->
+    <!--            <div class="card-body p-3 d-flex align-items-center gap-3">-->
+    <!--                <div class="rounded-circle bg-danger bg-opacity-10 p-2">-->
+    <!--                    <i class="fas fa-file-pdf text-danger fa-lg"></i>-->
+    <!--                </div>-->
+    <!--                <div>-->
+    <!--                    <h6 class="mb-1">KPI Summary PDF</h6>-->
+    <!--                    <p class="text-muted small mb-2">One-page KPI summary</p>-->
+    <!--                    <a href="{{ route('reports.kpi.export', 'pdf') }}" class="btn btn-outline-danger btn-sm">-->
+    <!--                        <i class="fas fa-download me-1"></i> Download PDF-->
+    <!--                    </a>-->
+    <!--                </div>-->
+    <!--            </div>-->
+    <!--        </div>-->
+    <!--    </div>-->
+    <!--    <div class="col-md-4">-->
+    <!--        <div class="card shadow-sm">-->
+    <!--            <div class="card-body p-3 d-flex align-items-center gap-3">-->
+    <!--                <div class="rounded-circle bg-warning bg-opacity-10 p-2">-->
+    <!--                    <i class="fas fa-file-csv text-warning fa-lg"></i>-->
+    <!--                </div>-->
+    <!--                <div>-->
+    <!--                    <h6 class="mb-1">SLA Report CSV</h6>-->
+    <!--                    <p class="text-muted small mb-2">SLA compliance data export</p>-->
+    <!--                    <a href="{{ route('reports.sla.export', 'excel') }}" class="btn btn-outline-warning btn-sm">-->
+    <!--                        <i class="fas fa-download me-1"></i> Download CSV-->
+    <!--                    </a>-->
+    <!--                </div>-->
+    <!--            </div>-->
+    <!--        </div>-->
+    <!--    </div>-->
+    <!--</div>-->
+    
+
+<div class="row g-3">
+
+    <!-- Export All Data -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="me-3">
+                    <div class="icon-circle bg-success-subtle">
+                        <i class="fas fa-file-excel text-success fa-2x"></i>
                     </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-body p-3 d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-danger bg-opacity-10 p-2">
-                        <i class="fas fa-file-pdf text-danger fa-lg"></i>
-                    </div>
-                    <div>
-                        <h6 class="mb-1">KPI Summary PDF</h6>
-                        <p class="text-muted small mb-2">One-page KPI summary</p>
-                        <a href="{{ route('reports.kpi.export', 'pdf') }}" class="btn btn-outline-danger btn-sm">
-                            <i class="fas fa-download me-1"></i> Download PDF
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-body p-3 d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-warning bg-opacity-10 p-2">
-                        <i class="fas fa-file-csv text-warning fa-lg"></i>
-                    </div>
-                    <div>
-                        <h6 class="mb-1">SLA Report CSV</h6>
-                        <p class="text-muted small mb-2">SLA compliance data export</p>
-                        <a href="{{ route('reports.sla.export', 'excel') }}" class="btn btn-outline-warning btn-sm">
-                            <i class="fas fa-download me-1"></i> Download CSV
-                        </a>
-                    </div>
+                <div>
+                    <h6 class="mb-1">Export All Data</h6>
+                    <p class="text-muted small mb-2">Complete incident data export</p>
+                    <a href="{{ route('reports.export', ['type' => 'all', 'format' => 'excel']) }}"
+                       class="btn btn-sm btn-link text-success p-0">
+                        <i class="fas fa-download me-1"></i> Download Excel
+                    </a>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- KPI Summary PDF -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="me-3">
+                    <div class="icon-circle bg-danger-subtle">
+                        <i class="fas fa-file-pdf text-danger fa-2x"></i>
+                    </div>
+                </div>
+                <div>
+                    <h6 class="mb-1">KPI Summary PDF</h6>
+                    <p class="text-muted small mb-2">One-page KPI summary</p>
+                    <a href="{{ route('reports.kpi.export', ['format' => 'pdf']) }}"
+                       class="btn btn-sm btn-link text-danger p-0">
+                        <i class="fas fa-download me-1"></i> Download PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLA Report CSV -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="me-3">
+                    <div class="icon-circle bg-warning-subtle">
+                        <i class="fas fa-file-csv text-warning fa-2x"></i>
+                    </div>
+                </div>
+                <div>
+                    <h6 class="mb-1">SLA Report CSV</h6>
+                    <p class="text-muted small mb-2">SLA compliance data export</p>
+                    <a href="{{ route('reports.sla.export', ['format' => 'csv']) }}"
+                       class="btn btn-sm btn-link text-warning p-0">
+                        <i class="fas fa-download me-1"></i> Download CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 </div>
 @endsection

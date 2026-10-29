@@ -616,7 +616,8 @@ class ReportController extends Controller
         }
 
         // Get date range
-        $period = $request->get('period', 'last30days');
+        // $period = $request->get('period', 'last30days');
+        $period = $request->get('period', 'thisYear');
         $dateRange = $this->getDateRange($period, $request);
 
         // Get all departments with stats
@@ -1581,4 +1582,319 @@ class ReportController extends Controller
             default => abort(400),
         };
     }
+    
+    
+    
+   
+/**
+ * Export All Data - Comprehensive Excel Export
+ * 
+ * This handles the "Export All Data" quick export button.
+ * Generates a multi-sheet Excel file with:
+ *   - Summary (KPI metrics)
+ *   - All Incidents
+ *   - Department breakdown
+ *   - Category breakdown
+ *   - SLA compliance
+ *   - User performance
+ * 
+ * Route: /reports/export/{type}
+ * Example: /reports/export/all
+ *          /reports/export/all?format=excel
+ *          /reports/export/incidents?format=excel
+ */
+public function export(Request $request, string $type = 'all')
+{
+    $this->authorize('export-reports');
+
+    // Get format from query string, default to excel
+    $format = $request->get('format', 'excel');
+
+    // Validate format
+    if (!in_array($format, ['excel', 'pdf', 'csv'])) {
+        abort(400, 'Unsupported export format. Allowed: excel, pdf, csv');
+    }
+
+    // Get date range (default: last 30 days for "export all", or custom)
+    $period = $request->get('period', 'last30days');
+    $dateRange = $this->getDateRange($period, $request);
+
+    // AUTO FILTER: Apply department restriction for non-admin users
+    $departmentId = $request->get('department_id');
+    $autoDepartmentId = $this->getDepartmentFilter();
+    if ($autoDepartmentId && !$this->hasFullAccess()) {
+        $departmentId = $autoDepartmentId;
+    }
+
+    // Route to appropriate export method
+    return match ($type) {
+        'all'         => $this->exportAll($request, $format, $dateRange, $departmentId),
+        'incidents'   => $this->exportAllIncidents($request, $format, $dateRange, $departmentId),
+        'kpi'         => $this->exportKpi($request, $format),
+        'department'  => $this->exportDepartment($request, $format),
+        'sla'         => $this->exportSla($request, $format),
+        'category'    => $this->exportCategory($request, $format),
+        'custom'      => $this->exportCustom($request, $format),
+        default       => abort(404, "Unknown export type: {$type}"),
+    };
+}
+
+/**
+ * Export ALL data - comprehensive multi-sheet export
+ */
+protected function exportAll(Request $request, string $format, array $dateRange, ?int $departmentId = null)
+{
+    $categoryId = $request->get('category_id');
+
+    // Build all datasets
+    $data = [
+        'kpi'                    => $this->getKpiMetrics($dateRange, $departmentId, $categoryId),
+        'department_performance' => $this->getDepartmentPerformance($dateRange, $departmentId),
+        'category_breakdown'     => $this->getCategoryBreakdown($dateRange, $departmentId),
+        'sla_compliance'         => $this->getSlaComplianceByDepartment($dateRange, $departmentId),
+        'severity_distribution'  => $this->getSeverityDistribution($dateRange, $departmentId, $categoryId),
+        'status_distribution'    => $this->getStatusDistribution($dateRange, $departmentId, $categoryId),
+        'incidents'              => $this->getAllIncidentsForExport($dateRange, $departmentId, $categoryId),
+        'period'                 => $dateRange['start']->format('d M Y') . ' to ' . $dateRange['end']->format('d M Y'),
+        'date_from'              => $dateRange['start']->format('d M Y'),
+        'date_to'                => $dateRange['end']->format('d M Y'),
+        'generated_at'           => now()->format('d M Y, H:i'),
+        'generated_by'           => Auth::user()->name,
+        'department_name'        => $departmentId ? Department::find($departmentId)?->name : 'All Departments',
+        'is_restricted'          => !$this->hasFullAccess(),
+    ];
+
+    $filename = 'Complete_Report_' . now()->format('Y-m-d_His');
+
+    return match ($format) {
+        'excel' => Excel::download(new \App\Exports\CompleteReportExport($data), $filename . '.xlsx'),
+        'pdf'   => $this->exportAllPdf($data, $filename),
+        'csv'   => $this->exportAllCsv($data, $filename),
+    };
+}
+
+/**
+ * Export only incidents list
+ */
+protected function exportAllIncidents(Request $request, string $format, array $dateRange, ?int $departmentId = null)
+{
+    $categoryId = $request->get('category_id');
+    $statusFilter = $request->get('status');
+    $severityFilter = $request->get('severity');
+
+    $incidents = $this->getAllIncidentsForExport(
+        $dateRange,
+        $departmentId,
+        $categoryId,
+        $statusFilter,
+        $severityFilter
+    );
+
+    $data = [
+        'incidents'       => $incidents,
+        'date_from'       => $dateRange['start']->format('d M Y'),
+        'date_to'         => $dateRange['end']->format('d M Y'),
+        'total'           => $incidents->count(),
+        'generated_at'    => now()->format('d M Y, H:i'),
+        'generated_by'    => Auth::user()->name,
+        'is_restricted'   => !$this->hasFullAccess(),
+        'department_name' => $departmentId ? Department::find($departmentId)?->name : 'All Departments',
+    ];
+
+    $filename = 'All_Incidents_' . now()->format('Y-m-d_His');
+
+    return match ($format) {
+        'excel' => Excel::download(new \App\Exports\CustomReportExport($data), $filename . '.xlsx'),
+        'pdf'   => Pdf::loadView('reports.exports.custom-pdf', $data)
+                        ->setPaper('a4', 'landscape')
+                        ->download($filename . '.pdf'),
+        'csv'   => $this->exportIncidentsCsv($data, $filename),
+    };
+}
+
+/**
+ * Get all incidents for export with relationships loaded
+ */
+protected function getAllIncidentsForExport(
+    array $dateRange,
+    ?int $departmentId = null,
+    ?int $categoryId = null,
+    ?string $status = null,
+    ?string $severity = null
+) {
+    $query = Incident::with([
+        // 'airport',
+        'department',
+        'category',
+        'assignedTo',
+        'reporter',
+    ])
+        ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+
+    if ($departmentId) {
+        $query->where('department_id', $departmentId);
+    }
+    if ($categoryId) {
+        $query->where('category_id', $categoryId);
+    }
+    if ($status) {
+        $query->where('status', $status);
+    }
+    if ($severity) {
+        $query->where('severity', $severity);
+    }
+
+    return $query->orderBy('created_at', 'desc')->get();
+}
+
+/**
+ * Export All data as CSV (flat structure)
+ */
+protected function exportAllCsv(array $data, string $filename)
+{
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+    ];
+
+    $callback = function () use ($data) {
+        $file = fopen('php://output', 'w');
+
+        // Header Info
+        fputcsv($file, ['IRMSystem - Complete Report']);
+        fputcsv($file, ['Period', $data['date_from'] . ' to ' . $data['date_to']]);
+        fputcsv($file, ['Department', $data['department_name']]);
+        fputcsv($file, ['Generated', $data['generated_at']]);
+        fputcsv($file, ['Generated By', $data['generated_by']]);
+        if ($data['is_restricted']) {
+            fputcsv($file, ['Note', 'This report is restricted to your department only']);
+        }
+        fputcsv($file, ['']);
+
+        // KPI Summary
+        fputcsv($file, ['=== KPI SUMMARY ===']);
+        fputcsv($file, ['Metric', 'Value']);
+        foreach ($data['kpi'] as $key => $value) {
+            fputcsv($file, [ucwords(str_replace('_', ' ', $key)), $value]);
+        }
+        fputcsv($file, ['']);
+
+        // Department Performance
+        fputcsv($file, ['=== DEPARTMENT PERFORMANCE ===']);
+        fputcsv($file, ['Department', 'Total', 'Active', 'Resolved', 'Escalated', 'SLA %', 'Avg Response (min)', 'Performance %']);
+        foreach ($data['department_performance'] as $dept) {
+            fputcsv($file, [
+                $dept['name'] ?? '',
+                $dept['total'] ?? 0,
+                $dept['active'] ?? 0,
+                $dept['resolved'] ?? 0,
+                $dept['escalated'] ?? 0,
+                $dept['sla_compliance'] ?? 0,
+                $dept['avg_response_time'] ?? 0,
+                $dept['performance'] ?? 0,
+            ]);
+        }
+        fputcsv($file, ['']);
+
+        // Category Breakdown
+        fputcsv($file, ['=== CATEGORY BREAKDOWN ===']);
+        fputcsv($file, ['Category', 'Total', 'Open', 'Resolved', 'SLA %']);
+        foreach ($data['category_breakdown'] as $cat) {
+            fputcsv($file, [
+                $cat['name'] ?? '',
+                $cat['total'] ?? 0,
+                $cat['open'] ?? 0,
+                $cat['resolved'] ?? 0,
+                $cat['sla_compliance'] ?? 0,
+            ]);
+        }
+        fputcsv($file, ['']);
+
+        // Incidents
+        fputcsv($file, ['=== ALL INCIDENTS ===']);
+        fputcsv($file, [
+            'Incident ID', 'Title', 'Airport', 'Department', 'Category',
+            'Severity', 'Priority', 'Status', 'Reported By', 'Assigned To',
+            'Created At', 'Acknowledged At', 'Resolved At', 'Closed At',
+            'SLA Due At', 'SLA Breaches', 'Location',
+        ]);
+        foreach ($data['incidents'] as $incident) {
+            fputcsv($file, [
+                $incident->incident_id,
+                $incident->title,
+                $incident->airport?->code ?? 'N/A',
+                $incident->department?->name ?? 'N/A',
+                $incident->category?->name ?? 'N/A',
+                $incident->severity,
+                $incident->priority,
+                $incident->status,
+                $incident->reportedBy?->name ?? 'N/A',
+                $incident->assignedTo?->name ?? 'Unassigned',
+                optional($incident->created_at)->format('Y-m-d H:i'),
+                optional($incident->acknowledged_at)->format('Y-m-d H:i'),
+                optional($incident->resolved_at)->format('Y-m-d H:i'),
+                optional($incident->closed_at)->format('Y-m-d H:i'),
+                optional($incident->sla_due_at)->format('Y-m-d H:i'),
+                $incident->sla_breach_count,
+                $incident->location ?? 'N/A',
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
+
+/**
+ * Export incidents as CSV
+ */
+protected function exportIncidentsCsv(array $data, string $filename)
+{
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+    ];
+
+    $callback = function () use ($data) {
+        $file = fopen('php://output', 'w');
+
+        fputcsv($file, ['Incident ID', 'Title', 'Airport', 'Department', 'Category',
+            'Severity', 'Priority', 'Status', 'Reported By', 'Assigned To',
+            'Created At', 'Resolved At', 'SLA Breaches']);
+
+        foreach ($data['incidents'] as $incident) {
+            fputcsv($file, [
+                $incident->incident_id,
+                $incident->title,
+                $incident->airport?->code ?? 'N/A',
+                $incident->department?->name ?? 'N/A',
+                $incident->category?->name ?? 'N/A',
+                $incident->severity,
+                $incident->priority,
+                $incident->status,
+                $incident->reportedBy?->name ?? 'N/A',
+                $incident->assignedTo?->name ?? 'Unassigned',
+                optional($incident->created_at)->format('Y-m-d H:i'),
+                optional($incident->resolved_at)->format('Y-m-d H:i'),
+                $incident->sla_breach_count,
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
+
+/**
+ * Export All data as PDF
+ */
+protected function exportAllPdf(array $data, string $filename)
+{
+    $pdf = Pdf::loadView('reports.exports.complete-pdf', $data);
+    $pdf->setPaper('a4', 'landscape');
+
+    return $pdf->download($filename . '.pdf');
+}
 }

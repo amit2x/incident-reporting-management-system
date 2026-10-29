@@ -9,16 +9,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
+use Rappasoft\LaravelAuthenticationLog\Traits\AuthenticationLoggable;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Support\Facades\Cache;
-use App\Traits\HasAirport;
-
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
+    use AuthenticationLoggable, HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -59,22 +58,22 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     protected static function booted()
-{
-    static::creating(function ($user) {
+    {
+        static::creating(function ($user) {
 
-        if (
-            auth()->check() &&
-            empty($user->airport_id)
-        ) {
-            $user->airport_id = auth()->user()->airport_id;
-        }
+            if (
+                auth()->check() &&
+                empty($user->airport_id)
+            ) {
+                $user->airport_id = auth()->user()->airport_id;
+            }
 
-    });
-}
+        });
+    }
 
     public function scopeCurrentAirport($query)
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return $query;
         }
 
@@ -269,53 +268,52 @@ class User extends Authenticatable implements MustVerifyEmail
     //     return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=random&size=128&bold=true&color=fff';
     // }
 
-//     public function getAvatarUrlAttribute(): string
-// {
-//     // Cache the avatar URL for 1 hour to avoid repeated API calls
-//     return Cache::remember('user_avatar_' . $this->id, 3600, function () {
-//         if ($this->avatar) {
-//             return Storage::url($this->avatar);
-//         }
+    //     public function getAvatarUrlAttribute(): string
+    // {
+    //     // Cache the avatar URL for 1 hour to avoid repeated API calls
+    //     return Cache::remember('user_avatar_' . $this->id, 3600, function () {
+    //         if ($this->avatar) {
+    //             return Storage::url($this->avatar);
+    //         }
 
-//         // Add a timeout to prevent hanging
-//         try {
-//             $context = stream_context_create(['http' => ['timeout' => 2]]);
-//             $response = @file_get_contents(
-//                 'https://ui-avatars.com/api/?name=' . urlencode($this->name) .
-//                 '&background=random&size=128&bold=true&color=fff',
-//                 false,
-//                 $context
-//             );
-//             if ($response !== false) {
-//                 return 'data:image/svg+xml;base64,' . base64_encode($response);
-//             }
-//         } catch (\Exception $e) {
-//             // Fallback to initials
-//             return 'data:image/svg+xml;base64,' . base64_encode(
-//                 '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128">' .
-//                 '<rect width="128" height="128" fill="#4361ee"/>' .
-//                 '<text x="64" y="80" font-size="48" text-anchor="middle" fill="white" font-family="Arial">' .
-//                 substr($this->name, 0, 2) .
-//                 '</text></svg>'
-//             );
-//         }
+    //         // Add a timeout to prevent hanging
+    //         try {
+    //             $context = stream_context_create(['http' => ['timeout' => 2]]);
+    //             $response = @file_get_contents(
+    //                 'https://ui-avatars.com/api/?name=' . urlencode($this->name) .
+    //                 '&background=random&size=128&bold=true&color=fff',
+    //                 false,
+    //                 $context
+    //             );
+    //             if ($response !== false) {
+    //                 return 'data:image/svg+xml;base64,' . base64_encode($response);
+    //             }
+    //         } catch (\Exception $e) {
+    //             // Fallback to initials
+    //             return 'data:image/svg+xml;base64,' . base64_encode(
+    //                 '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128">' .
+    //                 '<rect width="128" height="128" fill="#4361ee"/>' .
+    //                 '<text x="64" y="80" font-size="48" text-anchor="middle" fill="white" font-family="Arial">' .
+    //                 substr($this->name, 0, 2) .
+    //                 '</text></svg>'
+    //             );
+    //         }
 
-//         return asset('images/default-avatar.png');
-//     });
-// }
+    //         return asset('images/default-avatar.png');
+    //     });
+    // }
 
-public function getAvatarUrlAttribute(): string
-{
-    return Cache::remember('user_avatar_' . $this->id, 3600, function () {
-        if ($this->avatar) {
-            return Storage::url($this->avatar);
-        }
+    public function getAvatarUrlAttribute(): string
+    {
+        return Cache::remember('user_avatar_'.$this->id, 3600, function () {
+            if ($this->avatar) {
+                return Storage::url($this->avatar);
+            }
 
-        // 🚀 Super fast: No network hang, no base64 overhead!
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&background=random&size=128&bold=true&color=fff';
-    });
-}
-
+            // 🚀 Super fast: No network hang, no base64 overhead!
+            return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=random&size=128&bold=true&color=fff';
+        });
+    }
 
     /**
      * Get full name

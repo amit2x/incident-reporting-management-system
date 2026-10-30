@@ -77,7 +77,7 @@ class AirportController extends Controller
 
         // Get recent incidents for this airport
         $recentIncidents = $airport->incidents()
-            ->with(['category', 'reportedBy'])
+            ->with(['category', 'reporter'])
             ->latest()
             ->limit(5)
             ->get();
@@ -190,28 +190,19 @@ class AirportController extends Controller
     /**
      * Validate airport data.
      */
-    protected function validateAirport(Request $request, ?Airport $airport = null)
+       protected function validateAirport(Request $request, ?Airport $airport = null)
     {
         $rules = [
             'code' => [
-                'required',
-                'string',
-                'max:10',
-                'regex:/^[A-Za-z0-9]+$/',
+                'required', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/',
                 Rule::unique('airports', 'code')->ignore($airport),
             ],
             'icao_code' => [
-                'nullable',
-                'string',
-                'max:4',
-                'regex:/^[A-Za-z]+$/',
+                'nullable', 'string', 'max:4', 'regex:/^[A-Za-z]+$/',
                 Rule::unique('airports', 'icao_code')->ignore($airport),
             ],
             'iata_code' => [
-                'nullable',
-                'string',
-                'max:3',
-                'regex:/^[A-Za-z]+$/',
+                'nullable', 'string', 'max:3', 'regex:/^[A-Za-z]+$/',
                 Rule::unique('airports', 'iata_code')->ignore($airport),
             ],
             'name' => 'required|string|max:191',
@@ -229,24 +220,52 @@ class AirportController extends Controller
             'primary_color' => 'nullable|string|max:7|regex:/^#[a-fA-F0-9]{6}$/',
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
+
+            // Attendance Settings Validation
+            'settings.attendance.allow_self_mark' => 'nullable|boolean',
+            'settings.attendance.location_check_required' => 'nullable|boolean',
+            'settings.attendance.geofence_lat' => 'nullable|numeric|between:-90,90',
+            'settings.attendance.geofence_lng' => 'nullable|numeric|between:-180,180',
+            'settings.attendance.geofence_radius_meters' => 'nullable|integer|min:10|max:5000',
+            'settings.attendance.self_mark_start_time' => 'nullable|date_format:H:i',
+            'settings.attendance.self_mark_end_time' => 'nullable|date_format:H:i',
         ];
 
         $validator = Validator::make($request->all(), $rules);
 
-        // Additional validation for at least one code
         $validator->after(function ($validator) use ($request) {
             if (empty($request->icao_code) && empty($request->iata_code)) {
-                $validator->errors()->add(
-                    'icao_code',
-                    'At least one of ICAO code or IATA code is required.'
-                );
-                $validator->errors()->add(
-                    'iata_code',
-                    'At least one of ICAO code or IATA code is required.'
-                );
+                $validator->errors()->add('icao_code', 'At least one of ICAO code or IATA code is required.');
+                $validator->errors()->add('iata_code', 'At least one of ICAO code or IATA code is required.');
+            }
+            
+            // Ensure end time is after start time
+            if ($request->filled('settings.attendance.self_mark_start_time') && 
+                $request->filled('settings.attendance.self_mark_end_time')) {
+                $start = strtotime($request->input('settings.attendance.self_mark_start_time'));
+                $end = strtotime($request->input('settings.attendance.self_mark_end_time'));
+                if ($end <= $start) {
+                    $validator->errors()->add('settings.attendance.self_mark_end_time', 'End time must be after start time.');
+                }
             }
         });
 
-        return $validator->validate();
+        $validated = $validator->validate();
+
+        // Ensure settings array is formatted correctly for JSON storage
+        if (isset($validated['settings'])) {
+            $currentSettings = $airport->settings ?? [];
+            
+            // Merge deeply to avoid overwriting other settings like 'incident_id_prefix'
+            $validated['settings'] = array_merge($currentSettings, $validated['settings']);
+            
+            // Cast booleans explicitly
+            if (isset($validated['settings']['attendance'])) {
+                $validated['settings']['attendance']['allow_self_mark'] = (bool) $request->input('settings.attendance.allow_self_mark', false);
+                $validated['settings']['attendance']['location_check_required'] = (bool) $request->input('settings.attendance.location_check_required', false);
+            }
+        }
+
+        return $validated;
     }
 }

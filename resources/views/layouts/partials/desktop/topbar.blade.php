@@ -106,11 +106,34 @@
                 </div>
                 @endauth
 
-                {{-- Theme Toggle --}}
-                <button class="btn btn-light d-flex align-items-center justify-content-center" onclick="toggleTheme()"
-                    style="width: 40px; height: 40px; border-radius: var(--radius-md);">
-                    <i class="fas fa-moon" id="themeIcon"></i>
-                </button>
+                <!--{{-- Theme Toggle --}}-->
+                <!--<button class="btn btn-light d-flex align-items-center justify-content-center" onclick="toggleTheme()"-->
+                <!--    style="width: 40px; height: 40px; border-radius: var(--radius-md);">-->
+                <!--    <i class="fas fa-moon" id="themeIcon"></i>-->
+                <!--</button>-->
+                
+                  @can('manage-attendance')
+                    {{-- Priority 1: Show Manage Attendance if they have 'manage-attendance' or BOTH permissions --}}
+                    <a href="{{ route('nodal.attendance.index') }}" 
+                       class="btn btn-light d-inline-flex align-items-center justify-content-center p-0 {{ request()->routeIs('nodal.attendance.index') ? 'active bg-primary-subtle text-primary border-primary' : '' }}"
+                       style="width: 40px; height: 40px; border-radius: var(--radius-md);"
+                       title="Manage Attendance"
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="bottom">
+                        <i class="fas fa-user-clock {{ request()->routeIs('nodal.attendance.index') ? '' : 'text-muted' }} fs-5"></i>
+                    </a>
+                @elsecan('attendance-mark-self')
+                    {{-- Priority 2: Fallback to Mark Self if they ONLY have 'attendance-mark-self' --}}
+                    <a href="{{ route('attendance.mark-self') }}" 
+                       class="btn btn-light d-inline-flex align-items-center justify-content-center p-0 {{ request()->routeIs('attendance.mark-self') ? 'active bg-primary-subtle text-primary border-primary' : '' }}"
+                       style="width: 40px; height: 40px; border-radius: var(--radius-md);"
+                       title="Mark Attendance"
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="bottom">
+                        <i class="fas fa-user-check {{ request()->routeIs('attendance.mark-self') ? '' : 'text-muted' }} fs-5"></i>
+                    </a>
+                @endcan
+
 
                 {{-- User Menu --}}
                 <div class="dropdown">

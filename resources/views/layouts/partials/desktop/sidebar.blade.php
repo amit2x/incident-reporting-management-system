@@ -42,21 +42,21 @@
 
                 </a>
             </div>
-            @can('attendance-mark')
+            @can('attendance-mark-self')
                 <div class="nav-item">
-                    <a href="{{ route('attendance.mark-self') }}"
-                        class="nav-link {{ request()->routeIs('attendance.mark-self') ? 'active' : '' }}">
-                        <i class="fas fa-gauge-high"></i>
+                    <a href="{{ route('attendance.mark-self') }}" class="nav-link {{ request()->is('attendance/mark', 'attendance/my') ? 'active' : '' }}">
+                        <i class="fas fa-user-check"></i>
                         <span>Mark Attendance</span>
                     </a>
                 </div>
             @endcan
 
+
             @can('manage-attendance')
                 <div class="nav-item">
                     <a href="{{ route('nodal.attendance.index') }}"
-                        class="nav-link {{ request()->routeIs('attendance.mark-self') ? 'active' : '' }}">
-                        <i class="fas fa-gauge-high"></i>
+                        class="nav-link {{ request()->routeIs('nodal.attendance.index') ? 'active' : '' }}">
+                        <i class="fas fa-clipboard-user"></i>
                         <span>Manage Attendance</span>
                     </a>
                 </div>
@@ -104,6 +104,13 @@
                         class="nav-link {{ request()->routeIs('reports.sla') ? 'active' : '' }}">
                         <i class="fas fa-stopwatch"></i>
                         <span>SLA Report</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{{ route('reports.attendance.index') }}"
+                        class="nav-link {{ request()->routeIs('reports.attendance.index') ? 'active' : '' }}">
+                        <i class="fas fa-clipboard-user"></i>
+                        <span>Attendance Report</span>
                     </a>
                 </div>
             </div>

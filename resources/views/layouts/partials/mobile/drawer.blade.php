@@ -47,8 +47,20 @@
         </a>
         @can('create-incident')
         <a href="{{ route('incidents.create') }}" class="drawer-link">
-            <i class="fas fa-plus-circle"></i> Report Incident
+            <i class="fas fa-plus-circle text-warning"></i> Report Incident
         </a>
+        @endcan
+        
+         @can('manage-attendance')
+          <a href="{{ route('nodal.attendance.index') }}" class="drawer-link">
+            <i class="fas fa-clipboard-user text-success"></i> Manage Attendance
+            </a>
+         @endcan
+         
+        @can('attendance-mark-self')
+            <a href="{{ route('attendance.mark-self') }}" class="drawer-link">
+                <i class="fas fa-calendar-check text-warning"></i> Mark Attendance
+            </a>
         @endcan
         @can('view-reports')
 

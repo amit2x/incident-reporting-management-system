@@ -272,9 +272,9 @@ class Airport extends Model
         $defaults = [
             'allow_self_mark' => true,
             'location_check_required' => true,
-            'geofence_lat' => $this->latitude ?? 22.6547,
-            'geofence_lng' => $this->longitude ?? 88.4467,
-            'geofence_radius_meters' => 100,
+            'geofence_lat' => $this->latitude ?? 22.64076300,
+            'geofence_lng' => $this->longitude ?? 88.43851300,
+            'geofence_radius_meters' => 300,
             'self_mark_start_time' => '11:00',
             'self_mark_end_time' => '18:00',
             'timezone' => $this->timezone ?? 'Asia/Kolkata',
@@ -282,4 +282,6 @@ class Airport extends Model
 
         return array_merge($defaults, $this->settings['attendance'] ?? []);
     }
+    
+    
 }

@@ -223,6 +223,8 @@
                     </div>
                 </div>
             </div>
+            
+            @include('admin.airports.partials.attendance-settings', ['airport' => new \App\Models\Airport()])
 
             <div class="mt-4">
                 <button type="submit" class="btn btn-primary">

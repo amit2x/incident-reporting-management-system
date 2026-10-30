@@ -430,7 +430,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // Attendance Routes
 
-Route::middleware(['auth', 'role:admin|super-admin'])->group(function () {
+Route::middleware(['auth', 'role:admin|super-admin|staff|supervisor|hod|nodal-officer'])->group(function () {
 
     // ── USER: Self-marking
     Route::middleware('permission:attendance-mark-self')->group(function () {
@@ -473,6 +473,7 @@ Route::middleware(['auth', 'role:admin|super-admin'])->group(function () {
         ->prefix('reports/attendance')->name('reports.attendance.')->group(function () {
             Route::get('/', [AttendanceReportController::class, 'index'])->name('index');
             Route::get('/export/{format}', [AttendanceReportController::class, 'export'])->name('export');
+            Route::get('/details', [AttendanceReportController::class, 'getDetails'])->name('details');
         });
 });
 
